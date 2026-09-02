@@ -59,7 +59,7 @@ remark      VARCHAR(500)
 ## 4. PostgreSQL类型建议
 
 - 问卷设置、题型特有配置和异构答案可使用 `JSONB`，但核心关联、状态、顺序和正式分数必须使用独立字段。
-- 文本说明使用 `TEXT`。
+- 普通文本说明使用`TEXT`；P4已对问卷富文本说明增加受限结构化`JSONB`，并继续保留后端提取的`TEXT`摘要。
 - 简短状态和题型使用 `VARCHAR`，不使用数据库原生ENUM，便于迁移和兼容。
 - 分数和权重使用 `NUMERIC`，禁止`REAL`和`DOUBLE PRECISION`作为正式结果字段。
 
@@ -157,3 +157,15 @@ python scripts\feedback_p0_database_precheck.py --env=dev
 - 2026-09-02已在独立的`ruoyi_feedback_dev`和`ruoyi_feedback_test`执行完整基线初始化、`upgrade head`、`current`和`history`，两个库均处于唯一head。
 - 后续首个`fb_`迁移必须以该revision作为`down_revision`。
 - 不得只对已有数据库执行`stamp`后就宣称迁移链路可用；新环境仍必须先执行完整RuoYi PostgreSQL基线，再执行`alembic upgrade head`。
+
+### 8.3 P4已实施迁移
+
+P4新增revision `20260902_03_feedback_designer`，其`down_revision`为已验证的`20260902_02_feedback_domain`：
+
+- `fb_questionnaire_version`新增可空`description_doc JSONB`，保存经过后端白名单校验的问卷说明文档；既有`description TEXT`保存后端提取的纯文本摘要。
+- `fb_questionnaire_page`新增非空`page_code VARCHAR(64)`和`(version_id, page_code)`唯一约束；既有页面先确定性回填再收紧非空约束。
+- 不新增问卷、页面、题目、选项、指标或答案平行表；继续复用P2实体和正式数值字段。
+- 迁移已在独立开发库和测试库升级到唯一head；测试库还完成带既有页面的P3→P4→P3→P4往返，两次确定性回填相同`page_code`。
+- [P2字段字典](./10-p2-field-dictionary.md)已登记P4增量，结构验证器已覆盖新增字段、中文注释、唯一约束和模型一致性。
+
+完整迁移、协议和升级/降级门禁见[P4技术预检](./11-p4-questionnaire-designer-precheck.md)。

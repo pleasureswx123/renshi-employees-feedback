@@ -1,6 +1,7 @@
 <script setup>
 import { reactive, ref, watch } from 'vue'
 
+import RichTextEditor from './RichTextEditor.vue'
 import QuestionRenderer from './questions/QuestionRenderer.vue'
 
 const props = defineProps({
@@ -48,10 +49,14 @@ function updateAnswer(questionCode, value) {
       <article v-if="draft" class="preview-document">
         <header>
           <h2>{{ draft.title }}</h2>
-          <p v-if="draft.description">{{ draft.description }}</p>
+          <RichTextEditor
+            v-if="draft.descriptionDoc"
+            :model-value="draft.descriptionDoc"
+            readonly
+          />
         </header>
-        <section v-for="page in draft.pages" :key="page.pageId || page.sortOrder" class="preview-page">
-          <h3>{{ page.pageTitle }}</h3>
+        <section v-for="(page, pageIndex) in draft.pages" :key="page.pageCode" class="preview-page">
+          <h3>{{ pageIndex + 1 }}. {{ page.pageTitle }}</h3>
           <p v-if="page.pageDescription">{{ page.pageDescription }}</p>
           <el-empty v-if="!page.questions.length" description="当前页面还没有题目" :image-size="72" />
           <div v-for="question in page.questions" :key="question.questionCode" class="preview-question">
@@ -108,6 +113,10 @@ function updateAnswer(questionCode, value) {
 .preview-page > p {
   color: #64748b;
   line-height: 1.7;
+}
+
+.preview-page {
+  margin-top: 28px;
 }
 
 .preview-question {

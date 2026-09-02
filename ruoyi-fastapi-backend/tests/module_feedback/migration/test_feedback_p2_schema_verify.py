@@ -1,6 +1,9 @@
 import pytest
 
 from scripts.feedback_p2_schema_verify import (
+    DESIGNER_COLUMNS,
+    DESIGNER_REVISION,
+    DOMAIN_REVISION,
     EXPECTED_TABLES,
     IMMUTABLE_TABLES,
     NUMERIC_12_4_COLUMNS,
@@ -19,7 +22,14 @@ def test_schema_verifier_covers_all_p2_tables_and_key_gates() -> None:
     assert ('fb_score_result', 'score') in NUMERIC_12_4_COLUMNS
     assert 'uq_fb_assignment_business_key' in REQUIRED_CONSTRAINTS
     assert 'uq_fb_answer_sheet_question' in REQUIRED_CONSTRAINTS
+    assert 'uq_fb_questionnaire_page_version_code' in REQUIRED_CONSTRAINTS
     assert 'ix_fb_assignment_evaluator_status' in REQUIRED_INDEXES
+    assert DESIGNER_REVISION == '20260902_03_feedback_designer'
+    assert DOMAIN_REVISION == '20260902_02_feedback_domain'
+    assert {
+        ('fb_questionnaire_version', 'description_doc'),
+        ('fb_questionnaire_page', 'page_code'),
+    } == DESIGNER_COLUMNS
 
 
 def test_migration_cycle_is_restricted_to_feedback_test_database() -> None:

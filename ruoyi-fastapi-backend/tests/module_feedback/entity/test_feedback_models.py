@@ -83,7 +83,10 @@ def test_key_business_constraints_are_present_in_metadata() -> None:
     expected_constraints = {
         'fb_assignment': {'uq_fb_assignment_business_key', 'ck_fb_assignment_status'},
         'fb_answer': {'uq_fb_answer_sheet_question', 'ck_fb_answer_value_channel'},
-        'fb_questionnaire_page': {'uq_fb_questionnaire_page_version_sort'},
+        'fb_questionnaire_page': {
+            'uq_fb_questionnaire_page_version_sort',
+            'uq_fb_questionnaire_page_version_code',
+        },
         'fb_question': {'uq_fb_question_page_sort', 'ck_fb_question_score_range'},
         'fb_indicator': {'ck_fb_indicator_weight'},
         'fb_relation': {'ck_fb_relation_weight'},

@@ -145,7 +145,7 @@ onMounted(loadProjects)
     <header class="page-header">
       <div>
         <h1 class="page-heading">评价项目</h1>
-        <p class="page-description">创建准备阶段项目，并进入专用问卷编辑器配置单选题草稿。</p>
+        <p class="page-description">创建准备阶段项目，并进入专用问卷编辑器配置问卷与指标草稿。</p>
       </div>
       <el-button
         v-if="permissionStore.hasPermission('feedback:project:add')"

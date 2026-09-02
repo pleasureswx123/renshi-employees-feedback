@@ -3,6 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from module_feedback.entity.do import (
+    FbIndicator,
+    FbIndicatorQuestion,
     FbProject,
     FbQuestion,
     FbQuestionnairePage,
@@ -34,7 +36,8 @@ class FeedbackQuestionnaireDao:
             .options(
                 selectinload(FbQuestionnaireVersion.pages)
                 .selectinload(FbQuestionnairePage.questions)
-                .selectinload(FbQuestion.options)
+                .selectinload(FbQuestion.options),
+                selectinload(FbQuestionnaireVersion.indicators).selectinload(FbIndicator.question_bindings),
             )
         )
         row = (await db.execute(statement)).unique().first()
@@ -62,14 +65,41 @@ class FeedbackQuestionnaireDao:
         return (await db.execute(statement)).scalars().first()
 
     @classmethod
-    async def replace_draft_pages(
+    async def replace_draft_document(
         cls,
         db: AsyncSession,
         version_id: int,
         pages: list[FbQuestionnairePage],
+        indicators: list[FbIndicator],
+        indicator_bindings: dict[str, list[str]],
     ) -> None:
-        """删除旧草稿页面并写入新文档，不提交事务。"""
+        """整体替换页面、题目、指标和绑定，不提交事务。"""
         await db.execute(delete(FbQuestionnairePage).where(FbQuestionnairePage.version_id == version_id))
+        await db.execute(delete(FbIndicator).where(FbIndicator.version_id == version_id))
         await db.flush()
         db.add_all(pages)
+        await db.flush()
+
+        question_ids = {question.question_code: question.question_id for page in pages for question in page.questions}
+        db.add_all(indicators)
+        await db.flush()
+        indicator_ids = {indicator.indicator_code: indicator.indicator_id for indicator in indicators}
+
+        bindings: list[FbIndicatorQuestion] = []
+        for indicator_code, question_codes in indicator_bindings.items():
+            indicator_id = indicator_ids.get(indicator_code)
+            if indicator_id is None:
+                raise ValueError(f'找不到指标标识：{indicator_code}')
+            for question_code in question_codes:
+                question_id = question_ids.get(question_code)
+                if question_id is None:
+                    raise ValueError(f'找不到题目标识：{question_code}')
+                bindings.append(
+                    FbIndicatorQuestion(
+                        version_id=version_id,
+                        indicator_id=indicator_id,
+                        question_id=question_id,
+                    )
+                )
+        db.add_all(bindings)
         await db.flush()

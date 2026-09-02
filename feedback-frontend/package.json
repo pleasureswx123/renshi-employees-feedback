@@ -12,6 +12,11 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@tiptap/extension-bubble-menu": "3.30.2",
+    "@tiptap/extension-floating-menu": "3.30.2",
+    "@tiptap/pm": "3.30.2",
+    "@tiptap/starter-kit": "3.30.2",
+    "@tiptap/vue-3": "3.30.2",
     "axios": "1.19.0",
     "element-plus": "2.14.3",
     "js-cookie": "3.0.8",

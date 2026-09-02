@@ -1,4 +1,5 @@
 import math
+import uuid
 from datetime import datetime
 
 from sqlalchemy import ColumnElement
@@ -31,6 +32,10 @@ class FeedbackProjectService:
             ),
             None,
         )
+
+    @staticmethod
+    def _stable_code(prefix: str) -> str:
+        return f'{prefix}_{uuid.uuid4().hex}'
 
     @classmethod
     def _to_summary(cls, project: FbProject) -> ProjectSummaryModel:
@@ -130,6 +135,7 @@ class FeedbackProjectService:
             query_db.add(
                 FbQuestionnairePage(
                     version_id=version.version_id,
+                    page_code=cls._stable_code('P'),
                     page_title='第1页',
                     sort_order=1,
                     create_by=operator_name,

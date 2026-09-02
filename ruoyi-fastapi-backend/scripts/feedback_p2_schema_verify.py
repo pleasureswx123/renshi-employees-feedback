@@ -1,10 +1,11 @@
-"""验证P2评价业务PostgreSQL结构和可逆迁移链。"""
+"""验证P2/P4评价业务PostgreSQL结构和可逆迁移链。"""
 
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+import uuid
 from contextlib import closing
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,8 @@ from scripts.feedback_p0_database_precheck import (  # noqa: E402
 )
 
 BASELINE_REVISION = '20260902_01_feedback_baseline'
+DOMAIN_REVISION = '20260902_02_feedback_domain'
+DESIGNER_REVISION = '20260902_03_feedback_designer'
 EXPECTED_TABLES = {
     'fb_project',
     'fb_questionnaire_version',
@@ -59,6 +62,7 @@ REQUIRED_CONSTRAINTS = {
     'uq_fb_assignment_business_key',
     'uq_fb_answer_sheet_question',
     'uq_fb_questionnaire_page_version_sort',
+    'uq_fb_questionnaire_page_version_code',
     'uq_fb_question_page_sort',
     'ck_fb_question_score_range',
     'ck_fb_indicator_weight',
@@ -66,6 +70,10 @@ REQUIRED_CONSTRAINTS = {
     'ck_fb_assignment_status',
     'ck_fb_answer_value_channel',
     'ck_fb_score_result_dimensions',
+}
+DESIGNER_COLUMNS = {
+    ('fb_questionnaire_version', 'description_doc'),
+    ('fb_questionnaire_page', 'page_code'),
 }
 REQUIRED_INDEXES = {
     'ix_fb_project_status_create_time',
@@ -82,9 +90,15 @@ IMMUTABLE_TABLES = {'fb_answer_sheet', 'fb_answer', 'fb_score_result'}
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description='验证P2评价业务PostgreSQL结构')
+    parser = argparse.ArgumentParser(description='验证评价业务PostgreSQL结构')
     parser.add_argument('--database', default='ruoyi_feedback_test', help='只允许反馈开发库或测试库')
-    parser.add_argument('--migration-cycle', action='store_true', help='先降级到P0基线再重新升级到head')
+    cycle_group = parser.add_mutually_exclusive_group()
+    cycle_group.add_argument('--migration-cycle', action='store_true', help='先降级到P0基线再重新升级到head')
+    cycle_group.add_argument(
+        '--designer-migration-cycle',
+        action='store_true',
+        help='用一条P3结构测试数据执行P4升级、降级和再升级',
+    )
     parser.add_argument('--yes', action='store_true', help='确认在空的反馈测试库执行迁移循环')
     return parser.parse_args()
 
@@ -148,8 +162,147 @@ def run_migration_cycle(database_name: str) -> dict[str, Any]:
     }
 
 
+def insert_designer_migration_fixture(database_name: str, marker: str) -> tuple[int, int, int]:
+    """在P3结构下插入最小问卷页面，用于验证P4确定性回填。"""
+    with closing(connect_database(database_name)) as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT user_id FROM sys_user WHERE del_flag = '0' AND status = '0' ORDER BY user_id LIMIT 1")
+        user_row = cursor.fetchone()
+        if user_row is None:
+            raise RuntimeError('迁移往返测试需要至少一个可用的系统用户')
+        cursor.execute(
+            """
+            INSERT INTO fb_project(project_name, owner_user_id, create_by, update_by)
+            VALUES (%s, %s, 'p4-migration-test', 'p4-migration-test')
+            RETURNING project_id
+            """,
+            (marker, int(user_row[0])),
+        )
+        project_id = int(cursor.fetchone()[0])
+        cursor.execute(
+            """
+            INSERT INTO fb_questionnaire_version(
+                project_id, version_no, title, create_by, update_by
+            )
+            VALUES (%s, 1, 'P4迁移往返问卷', 'p4-migration-test', 'p4-migration-test')
+            RETURNING version_id
+            """,
+            (project_id,),
+        )
+        version_id = int(cursor.fetchone()[0])
+        cursor.execute(
+            """
+            INSERT INTO fb_questionnaire_page(
+                version_id, page_title, sort_order, create_by, update_by
+            )
+            VALUES (%s, 'P3既有页面', 1, 'p4-migration-test', 'p4-migration-test')
+            RETURNING page_id
+            """,
+            (version_id,),
+        )
+        page_id = int(cursor.fetchone()[0])
+        connection.commit()
+        return project_id, version_id, page_id
+
+
+def read_designer_migration_fixture(database_name: str, page_id: int) -> tuple[str, Any]:
+    """读取P4新增字段，确认页面标识和富文本默认值。"""
+    with closing(connect_database(database_name)) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT p.page_code, v.description_doc
+            FROM fb_questionnaire_page p
+            JOIN fb_questionnaire_version v ON v.version_id = p.version_id
+            WHERE p.page_id = %s
+            """,
+            (page_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            raise RuntimeError('P4迁移后未找到测试页面')
+        return str(row[0]), row[1]
+
+
+def verify_designer_columns_absent_and_fixture_present(database_name: str, page_id: int) -> None:
+    """确认降级回P3后只移除了P4增量字段，既有页面仍保留。"""
+    with closing(connect_database(database_name)) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT table_name, column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND (table_name, column_name) IN (
+                ('fb_questionnaire_version', 'description_doc'),
+                ('fb_questionnaire_page', 'page_code')
+              )
+            """
+        )
+        if cursor.fetchall():
+            raise RuntimeError('降级到P3后仍存在P4增量字段')
+        cursor.execute('SELECT EXISTS (SELECT 1 FROM fb_questionnaire_page WHERE page_id = %s)', (page_id,))
+        if not bool(cursor.fetchone()[0]):
+            raise RuntimeError('降级到P3时误删了既有问卷页面')
+
+
+def cleanup_designer_migration_fixture(database_name: str, project_id: int) -> None:
+    """清理由脚本创建的精确测试项目及级联问卷数据。"""
+    with closing(connect_database(database_name)) as connection, connection.cursor() as cursor:
+        cursor.execute('DELETE FROM fb_questionnaire_version WHERE project_id = %s', (project_id,))
+        cursor.execute(
+            """
+            DELETE FROM fb_project
+            WHERE project_id = %s AND create_by = 'p4-migration-test'
+            """,
+            (project_id,),
+        )
+        if cursor.rowcount != 1:
+            connection.rollback()
+            raise RuntimeError('迁移测试项目清理目标不唯一，已回滚')
+        connection.commit()
+
+
+def run_designer_migration_cycle(database_name: str) -> dict[str, Any]:
+    """在空测试库执行P3→P4→P3→P4的有数据迁移往返。"""
+    ensure_feedback_tables_empty(database_name)
+    if get_current_revision(database_name) != DESIGNER_REVISION:
+        raise RuntimeError(f'迁移往返必须从{DESIGNER_REVISION}开始')
+
+    marker = f'P4迁移往返-{uuid.uuid4()}'
+    project_id: int | None = None
+    page_id: int | None = None
+    first_page_code: str | None = None
+    second_page_code: str | None = None
+    try:
+        run_alembic(database_name, 'downgrade', DOMAIN_REVISION)
+        project_id, _, page_id = insert_designer_migration_fixture(database_name, marker)
+        run_alembic(database_name, 'upgrade', DESIGNER_REVISION)
+        first_page_code, first_doc = read_designer_migration_fixture(database_name, page_id)
+        if first_page_code != f'P_{page_id}' or first_doc is not None:
+            raise RuntimeError('首次升级未按约定回填page_code或description_doc默认值')
+
+        run_alembic(database_name, 'downgrade', DOMAIN_REVISION)
+        verify_designer_columns_absent_and_fixture_present(database_name, page_id)
+        run_alembic(database_name, 'upgrade', DESIGNER_REVISION)
+        second_page_code, second_doc = read_designer_migration_fixture(database_name, page_id)
+        if second_page_code != first_page_code or second_doc is not None:
+            raise RuntimeError('再次升级未保持确定性的page_code回填结果')
+    finally:
+        if get_current_revision(database_name) != DESIGNER_REVISION:
+            run_alembic(database_name, 'upgrade', DESIGNER_REVISION)
+        if project_id is not None:
+            cleanup_designer_migration_fixture(database_name, project_id)
+
+    return {
+        'database': database_name,
+        'fromRevision': DOMAIN_REVISION,
+        'toRevision': DESIGNER_REVISION,
+        'firstPageCode': first_page_code,
+        'secondPageCode': second_page_code,
+        'fixtureCleaned': True,
+    }
+
+
 def model_type_signature(column_type: Any) -> tuple[str, int | None, int | None, int | None]:
-    """把P2模型字段类型转换为information_schema可比较签名。"""
+    """把模型字段类型转换为information_schema可比较签名。"""
     if isinstance(column_type, JSONB):
         return ('jsonb', None, None, None)
     if isinstance(column_type, Numeric):
@@ -168,7 +321,7 @@ def model_type_signature(column_type: Any) -> tuple[str, int | None, int | None,
         return ('boolean', None, None, None)
     if isinstance(column_type, DateTime):
         return ('timestamp without time zone', None, None, None)
-    raise TypeError(f'P2模型包含未纳入验证的字段类型：{column_type!r}')
+    raise TypeError(f'模型包含未纳入验证的字段类型：{column_type!r}')
 
 
 def verify_model_column_contract(column_rows: list[tuple[Any, ...]]) -> int:
@@ -264,6 +417,9 @@ def verify_schema(database_name: str) -> dict[str, Any]:
             (str(table), str(column)): (str(data_type), precision, scale)
             for table, column, data_type, _length, precision, scale, _nullable in column_rows
         }
+        missing_designer_columns = sorted(DESIGNER_COLUMNS - set(column_types))
+        if missing_designer_columns:
+            raise RuntimeError(f'缺少P4问卷设计器字段：{missing_designer_columns}')
         for key in NUMERIC_12_4_COLUMNS:
             if column_types.get(key) != ('numeric', 12, 4):
                 raise RuntimeError(f'正式分数或权重字段不是NUMERIC(12,4)：{key} -> {column_types.get(key)}')
@@ -290,7 +446,7 @@ def verify_schema(database_name: str) -> dict[str, Any]:
         constraints = {str(row[0]) for row in cursor.fetchall()}
         missing_constraints = sorted(REQUIRED_CONSTRAINTS - constraints)
         if missing_constraints:
-            raise RuntimeError(f'缺少P2关键约束：{missing_constraints}')
+            raise RuntimeError(f'缺少评价业务关键约束：{missing_constraints}')
 
         cursor.execute(
             """
@@ -313,6 +469,8 @@ def verify_schema(database_name: str) -> dict[str, Any]:
         'columnCommentCount': len(columns),
         'modelColumnContractCount': model_column_count,
         'numeric12Scale4Count': len(NUMERIC_12_4_COLUMNS),
+        'designerRevision': DESIGNER_REVISION,
+        'designerColumnCount': len(DESIGNER_COLUMNS),
         'requiredConstraintCount': len(REQUIRED_CONSTRAINTS),
         'requiredIndexCount': len(REQUIRED_INDEXES),
         'immutableTablesWithoutSoftDelete': sorted(IMMUTABLE_TABLES),
@@ -321,15 +479,18 @@ def verify_schema(database_name: str) -> dict[str, Any]:
 
 def main() -> int:
     args = parse_args()
-    database_name = validate_database_name(args.database, cycle=args.migration_cycle)
+    cycle_requested = args.migration_cycle or args.designer_migration_cycle
+    database_name = validate_database_name(args.database, cycle=cycle_requested)
     cycle_result = None
-    if args.migration_cycle:
+    if cycle_requested:
         if not args.yes:
             raise RuntimeError('执行迁移循环必须显式传入--yes')
-        cycle_result = run_migration_cycle(database_name)
+        cycle_result = (
+            run_migration_cycle(database_name) if args.migration_cycle else run_designer_migration_cycle(database_name)
+        )
     payload = verify_schema(database_name)
     if cycle_result is not None:
-        payload['migrationCycle'] = cycle_result
+        payload['designerMigrationCycle' if args.designer_migration_cycle else 'migrationCycle'] = cycle_result
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 

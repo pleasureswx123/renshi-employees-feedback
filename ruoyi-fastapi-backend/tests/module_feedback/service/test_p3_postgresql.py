@@ -105,10 +105,12 @@ async def test_p3_project_and_single_choice_draft_round_trip_in_postgresql() -> 
                     settings={'showProgress': True},
                     pages=[
                         {
+                            'pageCode': 'P_CORE',
                             'pageTitle': '核心能力',
                             'sortOrder': 1,
                             'questions': [
                                 {
+                                    'questionCode': 'Q_GOAL',
                                     'questionType': 'SINGLE_CHOICE',
                                     'title': '能够清晰说明工作目标',
                                     'description': '请选择最符合实际情况的选项',
@@ -116,13 +118,24 @@ async def test_p3_project_and_single_choice_draft_round_trip_in_postgresql() -> 
                                     'sortOrder': 1,
                                     'options': [
                                         {
+                                            'optionCode': 'O_ALWAYS',
                                             'optionLabel': '始终如此',
                                             'score': '5.0000',
                                             'requiresReason': True,
                                             'sortOrder': 1,
                                         },
-                                        {'optionLabel': '经常如此', 'score': '4.0000', 'sortOrder': 2},
-                                        {'optionLabel': '有时如此', 'score': '3.0000', 'sortOrder': 3},
+                                        {
+                                            'optionCode': 'O_OFTEN',
+                                            'optionLabel': '经常如此',
+                                            'score': '4.0000',
+                                            'sortOrder': 2,
+                                        },
+                                        {
+                                            'optionCode': 'O_SOMETIMES',
+                                            'optionLabel': '有时如此',
+                                            'score': '3.0000',
+                                            'sortOrder': 3,
+                                        },
                                     ],
                                 }
                             ],

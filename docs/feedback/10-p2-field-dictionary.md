@@ -1,8 +1,8 @@
-# P2 领域表与字段字典
+# P2领域表与P4增量字段字典
 
 ## 1. 文档状态
 
-本文是 P2“领域骨架与 PostgreSQL 迁移”的已实现字段契约，对应 Alembic revision `20260902_02_feedback_domain`。字段类型、可空性、默认值、外键、唯一约束和中文说明以本文、迁移和 SQLAlchemy 实体三者一致为验收标准。
+本文是P2“领域骨架与PostgreSQL迁移”的已实现字段契约，并登记P4增量字段，对应Alembic revisions `20260902_02_feedback_domain`和`20260902_03_feedback_designer`。字段类型、可空性、默认值、外键、唯一约束和中文说明以本文、迁移和SQLAlchemy实体三者一致为验收标准。
 
 P2 只建立领域持久化骨架，不代表项目、问卷、发布、答题、计分或报告 API 已经实现。
 
@@ -77,6 +77,7 @@ fb_score_result
 | `status` | `VARCHAR(20)` | 否 | `DRAFT`；仅允许`DRAFT/FROZEN` | 问卷版本状态 |
 | `title` | `VARCHAR(200)` | 否 | 无 | 问卷标题 |
 | `description` | `TEXT` | 是 | 无 | 问卷说明 |
+| `description_doc` | `JSONB` | 是 | P4新增；受限Tiptap文档或空 | 问卷富文本说明文档 |
 | `settings` | `JSONB` | 否 | `{}` | 问卷全局设置 |
 | `scoring_rule_snapshot` | `JSONB` | 否 | `{}` | 计分规则快照 |
 | `frozen_by` | `BIGINT` | 是 | FK `sys_user.user_id`；冻结状态必填 | 冻结人用户ID |
@@ -93,6 +94,7 @@ fb_score_result
 |---|---|---|---|---|
 | `page_id` | `BIGINT` | 否 | 自增主键 | 问卷页面ID |
 | `version_id` | `BIGINT` | 否 | FK `fb_questionnaire_version.version_id` | 问卷版本ID |
+| `page_code` | `VARCHAR(64)` | 否 | P4新增；版本内唯一 | 版本内稳定页面标识 |
 | `page_title` | `VARCHAR(200)` | 否 | 无 | 页面标题 |
 | `page_description` | `TEXT` | 是 | 无 | 页面说明 |
 | `sort_order` | `INTEGER` | 否 | `> 0`；版本内唯一 | 页面顺序 |
@@ -319,3 +321,23 @@ fb_score_result
 | 计分可复算 | `calculation_version`、`calculation_basis`、冻结版本和答卷快照 |
 
 状态的合法转换由服务层 `FeedbackStateTransitionService` 维护；数据库检查约束负责拒绝未知状态和缺失终态时间，两层职责不能相互替代。
+
+## 9. P4问卷设计器增量契约
+
+### 9.1 迁移与兼容
+
+- revision `20260902_03_feedback_designer`只为既有问卷版本增加`description_doc`，为既有页面增加`page_code`及唯一约束，不创建平行问卷表。
+- 既有页面升级时按`P_<page_id>`确定性回填`page_code`；`description_doc`保持可空，`description`继续保存后端从富文本文档提取的纯文本摘要。
+- 测试库已完成带既有页面的P3→P4→P3→P4往返，两次均回填相同页面标识，页面记录未丢失。
+
+### 9.2 题型JSON配置
+
+| 题型 | `config`结构 | 分数/选项约束 |
+|---|---|---|
+| `SINGLE_CHOICE` | `{}` | 仅此题型持久化两个及以上`fb_question_option`；选项分值为`NUMERIC(12,4)` |
+| `STAR_RATING` | `{}` | 整数区间，星数为2至10；不创建伪选项 |
+| `NUMERIC_INPUT` | `{"defaultValue": Decimal或null}` | 默认值在区间内且精度不超过`decimal_places` |
+| `SLIDER` | `{"step": Decimal, "defaultValue": Decimal或null}` | 步长为正且不大于区间，默认值必须落在合法步长上 |
+| `TEXT` | `{"maxLength": 1..5000}` | `is_scored=false`，无分数区间且不创建伪选项 |
+
+指标继续使用`fb_indicator`和`fb_indicator_question`：接口以稳定`indicatorCode/questionCode`表达绑定，保存事务在数据库ID水合后写入关系；首期发布就绪要求指标权重精确合计`100.0000`，每道计分题恰好绑定一个指标。问答题可以归类到指标，但不参与原始满分。

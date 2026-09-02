@@ -15,6 +15,7 @@ def build_draft_payload() -> dict:
         'description': '验证草稿协议',
         'pages': [
             {
+                'pageCode': 'P_1',
                 'pageTitle': '第1页',
                 'sortOrder': 1,
                 'questions': [
@@ -58,8 +59,8 @@ def test_questionnaire_draft_contract_preserves_decimal_and_reason_rule() -> Non
     ('mutator', 'message'),
     [
         (
-            lambda payload: payload['pages'][0]['questions'][0].update(questionType='TEXT'),
-            'SINGLE_CHOICE',
+            lambda payload: payload['pages'][0]['questions'][0].update(questionType='UNKNOWN'),
+            'UNKNOWN',
         ),
         (
             lambda payload: payload['pages'][0]['questions'][0].update(options=[]),
@@ -67,7 +68,7 @@ def test_questionnaire_draft_contract_preserves_decimal_and_reason_rule() -> Non
         ),
         (
             lambda payload: payload['pages'][0]['questions'][0]['options'][1].update(sortOrder=1),
-            '选项顺序不能重复',
+            '选项顺序必须从1开始连续排列',
         ),
         (
             lambda payload: payload['pages'][0]['questions'][0]['options'][1].update(optionCode='O_A'),

@@ -78,6 +78,7 @@ async def test_async_dao_loads_relationships_and_leaves_transaction_to_service()
                 )
                 page = FbQuestionnairePage(
                     version_id=version.version_id,
+                    page_code='P1',
                     page_title='第一页',
                     sort_order=1,
                     create_by='p2-test',

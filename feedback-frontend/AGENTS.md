@@ -21,8 +21,8 @@
 - Pinia
 - Vue Router
 - Axios
-- `vuedraggable`，用于页面和题目排序
-- Quill 或项目既有富文本组件，用于问卷说明
+- 页面和题目排序首期使用明确的上移、下移和跨页选择器；不把拖拽库作为P4必要依赖
+- Tiptap Vue 3，用于受限的问卷说明JSON编辑与只读渲染；不保存任意HTML
 
 必须复用后端现有 `/login`、`/getInfo`、`/logout`、Token 和传输加密契约，但平台端代码独立维护。
 

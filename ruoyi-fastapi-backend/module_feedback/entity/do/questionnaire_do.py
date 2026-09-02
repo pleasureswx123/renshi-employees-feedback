@@ -62,6 +62,7 @@ class FbQuestionnaireVersion(FeedbackAuditMixin, LockVersionMixin, Base):
     )
     title = Column(String(200), nullable=False, comment='问卷标题')
     description = Column(Text, nullable=True, comment='问卷说明')
+    description_doc = Column(JSONB, nullable=True, comment='问卷富文本说明文档')
     settings = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"), comment='问卷全局设置')
     scoring_rule_snapshot = Column(
         JSONB,
@@ -109,6 +110,7 @@ class FbQuestionnairePage(FeedbackAuditMixin, Base):
     __tablename__ = 'fb_questionnaire_page'
     __table_args__ = (
         UniqueConstraint('version_id', 'sort_order', name='uq_fb_questionnaire_page_version_sort'),
+        UniqueConstraint('version_id', 'page_code', name='uq_fb_questionnaire_page_version_code'),
         UniqueConstraint('version_id', 'page_id', name='uq_fb_questionnaire_page_version_id'),
         CheckConstraint('sort_order > 0', name='ck_fb_questionnaire_page_sort'),
         {'comment': '问卷页面表'},
@@ -121,6 +123,7 @@ class FbQuestionnairePage(FeedbackAuditMixin, Base):
         nullable=False,
         comment='问卷版本ID',
     )
+    page_code = Column(String(64), nullable=False, comment='版本内稳定页面标识')
     page_title = Column(String(200), nullable=False, comment='页面标题')
     page_description = Column(Text, nullable=True, comment='页面说明')
     sort_order = Column(Integer, nullable=False, comment='页面顺序')

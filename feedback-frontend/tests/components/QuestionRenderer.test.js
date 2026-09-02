@@ -48,4 +48,57 @@ describe('共享题型渲染器', () => {
     expect(wrapper.findAll('input[type="radio"]').every(input => input.attributes('disabled') !== undefined)).toBe(true)
     expect(wrapper.text()).toContain('5分')
   })
+
+  it.each([
+    ['STAR_RATING', '.el-rate'],
+    ['NUMERIC_INPUT', '.el-input-number'],
+    ['SLIDER', '.el-slider'],
+    ['TEXT', 'textarea']
+  ])('用真实Element Plus组件渲染%s', (questionType, selector) => {
+    const typedQuestion = getQuestionTypeDefinition(questionType).createDefault()
+    const wrapper = mount(QuestionRenderer, {
+      global: { plugins: [ElementPlus] },
+      props: { question: typedQuestion, mode: 'preview' }
+    })
+
+    expect(wrapper.find(selector).exists()).toBe(true)
+  })
+
+  it('星级和滑块在用户操作前保持未作答语义', async () => {
+    const star = mount(QuestionRenderer, {
+      global: { plugins: [ElementPlus] },
+      props: {
+        question: getQuestionTypeDefinition('STAR_RATING').createDefault(),
+        mode: 'preview',
+        modelValue: { value: null }
+      }
+    })
+    expect(star.emitted('update:modelValue')).toBeUndefined()
+
+    const slider = mount(QuestionRenderer, {
+      global: { plugins: [ElementPlus] },
+      props: {
+        question: getQuestionTypeDefinition('SLIDER').createDefault(),
+        mode: 'preview',
+        modelValue: { value: null, touched: false }
+      }
+    })
+    expect(slider.text()).toContain('尚未作答')
+    slider.findComponent({ name: 'ElSlider' }).vm.$emit('input', 4)
+    await slider.vm.$nextTick()
+    expect(slider.emitted('update:modelValue').at(-1)[0]).toEqual({ value: 4, touched: true })
+  })
+
+  it('问答题发出受最大长度控制的文字答案', async () => {
+    const textQuestion = getQuestionTypeDefinition('TEXT').createDefault()
+    textQuestion.config.maxLength = 20
+    const wrapper = mount(QuestionRenderer, {
+      global: { plugins: [ElementPlus] },
+      props: { question: textQuestion, mode: 'preview', modelValue: { text: '' } }
+    })
+
+    await wrapper.get('textarea').setValue('具体反馈')
+    expect(wrapper.emitted('update:modelValue').at(-1)[0]).toEqual({ text: '具体反馈' })
+    expect(wrapper.get('textarea').attributes('maxlength')).toBe('20')
+  })
 })
