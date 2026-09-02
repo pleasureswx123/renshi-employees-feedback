@@ -58,22 +58,33 @@ const routes = [
       {
         path: 'todos',
         name: 'employee-todos',
-        component: () => import('@/views/shared/PlaceholderView.vue'),
-        props: {
-          title: '我的待办',
-          description: 'P1 已完成工程与权限基线；真实评价任务将在后续阶段由后端生成。'
-        },
+        component: () => import('@/views/employee/EmployeeProjectsView.vue'),
         meta: { title: '我的待办', workspace: 'employee', permissions: ['feedback:task:view'] }
       },
       {
         path: 'reviews',
         name: 'employee-reviews',
-        component: () => import('@/views/shared/PlaceholderView.vue'),
-        props: {
-          title: '我评价的',
-          description: '这里将在后续阶段展示当前账号已经提交的评价记录。'
-        },
+        component: () => import('@/views/employee/EmployeeHistoryView.vue'),
         meta: { title: '我评价的', workspace: 'employee', permissions: ['feedback:history:view'] }
+      },
+      {
+        path: 'todos/:projectId',
+        name: 'employee-project',
+        component: () => import('@/views/employee/EmployeeProjectView.vue'),
+        meta: { title: '评价任务', workspace: 'employee', permissions: ['feedback:task:view'] }
+      },
+      {
+        path: 'tasks/:assignmentId',
+        name: 'employee-answer',
+        component: () => import('@/views/employee/AnswerSheetView.vue'),
+        meta: { title: '填写评价', workspace: 'employee', permissions: ['feedback:task:view'] }
+      },
+      {
+        path: 'reviews/:assignmentId',
+        name: 'employee-answer-history',
+        component: () => import('@/views/employee/AnswerSheetView.vue'),
+        props: { history: true },
+        meta: { title: '已提交答案', workspace: 'employee', permissions: ['feedback:history:view'] }
       }
     ]
   },

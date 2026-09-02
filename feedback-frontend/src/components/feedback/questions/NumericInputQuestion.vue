@@ -22,16 +22,19 @@ function changeValue(value) {
     </div>
     <p v-if="question.description" class="question-description">{{ question.description }}</p>
     <el-input-number
-      :model-value="modelValue?.value ?? question.config?.defaultValue ?? null"
+      :model-value="modelValue?.value ?? (mode === 'preview' ? question.config?.defaultValue : null)"
       :min="decimalToNumber(question.minScore)"
       :max="decimalToNumber(question.maxScore)"
       :precision="question.decimalPlaces"
       controls-position="right"
-      :disabled="mode === 'editor'"
+      :disabled="mode === 'editor' || mode === 'readonly'"
       aria-label="数字评分"
       @change="changeValue"
     />
     <small class="range-hint">允许范围：{{ question.minScore }} 至 {{ question.maxScore }}</small>
+    <small v-if="mode === 'answer' && question.config?.defaultValue != null && modelValue?.value == null" class="range-hint">
+      参考默认值：{{ question.config.defaultValue }}；请输入分值后才会记录答案
+    </small>
   </section>
 </template>
 

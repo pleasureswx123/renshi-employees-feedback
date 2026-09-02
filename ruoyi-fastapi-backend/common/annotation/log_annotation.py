@@ -10,7 +10,7 @@ from typing import Any, Literal, TypeVar
 
 import httpx
 from async_lru import alru_cache
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, ORJSONResponse, UJSONResponse
 from starlette.status import HTTP_200_OK
 from typing_extensions import ParamSpec
@@ -20,6 +20,7 @@ from common.context import RequestContext
 from common.enums import BusinessType
 from config.env import AppConfig
 from exceptions.exception import (
+    ConflictException,
     FileRangeNotSatisfiableException,
     LoginException,
     ServiceException,
@@ -192,20 +193,7 @@ class Log:
             oper_time = datetime.now()
             # 此处在登录之前向原始函数传递一些登录信息，用于监测在线用户的相关信息
             login_log = self._get_login_log(user_agent, oper_ip, oper_location, oper_time, kwargs)
-            try:
-                # 调用原始函数
-                result = await func(*args, **kwargs)
-            except (LoginException, ServiceWarning) as e:
-                logger.warning(e.message)
-                result = ResponseUtil.failure(data=e.data, msg=e.message)
-            except ServiceException as e:
-                logger.error(e.message)
-                result = ResponseUtil.error(data=e.data, msg=e.message)
-            except FileRangeNotSatisfiableException:
-                raise
-            except Exception as e:
-                logger.exception(e)
-                result = ResponseUtil.error(msg=str(e))
+            result = await self._call_with_error_response(func, *args, **kwargs)
             # 获取请求耗时
             cost_time = float(time.perf_counter() - start_time) * 1000
             # 判断请求是否来自api文档
@@ -269,6 +257,33 @@ class Log:
             return result
 
         return wrapper
+
+    async def _call_with_error_response(self, func: Callable, *args, **kwargs) -> Any:
+        """保留业务错误协议，同时对高敏感接口隐藏异常中的请求正文。"""
+        try:
+            return await func(*args, **kwargs)
+        except (LoginException, ServiceWarning) as e:
+            logger.warning(e.message)
+            return ResponseUtil.failure(data=e.data, msg=e.message)
+        except ServiceException as e:
+            logger.error(e.message)
+            return ResponseUtil.error(data=e.data, msg=e.message)
+        except ConflictException as e:
+            return ResponseUtil.conflict(data=e.data, msg=e.message)
+        except HTTPException as e:
+            return JSONResponse(
+                status_code=e.status_code,
+                headers=e.headers,
+                content={'code': e.status_code, 'msg': e.detail, 'success': False},
+            )
+        except FileRangeNotSatisfiableException:
+            raise
+        except Exception as e:
+            if self.request_log_mode == 'none' and self.response_log_mode == 'none':
+                logger.error('敏感接口处理失败：{}', type(e).__name__)
+                return ResponseUtil.error(msg='处理失败，请稍后重试')
+            logger.exception(e)
+            return ResponseUtil.error(msg=str(e))
 
     def _get_decorator_func_path(self, func: Callable) -> str:
         """

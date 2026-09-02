@@ -45,6 +45,9 @@ async function mockPublicEndpoints(page) {
       }
     })
   )
+  await page.route('**/dev-api/feedback/employee/projects*', route =>
+    route.fulfill({ json: { code: 200, rows: [], pageNum: 1, pageSize: 10, total: 0, hasNext: false } })
+  )
 }
 
 test('登录、刷新恢复、双工作台切换和退出形成完整路由链', async ({ page }) => {

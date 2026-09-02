@@ -152,3 +152,8 @@ cython_debug/
 .opencode/
 .qoder/
 .trae/
+
+# P6本地验收产物与临时凭据，不进入版本库
+/.playwright-cli/
+/output/playwright/
+/ruoyi-fastapi-backend/.tmp/

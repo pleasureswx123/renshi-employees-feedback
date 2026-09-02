@@ -55,7 +55,6 @@ NUMERIC_12_4_COLUMNS = {
     ('fb_question_option', 'score'),
     ('fb_indicator', 'weight'),
     ('fb_relation', 'weight'),
-    ('fb_answer_sheet', 'raw_total_score'),
     ('fb_answer', 'numeric_value'),
     ('fb_answer', 'raw_score'),
     ('fb_score_result', 'score'),
@@ -289,8 +288,9 @@ def cleanup_designer_migration_fixture(database_name: str, project_id: int) -> N
 def run_designer_migration_cycle(database_name: str) -> dict[str, Any]:
     """在空测试库执行P3→P4→P3→P4的有数据迁移往返。"""
     ensure_feedback_tables_empty(database_name)
-    if get_current_revision(database_name) != PUBLICATION_REVISION:
-        raise RuntimeError(f'迁移往返必须从{PUBLICATION_REVISION}开始')
+    current_head = get_repository_head()
+    if get_current_revision(database_name) != current_head:
+        raise RuntimeError(f'迁移往返必须从{current_head}开始')
 
     marker = f'P4迁移往返-{uuid.uuid4()}'
     project_id: int | None = None
@@ -313,8 +313,8 @@ def run_designer_migration_cycle(database_name: str) -> dict[str, Any]:
         if second_page_code != first_page_code or second_doc is not None:
             raise RuntimeError('再次升级未保持确定性的page_code回填结果')
     finally:
-        if get_current_revision(database_name) != PUBLICATION_REVISION:
-            run_alembic(database_name, 'upgrade', PUBLICATION_REVISION)
+        if get_current_revision(database_name) != current_head:
+            run_alembic(database_name, 'upgrade', current_head)
         if project_id is not None:
             cleanup_designer_migration_fixture(database_name, project_id)
 
@@ -502,8 +502,9 @@ def cleanup_publication_migration_fixture(database_name: str, project_id: int) -
 def run_publication_migration_cycle(database_name: str) -> dict[str, Any]:
     """在空测试库执行P4→P5→P4→P5的有数据迁移往返。"""
     ensure_feedback_tables_empty(database_name)
-    if get_current_revision(database_name) != PUBLICATION_REVISION:
-        raise RuntimeError(f'迁移往返必须从{PUBLICATION_REVISION}开始')
+    current_head = get_repository_head()
+    if get_current_revision(database_name) != current_head:
+        raise RuntimeError(f'迁移往返必须从{current_head}开始')
 
     marker = f'P5迁移往返-{uuid.uuid4()}'
     project_id: int | None = None
@@ -538,8 +539,8 @@ def run_publication_migration_cycle(database_name: str) -> dict[str, Any]:
             if int(cursor.fetchone()[0]) != 0:
                 raise RuntimeError('P5再次升级后选择表不为空')
     finally:
-        if get_current_revision(database_name) != PUBLICATION_REVISION:
-            run_alembic(database_name, 'upgrade', PUBLICATION_REVISION)
+        if get_current_revision(database_name) != current_head:
+            run_alembic(database_name, 'upgrade', current_head)
         if project_id is not None:
             cleanup_publication_migration_fixture(database_name, project_id)
 
@@ -734,6 +735,8 @@ def verify_schema(database_name: str) -> dict[str, Any]:  # noqa: PLR0912
         for key in NUMERIC_12_4_COLUMNS:
             if column_types.get(key) != ('numeric', 12, 4):
                 raise RuntimeError(f'正式分数或权重字段不是NUMERIC(12,4)：{key} -> {column_types.get(key)}')
+        if column_types.get(('fb_answer_sheet', 'raw_total_score')) != ('numeric', 18, 4):
+            raise RuntimeError('答卷原始总分必须为NUMERIC(18,4)，以容纳合法多题总分')
         floating_columns = sorted(
             key for key, value in column_types.items() if value[0] in {'real', 'double precision'}
         )
@@ -781,6 +784,7 @@ def verify_schema(database_name: str) -> dict[str, Any]:  # noqa: PLR0912
         'columnCommentCount': len(columns),
         'modelColumnContractCount': model_column_count,
         'numeric12Scale4Count': len(NUMERIC_12_4_COLUMNS),
+        'numeric18Scale4Count': 1,
         'designerRevision': DESIGNER_REVISION,
         'designerColumnCount': len(DESIGNER_COLUMNS),
         'publicationRevision': PUBLICATION_REVISION,

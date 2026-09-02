@@ -71,6 +71,8 @@ class ImportUtil:
         # 排除目录扩展
         exclude_dirs = {
             'venv',
+            '.venv',
+            '.tmp',
             '.env',
             '.git',
             '__pycache__',

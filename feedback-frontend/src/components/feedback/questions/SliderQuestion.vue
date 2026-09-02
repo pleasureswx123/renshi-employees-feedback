@@ -32,14 +32,17 @@ function changeValue(value) {
       :min="decimalToNumber(question.minScore)"
       :max="decimalToNumber(question.maxScore)"
       :step="decimalToNumber(question.config.step)"
-      :disabled="mode === 'editor'"
+      :disabled="mode === 'editor' || mode === 'readonly'"
       show-input
       aria-label="滑动评分"
       @input="changeValue"
     />
-    <small v-if="mode !== 'editor' && !modelValue?.touched" class="unanswered-hint">
+    <small v-if="!['editor', 'readonly'].includes(mode) && !modelValue?.touched" class="unanswered-hint">
       尚未作答，移动滑块或使用方向键后才会记录答案
     </small>
+    <el-button v-if="mode === 'answer' && !modelValue?.touched" link type="primary" @click="changeValue(decimalToNumber(displayValue))">
+      确认使用当前分值 {{ displayValue }}
+    </el-button>
   </section>
 </template>
 

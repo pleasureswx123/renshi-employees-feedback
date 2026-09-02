@@ -19,13 +19,15 @@ const emit = defineEmits(['update:modelValue'])
       :model-value="modelValue?.text || ''"
       type="textarea"
       :rows="4"
-      :maxlength="question.config.maxLength"
-      show-word-limit
+      :maxlength="mode === 'answer' ? undefined : question.config.maxLength"
+      :show-word-limit="mode !== 'answer'"
       :disabled="mode === 'editor'"
+      :readonly="mode === 'readonly'"
       placeholder="请输入回答"
       aria-label="问答内容"
       @input="emit('update:modelValue', { text: $event })"
     />
+    <small v-if="mode === 'answer'">{{ [...(modelValue?.text || '')].length }}/{{ question.config.maxLength }} 字</small>
   </section>
 </template>
 

@@ -62,7 +62,7 @@ class FbAnswerSheet(LockVersionMixin, Base):
         comment='最近填写页面ID',
     )
     answered_count = Column(Integer, nullable=False, server_default='0', comment='已作答题目数量')
-    raw_total_score = Column(Numeric(12, 4), nullable=True, comment='答卷原始总分')
+    raw_total_score = Column(Numeric(18, 4), nullable=True, comment='答卷原始总分')
     submission_snapshot = Column(
         JSONB,
         nullable=False,

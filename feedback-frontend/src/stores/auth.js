@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 
 import { getCurrentUser, login, logout } from '@/api/auth'
 import { getToken, removeToken, setToken } from '@/utils/auth'
+import { useAnswerSheetStore } from './answerSheet'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -68,6 +69,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     clearSession() {
+      useAnswerSheetStore().reset()
       removeToken()
       this.token = ''
       this.user = null

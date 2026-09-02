@@ -42,7 +42,7 @@ export const usePermissionStore = defineStore('permission', () => {
     return [
       canAccessWorkspace('hr') ? { key: 'hr', label: 'HR 工作台', path: '/hr/projects' } : null,
       canAccessWorkspace('employee')
-        ? { key: 'employee', label: '员工工作台', path: '/employee/todos' }
+        ? { key: 'employee', label: '员工工作台', path: hasPermission('feedback:task:view') ? '/employee/todos' : hasPermission('feedback:history:view') ? '/employee/reviews' : '/403' }
         : null
     ].filter(Boolean)
   }

@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
   question: { type: Object, required: true },
   mode: { type: String, default: 'preview' },
@@ -6,9 +8,12 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
+const minimum = computed(() => Number(props.question.minScore))
+const starCount = computed(() => Number(props.question.maxScore) - minimum.value + 1)
+const selectedStars = computed(() => props.modelValue?.value == null ? 0 : Number(props.modelValue.value) - minimum.value + 1)
 
 function changeValue(value) {
-  emit('update:modelValue', { value: value || null })
+  emit('update:modelValue', { value: value ? value + minimum.value - 1 : null })
 }
 </script>
 
@@ -20,12 +25,12 @@ function changeValue(value) {
     </div>
     <p v-if="question.description" class="question-description">{{ question.description }}</p>
     <el-rate
-      :model-value="modelValue?.value || 0"
-      :max="Number(question.maxScore)"
-      :disabled="mode === 'editor'"
+      :model-value="selectedStars"
+      :max="starCount"
+      :disabled="mode === 'editor' || mode === 'readonly'"
       clearable
       show-score
-      score-template="{value} 分"
+      :score-template="`${modelValue?.value ?? '未作答'} 分`"
       aria-label="星级评分"
       @change="changeValue"
     />

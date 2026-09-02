@@ -67,6 +67,11 @@ async function handleLogout() {
         <el-button :loading="loggingOut" @click="handleLogout">退出登录</el-button>
       </div>
     </el-header>
+    <nav class="mobile-workspace-nav" aria-label="工作台导航">
+      <el-menu :default-active="route.path" mode="horizontal" :ellipsis="false" router>
+        <el-menu-item v-for="item in menuItems" :key="item.path" :index="item.path">{{ item.label }}</el-menu-item>
+      </el-menu>
+    </nav>
     <el-container>
       <el-aside width="220px" class="workspace-aside">
         <el-menu :default-active="route.path" router>
@@ -128,9 +133,13 @@ async function handleLogout() {
 
 .workspace-main {
   padding: 24px;
+  min-width: 0;
 }
 
+.mobile-workspace-nav { display: none; }
+
 @media (max-width: 760px) {
+  .mobile-workspace-nav { display: block; }
   .workspace-header {
     height: auto;
     padding: 14px 16px;

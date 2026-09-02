@@ -1,8 +1,8 @@
-# P2领域表与P4/P5增量字段字典
+# P2领域表与P4/P5/P6增量字段字典
 
 ## 1. 文档状态
 
-本文是P2“领域骨架与PostgreSQL迁移”的已实现字段契约，并登记已实现P4和P5-00增量字段。当前已落地Alembic revisions为`20260902_02_feedback_domain`、`20260902_03_feedback_designer`和`20260902_04_feedback_publication`。字段类型、可空性、默认值、外键、唯一约束和中文说明以本文、迁移和SQLAlchemy实体三者一致为验收标准。
+本文登记领域表及P4/P5/P6增量字段契约。P6新增`20260902_05_feedback_answering`（答卷总分容量）与`20260902_06_feedback_permissions`（授权项），前序迁移保持不变。字段类型、可空性、默认值、外键、唯一约束和中文说明以本文、迁移和SQLAlchemy实体三者一致为验收标准；业务完成状态以路线图验收记录为准。
 
 P2 只建立领域持久化骨架，不代表项目、问卷、发布、答题、计分或报告 API 已经实现。
 
@@ -237,7 +237,7 @@ fb_score_result
 | `status` | `VARCHAR(20)` | 否 | `DRAFT`；仅允许`DRAFT/SUBMITTED` | 答卷状态 |
 | `last_page_id` | `BIGINT` | 是 | FK `fb_questionnaire_page.page_id` | 最近填写页面ID |
 | `answered_count` | `INTEGER` | 否 | `0`，且`>= 0` | 已作答题目数量 |
-| `raw_total_score` | `NUMERIC(12,4)` | 是 | 无 | 答卷原始总分 |
+| `raw_total_score` | `NUMERIC(18,4)` | 是 | P6扩容；未提交为空 | 答卷原始总分 |
 | `submission_snapshot` | `JSONB` | 否 | `{}` | 提交时校验与计分输入快照 |
 | `saved_time` | `TIMESTAMP` | 否 | `CURRENT_TIMESTAMP` | 最近保存时间 |
 | `submitted_time` | `TIMESTAMP` | 是 | `SUBMITTED`时必填 | 正式提交时间 |
@@ -317,7 +317,7 @@ fb_score_result
 | 逐人一份答卷 | `fb_answer_sheet.assignment_id`唯一 |
 | 单题答案唯一 | `uq_fb_answer_sheet_question` |
 | 提交数据不可软删除 | `fb_answer_sheet`、`fb_answer`、`fb_score_result`均无`del_flag` |
-| 正式分数不用浮点数 | 所有分数和权重均为`NUMERIC(12,4)` |
+| 正式分数不用浮点数 | 单题分数/权重为`NUMERIC(12,4)`，答卷原始总分为`NUMERIC(18,4)` |
 | 缺失关系不能当0分 | `score`可空，另有`has_missing_data`、任务计数和原/实际权重 |
 | 计分可复算 | `calculation_version`、`calculation_basis`、冻结版本和答卷快照 |
 
@@ -349,7 +349,7 @@ fb_score_result
 
 - 已实现revision：`20260902_04_feedback_publication`。
 - `down_revision`：`20260902_03_feedback_designer`。
-- 当前状态：迁移、SQLAlchemy实体、固定关系常量、新项目初始化和结构验证器已实现，并通过开发库/测试库真实PostgreSQL门禁；人员聚合接口和发布事务尚未实现。
+- 当前状态：迁移、实体、固定关系、人员聚合接口和发布事务均已实现；P5完整门禁见路线图。
 - 目标：分离“发布前可编辑的评价人选择”和“发布后员工正式任务”，不提前向`fb_assignment`写任务占位记录。
 
 ### 10.2 `fb_evaluator_selection`评价人选择配置表
@@ -387,3 +387,12 @@ fb_score_result
 | 发布后不可覆盖 | 项目`ACTIVE`且版本`FROZEN`后，所有配置写服务拒绝修改 |
 
 结构验证器已从13张表、184个字段升级为14张表、196个字段；所有新增表、字段、约束和索引均有中文注释或稳定名称并与SQLAlchemy模型一致。完整API、默认关系、数据范围、锁顺序和门禁见[P5技术预检](./12-p5-publication-precheck.md)。
+
+## 11. P6答卷与权限增量契约
+
+- `20260902_05_feedback_answering`只扩容原始总分，不新增答卷表。降级前加表锁并检查所有值能否恢复到`NUMERIC(12,4)`，无法表示时拒绝降级，不截断分数。
+- 草稿完整替换当前任务答案；`lock_version`每次成功写入递增，`last_page_id/saved_time`用于恢复。未作答不落一条伪零值答案。
+- 提交原子保存答案、原始分、状态和时间；`submission_snapshot`保存`schemaVersion/submissionId/answerDigest/versionId/evaluatorUserId/targetUserId/relationId/scoringRule/questionScores`。只有规范化内容和幂等键同时相同的重试可返回已有提交。
+- `fb_answer.value_snapshot`冻结题目Code/题型/标题、所选选项Code/文案；原始文本与原因保留在独立字段。正式答卷、答案和依据不能删除或覆盖。
+- `20260902_06_feedback_permissions`仅在既有`sys_menu`登记15项`feedback:*`权限，不创建平行身份体系、不自动授予任何角色。既有同名权限不变；降级只删除本迁移标记的菜单，若已授予角色则拒绝删除。
+- 当前结构门禁仍为14张领域表、196个字段/中文注释、10项`NUMERIC(12,4)`和1项`NUMERIC(18,4)`。完整接口与并发协议见[P6技术预检](./13-p6-answering-precheck.md)。

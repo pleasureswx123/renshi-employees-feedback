@@ -11,6 +11,7 @@ const emit = defineEmits(['update:modelValue'])
 const selectedOption = computed(() =>
   props.question.options.find(option => option.optionCode === props.modelValue?.optionCode)
 )
+const reasonLength = computed(() => [...(props.modelValue?.reason || '')].length)
 
 function changeOption(optionCode) {
   emit('update:modelValue', { optionCode, reason: '' })
@@ -30,7 +31,7 @@ function changeReason(reason) {
     <p v-if="question.description" class="question-description">{{ question.description }}</p>
     <el-radio-group
       :model-value="modelValue?.optionCode"
-      :disabled="mode === 'editor'"
+      :disabled="mode === 'editor' || mode === 'readonly'"
       class="option-list"
       @change="changeOption"
     >
@@ -49,12 +50,14 @@ function changeReason(reason) {
       :model-value="modelValue?.reason"
       type="textarea"
       :rows="3"
-      maxlength="500"
-      show-word-limit
+      :readonly="mode === 'readonly'"
+      :maxlength="mode === 'answer' ? undefined : 500"
+      :show-word-limit="mode !== 'answer'"
       placeholder="请说明选择该选项的原因"
       aria-label="附加原因"
       @input="changeReason"
     />
+    <small v-if="selectedOption?.requiresReason && mode === 'answer'">{{ reasonLength }}/500 字</small>
   </section>
 </template>
 
@@ -92,6 +95,8 @@ function changeReason(reason) {
   margin: 0;
   white-space: normal;
 }
+
+.option-list :deep(.el-radio__label) { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 
 .score-hint {
   margin-left: 8px;

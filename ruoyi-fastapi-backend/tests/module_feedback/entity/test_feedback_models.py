@@ -57,7 +57,7 @@ def test_all_p2_tables_and_columns_have_chinese_comments() -> None:
         assert all(column.comment for column in table.columns)
 
 
-def test_formal_scores_and_weights_use_numeric_12_4() -> None:
+def test_formal_scores_and_weights_use_exact_numeric_with_wide_sheet_total() -> None:
     numeric_columns = {
         ('fb_question', 'min_score'),
         ('fb_question', 'max_score'),
@@ -74,7 +74,8 @@ def test_formal_scores_and_weights_use_numeric_12_4() -> None:
     for table_name, column_name in numeric_columns:
         column_type = Base.metadata.tables[table_name].c[column_name].type
         assert isinstance(column_type, Numeric)
-        assert (column_type.precision, column_type.scale) == (12, 4)
+        expected_precision = 18 if (table_name, column_name) == ('fb_answer_sheet', 'raw_total_score') else 12
+        assert (column_type.precision, column_type.scale) == (expected_precision, 4)
 
 
 def test_immutable_submission_tables_do_not_define_soft_delete() -> None:

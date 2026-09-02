@@ -12,8 +12,10 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // 按浏览器构建链解析async-validator，避免Node外部化导入吞掉表单校验错误。
+    server: { deps: { inline: ['element-plus'] } },
     setupFiles: ['./tests/setup.js'],
-    exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
+    exclude: ['tests/e2e/**', 'tests/live-e2e/**', 'node_modules/**', 'dist/**'],
     clearMocks: true,
     restoreMocks: true
   }
