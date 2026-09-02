@@ -35,6 +35,8 @@
 
 RuoYi-Vue3-FastAPI是一套全部开源的快速开发平台，毫无保留给个人及企业免费使用。
 
+> 本仓库正在此基础上建设员工反馈与 360° 评价平台。项目采用 PostgreSQL，编码前的产品、架构、数据和验收基线见 [Feedback 项目文档](./docs/feedback/README.md)，仓库协作约束见 [AGENTS.md](./AGENTS.md)。
+
 * 前端采用Vue3、Element Plus，基于<u>[RuoYi-Vue3](https://github.com/yangzongzhuan/RuoYi-Vue3)</u>前端项目修改。
 * 移动端采用uni-app、Vue3、Vite，内置tailwindcss，基于<u>[RuoYi-App](https://github.com/yangzongzhuan/RuoYi-App)</u>项目修改。
 * 后端采用FastAPI、sqlalchemy、MySQL（PostgreSQL）、Redis、OAuth2 & Jwt。

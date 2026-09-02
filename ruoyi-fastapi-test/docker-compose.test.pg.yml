@@ -27,6 +27,10 @@ services:
     environment:
       TRANSPORT_CRYPTO_ENABLED: "false"
       TRANSPORT_CRYPTO_MODE: "off"
+      DB_DEFAULT_SOURCE: primary
+      DB_SOURCES: >-
+        {"primary":{"db_type":"postgresql","db_host":"ruoyi-pg","db_port":5432,"db_username":"postgres","db_password":"root","db_database":"ruoyi_feedback_test","db_required":true}}
+      REDIS_DATABASE: "3"
     depends_on:
       ruoyi-pg:
         condition: service_healthy
@@ -41,7 +45,7 @@ services:
     container_name: ruoyi-pg-test
     environment:
       POSTGRES_PASSWORD: root
-      POSTGRES_DB: ruoyi-fastapi
+      POSTGRES_DB: ruoyi_feedback_test
       POSTGRES_INITDB_ARGS: --encoding=UTF8 --lc-collate=C --lc-ctype=C
     ports:
       - "15433:5432"
@@ -51,7 +55,7 @@ services:
     networks:
       - ruoyi-network-test
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "ruoyi_feedback_test"]
       interval: 5s
       timeout: 10s
       retries: 30
