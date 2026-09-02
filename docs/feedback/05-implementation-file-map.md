@@ -6,31 +6,16 @@
 
 ```text
 ruoyi-fastapi-backend/
-├─ module_feedback/                         # 计划：评价核心模块
+├─ module_feedback/                         # 已存在：评价核心模块入口
+│  ├─ __init__.py                           # 已存在：模块路由注册
 │  ├─ controller/
-│  │  ├─ project_controller.py
-│  │  ├─ questionnaire_controller.py
-│  │  ├─ participant_controller.py
-│  │  ├─ task_controller.py
-│  │  ├─ progress_controller.py
-│  │  └─ report_controller.py
-│  ├─ service/
-│  │  ├─ project_service.py
-│  │  ├─ questionnaire_service.py
-│  │  ├─ publication_service.py
-│  │  ├─ task_service.py
-│  │  ├─ answer_service.py
-│  │  └─ report_service.py
-│  ├─ dao/
-│  ├─ entity/
-│  │  ├─ do/
-│  │  └─ vo/
-│  ├─ calculators/
-│  │  └─ score_calculator.py
-│  ├─ validators/
-│  │  └─ publication_validator.py
-│  └─ enums/
-│     └─ feedback_enums.py
+│  │  └─ feedback_controller.py             # 已存在：受登录保护的只读健康接口
+│  ├─ service/                              # 计划：P2及后续按业务需要创建
+│  ├─ dao/                                  # 计划：P2及后续按业务需要创建
+│  ├─ entity/                               # 计划：P2及后续按业务需要创建
+│  ├─ calculators/                          # 计划：P8计分实现
+│  ├─ validators/                           # 计划：P5发布校验
+│  └─ enums/                                # 计划：P2领域枚举
 ├─ alembic/versions/
 │  └─ 2026_09_02_1100-20260902_01_feedback_baseline.py
 │                                            # 已存在：RuoYi PostgreSQL基线revision
@@ -38,7 +23,9 @@ ruoyi-fastapi-backend/
 │  └─ feedback_p0_database_precheck.py       # 已存在：独立开发/测试库与Redis隔离预检
 ├─ tests/scripts/
 │  └─ test_feedback_p0_database_precheck.py  # 已存在：P0预检脚本直接测试
-└─ tests/module_feedback/                    # 计划：评价业务测试
+└─ tests/module_feedback/
+   └─ controller/
+      └─ test_feedback_controller.py         # 已存在：模块入口与鉴权测试
 ```
 
 具体拆分可以随实现调整，但Controller、Service、DAO、实体、计算器和发布校验职责不得混在单一大文件中。
@@ -49,55 +36,46 @@ ruoyi-fastapi-backend/
 feedback-frontend/
 ├─ AGENTS.md                                # 已存在：平台端规则
 ├─ README.md                                # 已存在：平台端说明和文档入口
-├─ package.json                             # 计划
-├─ vite.config.js                           # 计划
-├─ index.html                               # 计划
+├─ package.json                             # 已存在：依赖与开发、构建、测试命令
+├─ package-lock.json                        # 已存在：锁定依赖版本
+├─ vite.config.js                           # 已存在：Vite与后端代理配置
+├─ vitest.config.js                         # 已存在：前端单元测试配置
+├─ playwright.config.js                     # 已存在：浏览器E2E配置
+├─ index.html                               # 已存在：应用入口
 ├─ src/
-│  ├─ main.js
-│  ├─ App.vue
+│  ├─ main.js                               # 已存在：Vue、Pinia、Router、Element Plus入口
+│  ├─ App.vue                               # 已存在
 │  ├─ api/
-│  │  ├─ auth.js
+│  │  ├─ auth.js                            # 已存在：登录、当前用户和退出接口
 │  │  └─ feedback/
-│  │     ├─ projects.js
-│  │     ├─ questionnaires.js
-│  │     ├─ participants.js
-│  │     ├─ tasks.js
-│  │     ├─ progress.js
-│  │     └─ reports.js
-│  ├─ components/feedback/
-│  │  ├─ question-renderers/
-│  │  ├─ questionnaire-editor/
-│  │  ├─ participant-selector/
-│  │  └─ score-display/
+│  │     └─ ...                             # 计划：P3及后续真实业务接口
+│  ├─ components/
+│  │  └─ WorkspaceSwitcher.vue              # 已存在：双工作台切换
+│  ├─ components/feedback/                  # 计划：后续业务组件
 │  ├─ layouts/
-│  │  ├─ HrLayout.vue
-│  │  └─ EmployeeLayout.vue
+│  │  ├─ WorkspaceLayout.vue                # 已存在：共享工作台框架
+│  │  ├─ HrLayout.vue                       # 已存在
+│  │  └─ EmployeeLayout.vue                 # 已存在
 │  ├─ router/
-│  │  └─ index.js
+│  │  └─ index.js                           # 已存在：固定路由与权限守卫
 │  ├─ stores/
-│  │  ├─ auth.js
-│  │  ├─ permission.js
-│  │  └─ questionnaireEditor.js
+│  │  ├─ auth.js                            # 已存在：Token与会话恢复
+│  │  └─ permission.js                      # 已存在：权限并集与入口判定
 │  ├─ utils/
-│  │  ├─ request.js
-│  │  ├─ auth.js
-│  │  └─ transportCrypto.js
+│  │  ├─ request.js                         # 已存在：请求、401、错误和下载
+│  │  ├─ auth.js                            # 已存在：Token持久化
+│  │  ├─ sessionCache.js                    # 已存在：会话级策略缓存
+│  │  ├─ transportCryptoPolicy.js           # 已存在：后端传输策略同步
+│  │  └─ transportCrypto.js                 # 已存在：加解密信封实现
 │  └─ views/
-│     ├─ auth/
-│     ├─ employee/
-│     │  ├─ TodoList.vue
-│     │  ├─ TodoDetail.vue
-│     │  ├─ AnswerPage.vue
-│     │  ├─ SubmittedList.vue
-│     │  └─ SubmittedDetail.vue
-│     └─ hr/
-│        ├─ ProjectList.vue
-│        ├─ ProjectEditor.vue
-│        ├─ Participants.vue
-│        ├─ Publication.vue
-│        ├─ Progress.vue
-│        └─ Reports.vue
-└─ tests/                                   # 计划
+│     ├─ auth/LoginView.vue                  # 已存在：Element Plus登录表单
+│     ├─ errors/                             # 已存在：403与404页面
+│     └─ shared/PlaceholderView.vue          # 已存在：明确未实现业务边界
+└─ tests/
+   ├─ api/auth.test.js                       # 已存在：API契约测试
+   ├─ components/WorkspaceSwitcher.test.js  # 已存在：组件测试
+   ├─ stores/permission.test.js              # 已存在：Store测试
+   └─ e2e/login-routing.spec.js              # 已存在：登录与权限路由E2E
 ```
 
 ## 3. 管理端
