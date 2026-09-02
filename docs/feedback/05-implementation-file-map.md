@@ -10,22 +10,42 @@ ruoyi-fastapi-backend/
 │  ├─ __init__.py                           # 已存在：模块路由注册
 │  ├─ controller/
 │  │  └─ feedback_controller.py             # 已存在：受登录保护的只读健康接口
-│  ├─ service/                              # 计划：P2及后续按业务需要创建
-│  ├─ dao/                                  # 计划：P2及后续按业务需要创建
-│  ├─ entity/                               # 计划：P2及后续按业务需要创建
+│  ├─ service/
+│  │  └─ state_transition_service.py         # 已存在：项目与任务状态门禁
+│  ├─ dao/
+│  │  ├─ project_dao.py                     # 已存在：项目和问卷骨架查询
+│  │  ├─ assignment_dao.py                  # 已存在：评价任务查询与锁定
+│  │  ├─ answer_dao.py                      # 已存在：答卷查询与锁定
+│  │  └─ score_result_dao.py                # 已存在：计分结果查询
+│  ├─ entity/do/
+│  │  ├─ mixins.py                          # 已存在：审计和乐观锁字段
+│  │  ├─ project_do.py                      # 已存在：评价项目实体
+│  │  ├─ questionnaire_do.py                # 已存在：问卷、题目、选项和指标实体
+│  │  ├─ relation_do.py                     # 已存在：评价关系实体
+│  │  ├─ participant_do.py                  # 已存在：被评价人快照和任务实体
+│  │  ├─ answer_do.py                       # 已存在：答卷和答案实体
+│  │  └─ score_do.py                        # 已存在：计分结果实体
 │  ├─ calculators/                          # 计划：P8计分实现
 │  ├─ validators/                           # 计划：P5发布校验
-│  └─ enums/                                # 计划：P2领域枚举
+│  └─ enums/
+│     └─ feedback_enums.py                  # 已存在：P2领域枚举
 ├─ alembic/versions/
-│  └─ 2026_09_02_1100-20260902_01_feedback_baseline.py
-│                                            # 已存在：RuoYi PostgreSQL基线revision
+│  ├─ 2026_09_02_1100-20260902_01_feedback_baseline.py
+│  │                                          # 已存在：RuoYi PostgreSQL基线revision
+│  └─ 2026_09_02_1200-20260902_02_feedback_domain.py
+│                                             # 已存在：13张P2领域表及约束、索引、注释
 ├─ scripts/
-│  └─ feedback_p0_database_precheck.py       # 已存在：独立开发/测试库与Redis隔离预检
+│  ├─ feedback_p0_database_precheck.py       # 已存在：独立开发/测试库与Redis隔离预检
+│  └─ feedback_p2_schema_verify.py           # 已存在：P2结构和可逆迁移验证
 ├─ tests/scripts/
 │  └─ test_feedback_p0_database_precheck.py  # 已存在：P0预检脚本直接测试
 └─ tests/module_feedback/
-   └─ controller/
-      └─ test_feedback_controller.py         # 已存在：模块入口与鉴权测试
+   ├─ controller/                            # 已存在：模块入口与鉴权测试
+   ├─ enums/                                 # 已存在：枚举契约测试
+   ├─ service/                               # 已存在：状态转换测试
+   ├─ entity/                                # 已存在：模型和约束元数据测试
+   ├─ dao/                                   # 已存在：DAO单元及PostgreSQL事务测试
+   └─ migration/                             # 已存在：结构验证器门禁测试
 ```
 
 具体拆分可以随实现调整，但Controller、Service、DAO、实体、计算器和发布校验职责不得混在单一大文件中。
@@ -49,6 +69,8 @@ feedback-frontend/
 │  │  ├─ auth.js                            # 已存在：登录、当前用户和退出接口
 │  │  └─ feedback/
 │  │     └─ ...                             # 计划：P3及后续真实业务接口
+│  ├─ constants/
+│  │  └─ feedbackEnums.js                   # 已存在：与后端/数据库一致的领域枚举
 │  ├─ components/
 │  │  └─ WorkspaceSwitcher.vue              # 已存在：双工作台切换
 │  ├─ components/feedback/                  # 计划：后续业务组件
@@ -75,6 +97,7 @@ feedback-frontend/
    ├─ api/auth.test.js                       # 已存在：API契约测试
    ├─ components/WorkspaceSwitcher.test.js  # 已存在：组件测试
    ├─ stores/permission.test.js              # 已存在：Store测试
+   ├─ constants/feedbackEnums.test.js        # 已存在：P2枚举契约测试
    └─ e2e/login-routing.spec.js              # 已存在：登录与权限路由E2E
 ```
 
@@ -99,7 +122,8 @@ docs/feedback/
 ├─ 06-mvp-scope-and-acceptance.md
 ├─ 07-code-generator-usage.md
 ├─ 08-decisions-and-open-questions.md
-└─ 09-implementation-roadmap.md
+├─ 09-implementation-roadmap.md
+└─ 10-p2-field-dictionary.md
 ```
 
 ## 5. 文件创建原则

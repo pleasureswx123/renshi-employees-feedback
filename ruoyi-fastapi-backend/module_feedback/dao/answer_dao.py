@@ -1,0 +1,32 @@
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from module_feedback.entity.do import FbAnswerSheet
+
+
+class FeedbackAnswerDao:
+    """答卷及答案数据库访问。"""
+
+    @classmethod
+    async def add_answer_sheet(cls, db: AsyncSession, answer_sheet: FbAnswerSheet) -> FbAnswerSheet:
+        """新增答卷并刷新主键，不提交事务。"""
+        db.add(answer_sheet)
+        await db.flush()
+        return answer_sheet
+
+    @classmethod
+    async def get_by_assignment_id(cls, db: AsyncSession, assignment_id: int) -> FbAnswerSheet | None:
+        """读取任务答卷及其全部答案。"""
+        statement = (
+            select(FbAnswerSheet)
+            .where(FbAnswerSheet.assignment_id == assignment_id)
+            .options(selectinload(FbAnswerSheet.answers))
+        )
+        return (await db.execute(statement)).scalars().first()
+
+    @classmethod
+    async def get_by_assignment_id_for_update(cls, db: AsyncSession, assignment_id: int) -> FbAnswerSheet | None:
+        """锁定答卷主记录，答案写入与任务状态由服务层统一提交。"""
+        statement = select(FbAnswerSheet).where(FbAnswerSheet.assignment_id == assignment_id).with_for_update()
+        return (await db.execute(statement)).scalars().first()

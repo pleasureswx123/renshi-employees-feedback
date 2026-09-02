@@ -272,25 +272,25 @@ ruoyi-fastapi-backend/module_feedback/controller/feedback_controller.py
 
 ### 7.2 任务清单
 
-- [ ] `P2-01` 最终确认首期 ER 模型和字段字典。
+- [x] `P2-01` 最终确认首期 ER 模型和字段字典。
   - 输出：表、字段、类型、可空性、默认值、外键、唯一约束和中文注释。
   - 验证：与领域状态机、发布快照和计分输入逐项对应。
-- [ ] `P2-02` 创建项目与问卷配置迁移。
+- [x] `P2-02` 创建项目与问卷配置迁移。
   - 输出：`fb_project`、问卷版本、页面、题目、选项、指标和题目绑定表。
   - 验证：空库升级和降级通过，关键权重及顺序约束生效。
-- [ ] `P2-03` 创建关系与参与人员迁移。
+- [x] `P2-03` 创建关系与参与人员迁移。
   - 输出：评价关系、项目被评价人和评价任务表。
   - 验证：项目、评价人、被评价人和关系唯一约束生效。
-- [ ] `P2-04` 创建答卷与结果迁移。
+- [x] `P2-04` 创建答卷与结果迁移。
   - 输出：答卷、答案和计分结果表。
   - 验证：答卷题目唯一、正式分数使用 `NUMERIC`、提交数据不可软删除。
-- [ ] `P2-05` 实现状态和题型枚举。
+- [x] `P2-05` 实现状态和题型枚举。
   - 输出：项目状态、任务状态、题型、答案类型和结果类型枚举。
   - 验证：API、数据库和前端使用同一语义，不散落魔法字符串。
-- [ ] `P2-06` 实现 SQLAlchemy DO 和基础 DAO。
+- [x] `P2-06` 实现 SQLAlchemy DO 和基础 DAO。
   - 输出：实体映射和最小查询方法；可选择性借鉴代码生成结果。
   - 验证：关系加载、事务边界和异步会话行为有直接测试。
-- [ ] `P2-07` 建立状态转换测试。
+- [x] `P2-07` 建立状态转换测试。
   - 输出：准备、发布、完成及待评价、暂存、提交、关闭未完成的合法转换测试。
   - 验证：非法逆向转换在服务层被拒绝。
 
@@ -299,6 +299,44 @@ ruoyi-fastapi-backend/module_feedback/controller/feedback_controller.py
 - 全部首期表可以在独立 PostgreSQL 空库中由 Alembic 创建。
 - 关键唯一约束、检查约束和索引有自动化验证。
 - 实体模型能够表达发布冻结、逐人任务、提交快照和计分依据。
+
+### 7.4 2026-09-02执行与验收记录
+
+#### 已验证
+
+| 检查项 | 命令或方式 | 结果 |
+|---|---|---|
+| ER模型和字段字典 | [P2领域表与字段字典](./10-p2-field-dictionary.md)与迁移、模型逐项核对 | 13张表覆盖项目、冻结问卷、关系、人员快照、任务、答卷、答案和计分依据；字段类型、可空性、默认值、外键和业务约束已固化 |
+| Alembic迁移链 | `python -m alembic -c alembic.ini heads/history --verbose` | 仓库唯一head为`20260902_02_feedback_domain`，父revision为P0基线 |
+| 独立开发/测试库升级 | `python scripts\feedback_p0_database_precheck.py --env=dev` | `ruoyi_feedback_dev`和`ruoyi_feedback_test`均升级到P2 head；数据库、Redis隔离和传输加密诊断继续通过 |
+| 可逆迁移 | `python scripts\feedback_p2_schema_verify.py --database ruoyi_feedback_test --migration-cycle --yes` | 脚本确认13张评价表为空后降到P0基线，评价表数量变为0，再升级回P2 head并恢复13张表 |
+| PostgreSQL结构核验 | `feedback_p2_schema_verify.py`分别检查开发库和测试库 | 13张表、182个字段/中文注释、11个`NUMERIC(12,4)`字段、10个关键约束、9个关键索引均通过；182个字段与SQLAlchemy模型的类型和可空性一致 |
+| 不可变和正式分数边界 | 数据库元数据与模型测试 | `fb_answer_sheet`、`fb_answer`、`fb_score_result`均无软删除字段；评价表不存在`REAL/DOUBLE PRECISION`正式分数字段 |
+| 异步DAO与数据库约束 | 显式启用隔离PostgreSQL的DAO测试 | 真实异步Session完成项目/版本/页面/任务关系加载；DAO不提交事务；重复任务、重复单题答案和非法任务状态被数据库拒绝；外层事务回滚后不留业务数据 |
+| 后端自动化测试 | `RUN_FEEDBACK_POSTGRES_TESTS=1 python -m pytest tests\module_feedback` | P1模块入口及P2枚举、状态机、实体、DAO、迁移门禁共42项通过 |
+| 前端枚举契约 | `npm test` | 前端状态、题型、答案值、关系和结果类型与后端枚举、数据库检查约束一致；前端共9项测试通过 |
+| 格式与静态检查 | `ruff check`、`ruff format --check`、`git diff --check` | P2后端代码、迁移、脚本和测试检查通过 |
+
+#### 实现边界
+
+- P2只建立领域持久化、枚举、状态门禁和最小DAO，不提前实现P3项目CRUD、问卷编辑API或页面。
+- 发布、提交和完成的完整事务编排仍在后续服务阶段实现；P2 DAO只负责访问和锁定，不自行`commit`。
+- `fb_project_target`和`fb_assignment`保存发布时姓名、部门快照，同时继续引用RuoYi `sys_user/sys_dept`。
+- `fb_score_result.score`允许为空表达“数据不足”，并保存原配置权重、实际权重、完成数量和`calculation_basis`，不使用0掩盖缺失关系。
+- 全仓库`alembic check`仍会报告P2范围外既有AI插件表和RuoYi基线索引/默认值差异；P2使用限定`fb_`表的182字段、约束、索引和真实迁移循环完成无漂移核验，未修改这些既有差异。
+
+#### P2阶段结论
+
+```text
+阶段：P2 领域骨架与PostgreSQL迁移
+完成日期：2026-09-02
+实现范围：P2-01至P2-07全部完成
+数据库迁移：20260902_02_feedback_domain；13张fb_表，支持降到P0基线并重新升级
+验证命令与结果：后端42项、前端9项测试通过；两个隔离库结构核验通过；测试库降级/升级循环通过
+浏览器验收：P2不新增用户可见流程；沿用P1浏览器基线，本阶段不以静态页面冒充业务功能
+遗留问题：全仓库Alembic自动比较存在P2范围外既有漂移；已明确隔离，P2的fb_模型与数据库182字段一致
+是否允许进入下一阶段：是
+```
 
 ## 8. P3：项目草稿与单选题垂直切片
 
@@ -633,4 +671,4 @@ ruoyi-fastapi-backend/module_feedback/controller/feedback_controller.py
 
 ## 18. 当前执行起点
 
-`P0`和`P1`已经完成并通过阶段门禁，下一执行阶段为`P2 领域骨架与 PostgreSQL 迁移`。P2尚未开始；仍不得直接跳到项目业务、完整问卷编辑器或更后阶段。
+`P0`、`P1`和`P2`已经完成并通过阶段门禁，下一执行阶段为`P3 项目草稿与单选题垂直切片`。P3尚未开始；仍不得直接跳到完整问卷设计器、发布任务或更后阶段。
