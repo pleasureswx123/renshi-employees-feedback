@@ -25,12 +25,18 @@ const routes = [
       {
         path: 'projects',
         name: 'hr-projects',
-        component: () => import('@/views/shared/PlaceholderView.vue'),
-        props: {
-          title: '评价项目',
-          description: 'P1 已完成工程与权限基线；项目管理业务将在后续阶段接入真实数据。'
-        },
+        component: () => import('@/views/hr/ProjectListView.vue'),
         meta: { title: '评价项目', workspace: 'hr', permissions: ['feedback:project:list'] }
+      },
+      {
+        path: 'projects/:projectId/editor',
+        name: 'hr-questionnaire-editor',
+        component: () => import('@/views/hr/QuestionnaireEditorView.vue'),
+        meta: {
+          title: '问卷编辑器',
+          workspace: 'hr',
+          permissions: ['feedback:questionnaire:edit']
+        }
       }
     ]
   },

@@ -5,7 +5,15 @@ const userInfo = {
   msg: '操作成功',
   user: { userId: 2, userName: 'feedback-user', nickName: '评价用户' },
   roles: ['feedback_hr', 'feedback_employee'],
-  permissions: ['feedback:project:list', 'feedback:task:view', 'feedback:history:view']
+  permissions: [
+    'feedback:project:list',
+    'feedback:project:add',
+    'feedback:project:edit',
+    'feedback:project:remove',
+    'feedback:questionnaire:edit',
+    'feedback:task:view',
+    'feedback:history:view'
+  ]
 }
 
 async function mockPublicEndpoints(page) {
@@ -24,6 +32,18 @@ async function mockPublicEndpoints(page) {
   )
   await page.route('**/dev-api/captchaImage', route =>
     route.fulfill({ json: { code: 200, captchaEnabled: false } })
+  )
+  await page.route('**/dev-api/feedback/projects*', route =>
+    route.fulfill({
+      json: {
+        code: 200,
+        rows: [],
+        pageNum: 1,
+        pageSize: 10,
+        total: 0,
+        hasNext: false
+      }
+    })
   )
 }
 
@@ -63,7 +83,7 @@ test('失效Token刷新受保护路由后返回登录页', async ({ context, pag
     route.fulfill({ json: { code: 401, msg: '登录状态已失效' } })
   )
   await context.addCookies([
-    { name: 'Feedback-Token', value: 'expired-token', url: 'http://127.0.0.1:5174' }
+    { name: 'Feedback-Token', value: 'expired-token', url: 'http://127.0.0.1:5176' }
   ])
 
   await page.goto('/employee/todos')

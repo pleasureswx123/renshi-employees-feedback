@@ -21,7 +21,7 @@ async def get_feedback_module_health() -> Response:
         data={
             'module': 'feedback',
             'status': 'ready',
-            'phase': 'P1',
+            'phase': 'P3',
             'apiPrefix': '/feedback',
         }
     )

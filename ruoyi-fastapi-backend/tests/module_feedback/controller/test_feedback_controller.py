@@ -69,6 +69,6 @@ async def test_feedback_health_response_is_read_only_phase_probe() -> None:
     assert payload['data'] == {
         'module': 'feedback',
         'status': 'ready',
-        'phase': 'P1',
+        'phase': 'P3',
         'apiPrefix': '/feedback',
     }
