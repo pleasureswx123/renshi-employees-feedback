@@ -56,4 +56,5 @@ class FbRelation(FeedbackAuditMixin, Base):
     sort_order = Column(Integer, nullable=False, comment='关系顺序')
 
     questionnaire_version = relationship('FbQuestionnaireVersion', back_populates='relations', lazy='raise')
+    evaluator_selections = relationship('FbEvaluatorSelection', lazy='raise', viewonly=True)
     assignments = relationship('FbAssignment', lazy='raise', viewonly=True)

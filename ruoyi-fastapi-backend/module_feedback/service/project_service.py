@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.vo import PageModel
 from exceptions.exception import ServiceException
+from module_feedback.constants import DEFAULT_RELATION_DEFINITIONS
 from module_feedback.dao import FeedbackProjectDao
-from module_feedback.entity.do import FbProject, FbQuestionnairePage, FbQuestionnaireVersion
+from module_feedback.entity.do import FbProject, FbQuestionnairePage, FbQuestionnaireVersion, FbRelation
 from module_feedback.entity.vo import (
     ProjectCreateModel,
     ProjectDetailModel,
@@ -36,6 +37,26 @@ class FeedbackProjectService:
     @staticmethod
     def _stable_code(prefix: str) -> str:
         return f'{prefix}_{uuid.uuid4().hex}'
+
+    @staticmethod
+    def _build_default_relations(project_id: int, version_id: int, operator_name: str) -> list[FbRelation]:
+        """为新草稿构造没有组织权重假设的固定评价关系。"""
+        return [
+            FbRelation(
+                project_id=project_id,
+                version_id=version_id,
+                relation_code=item.code,
+                relation_type=item.relation_type.value,
+                relation_name=item.name,
+                is_enabled=item.is_enabled,
+                participates_in_score=item.participates_in_score,
+                weight=item.weight,
+                sort_order=item.sort_order,
+                create_by=operator_name,
+                update_by=operator_name,
+            )
+            for item in DEFAULT_RELATION_DEFINITIONS
+        ]
 
     @classmethod
     def _to_summary(cls, project: FbProject) -> ProjectSummaryModel:
@@ -108,7 +129,7 @@ class FeedbackProjectService:
         owner_dept_id: int | None,
         operator_name: str,
     ) -> ProjectDetailModel:
-        """在同一事务中创建项目、草稿版本和第一页。"""
+        """在同一事务中创建项目、草稿版本、第一页和固定评价关系。"""
         try:
             project = await FeedbackProjectDao.add_project(
                 query_db,
@@ -132,15 +153,18 @@ class FeedbackProjectService:
                     update_by=operator_name,
                 ),
             )
-            query_db.add(
-                FbQuestionnairePage(
-                    version_id=version.version_id,
-                    page_code=cls._stable_code('P'),
-                    page_title='第1页',
-                    sort_order=1,
-                    create_by=operator_name,
-                    update_by=operator_name,
-                )
+            query_db.add_all(
+                [
+                    FbQuestionnairePage(
+                        version_id=version.version_id,
+                        page_code=cls._stable_code('P'),
+                        page_title='第1页',
+                        sort_order=1,
+                        create_by=operator_name,
+                        update_by=operator_name,
+                    ),
+                    *cls._build_default_relations(project.project_id, version.version_id, operator_name),
+                ]
             )
             await query_db.commit()
             loaded = await FeedbackProjectDao.get_project_by_id_scoped(query_db, project.project_id, True)

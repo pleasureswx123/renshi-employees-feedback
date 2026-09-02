@@ -68,7 +68,10 @@ service.interceptors.response.use(
     if (code !== 200) {
       const message = payload.msg || '请求失败'
       ElMessage.error(message)
-      throw new Error(message)
+      const businessError = new Error(message)
+      businessError.status = code
+      businessError.data = payload.data
+      throw businessError
     }
     return payload
   },
@@ -90,7 +93,10 @@ service.interceptors.response.use(
       (error.code === 'ECONNABORTED' ? '系统接口请求超时' : error.message) ||
       '后端接口连接异常'
     ElMessage.error(message)
-    throw new Error(message)
+    const requestError = new Error(message)
+    requestError.status = Number(error.response?.status || error.response?.data?.code || 0)
+    requestError.data = error.response?.data?.data
+    throw requestError
   }
 )
 

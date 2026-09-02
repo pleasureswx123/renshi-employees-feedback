@@ -13,7 +13,15 @@ EXPECTED_ROUTES = {
     ('DELETE', '/feedback/projects/{project_id}'): 'feedback:project:remove',
     ('GET', '/feedback/projects/{project_id}/questionnaire-draft'): 'feedback:questionnaire:edit',
     ('PUT', '/feedback/projects/{project_id}/questionnaire-draft'): 'feedback:questionnaire:edit',
+    ('GET', '/feedback/projects/{project_id}/participant-options'): 'feedback:participant:manage',
+    ('GET', '/feedback/projects/{project_id}/publication-config'): [
+        'feedback:participant:manage',
+        'feedback:project:publish',
+    ],
+    ('PUT', '/feedback/projects/{project_id}/publication-config'): 'feedback:participant:manage',
+    ('POST', '/feedback/projects/{project_id}/publish'): 'feedback:project:publish',
 }
+EXPECTED_USER_SCOPE_COUNT = 3
 
 
 def test_project_routes_use_fixed_permissions_and_data_scope() -> None:
@@ -26,7 +34,7 @@ def test_project_routes_use_fixed_permissions_and_data_scope() -> None:
         dependencies = [item.call for item in route.dependant.dependencies]
         assert any(isinstance(item, PreAuth) for item in dependencies)
         assert any(isinstance(item, CheckUserInterfaceAuth) and item.perm == permission for item in dependencies)
-        if route_key[0] != 'POST':
+        if route_key != ('POST', '/feedback/projects'):
             assert any(isinstance(item, GetDataScope) for item in dependencies)
 
 
@@ -37,5 +45,11 @@ def test_project_routes_bind_feedback_project_data_scope_aliases() -> None:
     ]
 
     assert scoped_dependencies
-    assert all(item.user_alias == 'owner_user_id' for item in scoped_dependencies)
-    assert all(item.dept_alias == 'owner_dept_id' for item in scoped_dependencies)
+    project_scopes = [item for item in scoped_dependencies if item.query_alias.__tablename__ == 'fb_project']
+    user_scopes = [item for item in scoped_dependencies if item.query_alias.__tablename__ == 'sys_user']
+
+    assert project_scopes
+    assert all(item.user_alias == 'owner_user_id' for item in project_scopes)
+    assert all(item.dept_alias == 'owner_dept_id' for item in project_scopes)
+    assert len(user_scopes) == EXPECTED_USER_SCOPE_COUNT
+    assert all(item.user_alias == 'user_id' and item.dept_alias == 'dept_id' for item in user_scopes)

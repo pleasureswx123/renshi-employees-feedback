@@ -36,3 +36,33 @@ export function saveQuestionnaireDraft(projectId, data) {
     headers: { repeatInterval: 1500 }
   })
 }
+
+export function listParticipantOptions(projectId, params) {
+  return request({
+    url: `/feedback/projects/${projectId}/participant-options`,
+    method: 'get',
+    params
+  })
+}
+
+export function getPublicationConfig(projectId) {
+  return request({ url: `/feedback/projects/${projectId}/publication-config`, method: 'get' })
+}
+
+export function savePublicationConfig(projectId, data) {
+  return request({
+    url: `/feedback/projects/${projectId}/publication-config`,
+    method: 'put',
+    data,
+    headers: { repeatInterval: 1500 }
+  })
+}
+
+export function publishProject(projectId, data) {
+  return request({
+    url: `/feedback/projects/${projectId}/publish`,
+    method: 'post',
+    data,
+    headers: { repeatInterval: 3000 }
+  })
+}

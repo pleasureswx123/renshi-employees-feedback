@@ -37,6 +37,16 @@ const routes = [
           workspace: 'hr',
           permissions: ['feedback:questionnaire:edit']
         }
+      },
+      {
+        path: 'projects/:projectId/publication',
+        name: 'hr-publication-config',
+        component: () => import('@/views/hr/PublicationConfigView.vue'),
+        meta: {
+          title: '人员关系与发布',
+          workspace: 'hr',
+          permissions: ['feedback:participant:manage', 'feedback:project:publish']
+        }
       }
     ]
   },

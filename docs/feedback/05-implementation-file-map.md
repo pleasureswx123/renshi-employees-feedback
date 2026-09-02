@@ -1,6 +1,6 @@
 # 计划文件清单
 
-本清单同时登记已落地文件和下一阶段计划。标记“计划”的路径尚未创建，不代表已经实现；P4已按[技术预检](./11-p4-questionnaire-designer-precheck.md)完成，后续计划从P5开始。
+本清单同时登记已落地文件和下一阶段计划。标记“计划”的路径尚未创建，不代表已经实现；P4和P5已按各自技术预检协议完成并通过阶段门禁，下一步从`P6-01`开始。
 
 ## 1. 后端
 
@@ -8,17 +8,20 @@
 ruoyi-fastapi-backend/
 ├─ module_feedback/                         # 已存在：评价核心模块入口
 │  ├─ __init__.py                           # 已存在：模块路由注册
+│  ├─ constants.py                          # 已存在：P5固定关系Code、类型和零权重默认协议
 │  ├─ controller/
 │  │  ├─ feedback_controller.py             # 已存在：受登录保护的只读健康接口
-│  │  └─ project_controller.py              # 已存在：项目CRUD和P4问卷草稿GET/PUT
+│  │  └─ project_controller.py              # 已存在：项目/P4草稿及P5候选人、聚合配置和发布接口
 │  ├─ service/
-│  │  ├─ project_service.py                 # 已存在：P3项目状态、权限、数据范围和事务
+│  │  ├─ project_service.py                 # 已存在：P3项目事务及P5新项目固定关系初始化
 │  │  ├─ questionnaire_service.py           # 已存在：P4聚合草稿事务、恢复、校验和乐观锁
-│  │  └─ state_transition_service.py        # 已存在：项目与任务状态门禁
+│  │  ├─ state_transition_service.py        # 已存在：项目与任务状态门禁
+│  │  └─ publication_service.py             # 已存在：P5聚合配置、发布校验、锁、快照和单事务发布
 │  ├─ dao/
 │  │  ├─ project_dao.py                     # 已存在：项目查询、锁定和持久化
 │  │  ├─ questionnaire_dao.py               # 已存在：问卷草稿查询、锁定和整体替换
 │  │  ├─ assignment_dao.py                  # 已存在：评价任务查询与锁定
+│  │  ├─ publication_dao.py                 # 已存在：P5关系/目标/选择替换、人员锁定和冻结读取
 │  │  ├─ answer_dao.py                      # 已存在：答卷查询与锁定
 │  │  └─ score_result_dao.py                # 已存在：计分结果查询
 │  ├─ entity/do/
@@ -26,17 +29,19 @@ ruoyi-fastapi-backend/
 │  │  ├─ project_do.py                      # 已存在：评价项目实体
 │  │  ├─ questionnaire_do.py                # 已存在：问卷、题目、选项和指标实体
 │  │  ├─ relation_do.py                     # 已存在：评价关系实体
-│  │  ├─ participant_do.py                  # 已存在：被评价人快照和任务实体
+│  │  ├─ participant_do.py                  # 已存在：被评价人快照、评价人选择配置和正式任务实体
 │  │  ├─ answer_do.py                       # 已存在：答卷和答案实体
 │  │  └─ score_do.py                        # 已存在：计分结果实体
 │  ├─ entity/vo/
 │  │  ├─ project_vo.py                      # 已存在：P3项目请求和响应协议
 │  │  ├─ questionnaire_vo.py                # 已存在：P4问卷页面、富文本和聚合草稿协议
 │  │  ├─ questionnaire_question_vo.py       # 已存在：五种题型Pydantic判别联合
-│  │  └─ indicator_vo.py                    # 已存在：指标及稳定题目Code绑定协议
+│  │  ├─ indicator_vo.py                    # 已存在：指标及稳定题目Code绑定协议
+│  │  └─ publication_vo.py                  # 已存在：P5人员候选、聚合配置、预览和发布协议
 │  ├─ calculators/                          # 计划：P8计分实现
 │  ├─ validators/
-│  │  └─ questionnaire_validator.py         # 已存在：结构错误、富文本与发布就绪校验
+│  │  ├─ questionnaire_validator.py         # 已存在：结构错误、富文本与发布就绪校验
+│  │  └─ publication_validator.py           # 已存在：P5人员、关系、选择和组合发布校验
 │  └─ enums/
 │     └─ feedback_enums.py                  # 已存在：P2领域枚举
 ├─ alembic/versions/
@@ -44,18 +49,20 @@ ruoyi-fastapi-backend/
 │  │                                          # 已存在：RuoYi PostgreSQL基线revision
 │  ├─ 2026_09_02_1200-20260902_02_feedback_domain.py
 │  │                                          # 已存在：13张P2领域表及约束、索引、注释
-│  └─ 2026_09_02_1300-20260902_03_feedback_designer.py
-│                                             # 已存在：P4富文本说明和页面稳定标识迁移
+│  ├─ 2026_09_02_1300-20260902_03_feedback_designer.py
+│  │                                          # 已存在：P4富文本说明和页面稳定标识迁移
+│  └─ 2026_09_02_1400-20260902_04_feedback_publication.py
+│                                             # 已存在：P5评价人选择配置表和固定关系回填
 ├─ scripts/
 │  ├─ feedback_p0_database_precheck.py       # 已存在：独立开发/测试库与Redis隔离预检
-│  └─ feedback_p2_schema_verify.py           # 已存在：P2/P4结构和两级可逆迁移验证
+│  └─ feedback_p2_schema_verify.py           # 已存在：P2/P4/P5结构及设计器/发布迁移往返验证
 ├─ tests/scripts/
 │  └─ test_feedback_p0_database_precheck.py  # 已存在：P0预检脚本直接测试
 └─ tests/module_feedback/
    ├─ controller/                            # 已存在：模块入口、项目和草稿API测试
    ├─ enums/                                 # 已存在：枚举契约测试
-   ├─ service/                               # 已存在：状态门禁及P3/P4真实PostgreSQL服务测试
-   ├─ entity/                                # 已存在：模型、约束元数据和P3/P4 VO测试
+   ├─ service/                               # 已存在：状态门禁及P3/P4/P5真实PostgreSQL服务测试
+   ├─ entity/                                # 已存在：模型、约束元数据、P3/P4 VO及P5固定关系测试
    ├─ dao/                                   # 已存在：DAO单元及真实PostgreSQL事务测试
    └─ migration/                             # 已存在：结构验证器门禁测试
 ```
@@ -80,7 +87,7 @@ feedback-frontend/
 │  ├─ api/
 │  │  ├─ auth.js                            # 已存在：登录、当前用户和退出接口
 │  │  └─ feedback/
-│  │     └─ projects.js                     # 已存在：项目CRUD和P4聚合问卷草稿接口
+│  │     └─ projects.js                     # 已存在：项目/P4草稿及P5配置/发布接口
 │  ├─ constants/
 │  │  └─ feedbackEnums.js                   # 已存在：与后端/数据库一致的领域枚举
 │  ├─ components/
@@ -91,6 +98,7 @@ feedback-frontend/
 │  │     ├─ QuestionTypePanel.vue           # 已存在：五种题型入口
 │  │     ├─ IndicatorPanel.vue              # 已存在：指标、权重和题目绑定
 │  │     ├─ RichTextEditor.vue              # 已存在：受限Tiptap JSON编辑与只读渲染
+│  │     ├─ publication/                    # 已存在：P5目标、关系、评价人双栏和发布预览组件
 │  │     └─ questions/
 │  │        ├─ questionTypeRegistry.js       # 已存在：五题型完整注册定义
 │  │        ├─ QuestionRenderer.vue          # 已存在：编辑预览共用渲染入口
@@ -108,11 +116,12 @@ feedback-frontend/
 │  │  ├─ HrLayout.vue                       # 已存在
 │  │  └─ EmployeeLayout.vue                 # 已存在
 │  ├─ router/
-│  │  └─ index.js                           # 已存在：固定路由与权限守卫
+│  │  └─ index.js                           # 已存在：固定路由、权限守卫和P5发布配置路由
 │  ├─ stores/
 │  │  ├─ auth.js                            # 已存在：Token与会话恢复
 │  │  ├─ permission.js                      # 已存在：权限并集与入口判定
-│  │  └─ questionnaireDraft.js              # 已存在：多页/题目/指标编辑、保存和ID水合动作
+│  │  ├─ questionnaireDraft.js              # 已存在：多页/题目/指标编辑、保存和ID水合动作
+│  │  └─ publicationConfig.js               # 已存在：P5聚合配置、脏状态、预览和发布动作
 │  ├─ utils/
 │  │  ├─ request.js                         # 已存在：请求、401、错误和下载
 │  │  ├─ auth.js                            # 已存在：Token持久化
@@ -120,6 +129,7 @@ feedback-frontend/
 │  │  ├─ transportCryptoPolicy.js           # 已存在：后端传输策略同步
 │  │  ├─ transportCrypto.js                 # 已存在：加解密信封实现
 │  │  ├─ questionnaireDraft.js              # 已存在：P4草稿规范化、校验和满分预览
+│  │  ├─ publicationConfig.js               # 已存在：P5配置规范化、固定关系与序列化校验
 │  │  ├─ fixedDecimal.js                    # 已存在：四位定点数运算与序列化
 │  │  └─ stableCode.js                      # 已存在：页面、题目、选项和指标稳定标识
 │  └─ views/
@@ -127,15 +137,16 @@ feedback-frontend/
 │     ├─ errors/                             # 已存在：403与404页面
 │     ├─ hr/
 │     │  ├─ ProjectListView.vue              # 已存在：P3项目草稿管理
-│     │  └─ QuestionnaireEditorView.vue      # 已存在：P4五题型、多页、指标设计器
+│     │  ├─ QuestionnaireEditorView.vue      # 已存在：P4五题型、多页、指标设计器
+│     │  └─ PublicationConfigView.vue        # 已存在：P5人员关系配置、权威预览、发布和只读复核
 │     └─ shared/PlaceholderView.vue          # 已存在：明确未实现业务边界
 └─ tests/
-   ├─ api/                                   # 已存在：登录、项目和草稿API测试
-   ├─ components/                            # 已存在：工作台、五题型注册表和共享渲染测试
+   ├─ api/                                   # 已存在：登录、项目、草稿和P5配置/发布测试
+   ├─ components/                            # 已存在：工作台、五题型及P5预览和冻结只读组件测试
    ├─ constants/feedbackEnums.test.js        # 已存在：P2枚举契约测试
-   ├─ stores/                                # 已存在：权限和P4聚合草稿Store测试
-   ├─ utils/                                 # 已存在：四位定点数直接测试
-   └─ e2e/                                   # 已存在：登录路由和P4完整编辑器浏览器测试
+   ├─ stores/                                # 已存在：权限、P4草稿和P5发布Store测试
+   ├─ utils/                                 # 已存在：四位定点数和P5配置协议测试
+   └─ e2e/                                   # 已存在：登录、P4和P5发布/权限浏览器测试
 ```
 
 ## 3. 管理端
@@ -161,7 +172,8 @@ docs/feedback/
 ├─ 08-decisions-and-open-questions.md
 ├─ 09-implementation-roadmap.md
 ├─ 10-p2-field-dictionary.md
-└─ 11-p4-questionnaire-designer-precheck.md
+├─ 11-p4-questionnaire-designer-precheck.md
+└─ 12-p5-publication-precheck.md
 ```
 
 ## 5. 文件创建原则

@@ -71,7 +71,78 @@ class FbProjectTarget(FeedbackAuditMixin, Base):
     )
 
     project = relationship('FbProject', back_populates='targets', lazy='raise')
+    evaluator_selections = relationship('FbEvaluatorSelection', lazy='raise', viewonly=True)
     assignments = relationship('FbAssignment', lazy='raise', viewonly=True)
+
+
+class FbEvaluatorSelection(FeedbackAuditMixin, Base):
+    """准备期评价人选择及发布后的冻结任务来源。"""
+
+    __tablename__ = 'fb_evaluator_selection'
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ['project_id', 'version_id', 'relation_id'],
+            ['fb_relation.project_id', 'fb_relation.version_id', 'fb_relation.relation_id'],
+            name='fk_fb_evaluator_selection_relation',
+            ondelete='CASCADE',
+        ),
+        ForeignKeyConstraint(
+            ['project_id', 'version_id', 'target_user_id', 'target_id'],
+            [
+                'fb_project_target.project_id',
+                'fb_project_target.version_id',
+                'fb_project_target.target_user_id',
+                'fb_project_target.target_id',
+            ],
+            name='fk_fb_evaluator_selection_target',
+            ondelete='CASCADE',
+        ),
+        UniqueConstraint(
+            'project_id',
+            'evaluator_user_id',
+            'target_user_id',
+            'relation_id',
+            name='uq_fb_evaluator_selection_business_key',
+        ),
+        Index(
+            'ix_fb_evaluator_selection_project_version',
+            'project_id',
+            'version_id',
+        ),
+        Index(
+            'ix_fb_evaluator_selection_evaluator_project',
+            'evaluator_user_id',
+            'project_id',
+        ),
+        {'comment': '评价人选择配置表'},
+    )
+
+    selection_id = Column(BigInteger, primary_key=True, autoincrement=True, comment='评价人选择配置ID')
+    project_id = Column(
+        BigInteger,
+        ForeignKey('fb_project.project_id', name='fk_fb_evaluator_selection_project', ondelete='RESTRICT'),
+        nullable=False,
+        comment='评价项目ID',
+    )
+    version_id = Column(BigInteger, nullable=False, comment='问卷版本ID')
+    target_id = Column(BigInteger, nullable=False, comment='项目被评价人记录ID')
+    target_user_id = Column(
+        BigInteger,
+        ForeignKey('sys_user.user_id', name='fk_fb_evaluator_selection_target_user', ondelete='RESTRICT'),
+        nullable=False,
+        comment='被评价人用户ID',
+    )
+    relation_id = Column(BigInteger, nullable=False, comment='评价关系ID')
+    evaluator_user_id = Column(
+        BigInteger,
+        ForeignKey('sys_user.user_id', name='fk_fb_evaluator_selection_evaluator_user', ondelete='RESTRICT'),
+        nullable=False,
+        comment='评价人用户ID',
+    )
+
+    project = relationship('FbProject', lazy='raise', viewonly=True)
+    relation = relationship('FbRelation', lazy='raise', viewonly=True)
+    target_snapshot = relationship('FbProjectTarget', lazy='raise', viewonly=True)
 
 
 class FbAssignment(LockVersionMixin, Base):

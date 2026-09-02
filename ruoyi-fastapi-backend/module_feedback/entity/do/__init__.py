@@ -3,7 +3,7 @@
 from module_admin.entity.do.dept_do import SysDept as _SysDept  # noqa: F401
 from module_admin.entity.do.user_do import SysUser as _SysUser  # noqa: F401
 from module_feedback.entity.do.answer_do import FbAnswer, FbAnswerSheet
-from module_feedback.entity.do.participant_do import FbAssignment, FbProjectTarget
+from module_feedback.entity.do.participant_do import FbAssignment, FbEvaluatorSelection, FbProjectTarget
 from module_feedback.entity.do.project_do import FbProject
 from module_feedback.entity.do.questionnaire_do import (
     FbIndicator,
@@ -20,6 +20,7 @@ __all__ = [
     'FbAnswer',
     'FbAnswerSheet',
     'FbAssignment',
+    'FbEvaluatorSelection',
     'FbIndicator',
     'FbIndicatorQuestion',
     'FbProject',

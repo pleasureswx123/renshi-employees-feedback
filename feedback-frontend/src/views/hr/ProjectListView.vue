@@ -145,7 +145,7 @@ onMounted(loadProjects)
     <header class="page-header">
       <div>
         <h1 class="page-heading">评价项目</h1>
-        <p class="page-description">创建准备阶段项目，并进入专用问卷编辑器配置问卷与指标草稿。</p>
+        <p class="page-description">创建并配置问卷、人员与关系；发布后可复核冻结配置。</p>
       </div>
       <el-button
         v-if="permissionStore.hasPermission('feedback:project:add')"
@@ -192,7 +192,7 @@ onMounted(loadProjects)
         <el-table-column prop="createBy" label="创建人" width="140" />
         <el-table-column prop="createTime" label="创建时间" width="190" />
         <el-table-column prop="updateTime" label="最近更新" width="190" />
-        <el-table-column label="操作" width="300" fixed="right">
+        <el-table-column label="操作" width="390" fixed="right">
           <template #default="{ row }">
             <el-button
               v-if="row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:questionnaire:edit')"
@@ -201,6 +201,14 @@ onMounted(loadProjects)
               @click="router.push(`/hr/projects/${row.projectId}/editor`)"
             >
               编辑问卷
+            </el-button>
+            <el-button
+              v-if="permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish'])"
+              type="primary"
+              link
+              @click="router.push(`/hr/projects/${row.projectId}/publication`)"
+            >
+              {{ row.status === ProjectStatus.PREPARING ? '配置并发布' : '查看发布配置' }}
             </el-button>
             <el-button
               v-if="row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:project:edit')"

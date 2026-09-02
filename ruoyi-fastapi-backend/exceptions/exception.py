@@ -48,6 +48,15 @@ class ServiceWarning(Exception):
         self.message = message
 
 
+class ConflictException(Exception):
+    """业务状态、乐观锁或发布完整性冲突。"""
+
+    def __init__(self, data: object | None = None, message: str | None = None) -> None:
+        self.data = data
+        self.message = message
+        super().__init__(message)
+
+
 class FileRangeNotSatisfiableException(Exception):
     """
     文件Range范围不可满足异常

@@ -293,6 +293,26 @@ class ResponseUtil:
         )
 
     @classmethod
+    def conflict(
+        cls,
+        msg: str = '请求状态冲突，请刷新后重试',
+        data: Any | None = None,
+    ) -> Response:
+        """返回HTTP 409业务冲突。"""
+        result = {
+            'code': HttpStatusConstant.CONFLICT,
+            'msg': msg,
+            'success': False,
+            'time': datetime.now(),
+        }
+        if data is not None:
+            result['data'] = data
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=jsonable_encoder(result),
+        )
+
+    @classmethod
     def streaming(
         cls,
         *,

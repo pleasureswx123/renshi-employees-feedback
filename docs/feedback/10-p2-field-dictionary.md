@@ -1,8 +1,8 @@
-# P2领域表与P4增量字段字典
+# P2领域表与P4/P5增量字段字典
 
 ## 1. 文档状态
 
-本文是P2“领域骨架与PostgreSQL迁移”的已实现字段契约，并登记P4增量字段，对应Alembic revisions `20260902_02_feedback_domain`和`20260902_03_feedback_designer`。字段类型、可空性、默认值、外键、唯一约束和中文说明以本文、迁移和SQLAlchemy实体三者一致为验收标准。
+本文是P2“领域骨架与PostgreSQL迁移”的已实现字段契约，并登记已实现P4和P5-00增量字段。当前已落地Alembic revisions为`20260902_02_feedback_domain`、`20260902_03_feedback_designer`和`20260902_04_feedback_publication`。字段类型、可空性、默认值、外键、唯一约束和中文说明以本文、迁移和SQLAlchemy实体三者一致为验收标准。
 
 P2 只建立领域持久化骨架，不代表项目、问卷、发布、答题、计分或报告 API 已经实现。
 
@@ -15,6 +15,7 @@ fb_project
        ├─< fb_indicator ─< fb_indicator_question >─ fb_question
        ├─< fb_relation
        └─< fb_project_target
+              ├─< fb_evaluator_selection >─ fb_relation
               └─< fb_assignment >─ fb_relation
                      └─1 fb_answer_sheet ─< fb_answer
 
@@ -28,7 +29,7 @@ fb_score_result
 
 ## 3. 通用字段约定
 
-下列表使用统一审计字段：`fb_project`、`fb_questionnaire_version`、`fb_questionnaire_page`、`fb_question`、`fb_question_option`、`fb_indicator`、`fb_relation`、`fb_project_target`。
+下列表使用统一审计字段：`fb_project`、`fb_questionnaire_version`、`fb_questionnaire_page`、`fb_question`、`fb_question_option`、`fb_indicator`、`fb_relation`、`fb_project_target`、`fb_evaluator_selection`。
 
 | 字段 | PostgreSQL类型 | 可空 | 默认/约束 | 中文说明 |
 |---|---|---|---|---|
@@ -341,3 +342,48 @@ fb_score_result
 | `TEXT` | `{"maxLength": 1..5000}` | `is_scored=false`，无分数区间且不创建伪选项 |
 
 指标继续使用`fb_indicator`和`fb_indicator_question`：接口以稳定`indicatorCode/questionCode`表达绑定，保存事务在数据库ID水合后写入关系；首期发布就绪要求指标权重精确合计`100.0000`，每道计分题恰好绑定一个指标。问答题可以归类到指标，但不参与原始满分。
+
+## 10. P5-00发布配置已实现增量契约
+
+### 10.1 实现状态
+
+- 已实现revision：`20260902_04_feedback_publication`。
+- `down_revision`：`20260902_03_feedback_designer`。
+- 当前状态：迁移、SQLAlchemy实体、固定关系常量、新项目初始化和结构验证器已实现，并通过开发库/测试库真实PostgreSQL门禁；人员聚合接口和发布事务尚未实现。
+- 目标：分离“发布前可编辑的评价人选择”和“发布后员工正式任务”，不提前向`fb_assignment`写任务占位记录。
+
+### 10.2 `fb_evaluator_selection`评价人选择配置表
+
+另含第3节统一审计字段，不含软删除和独立锁版本。
+
+| 字段 | PostgreSQL类型 | 可空 | 默认/关系/约束 | 中文说明 |
+|---|---|---|---|---|
+| `selection_id` | `BIGINT` | 否 | 自增主键 | 评价人选择配置ID |
+| `project_id` | `BIGINT` | 否 | FK `fb_project.project_id` | 评价项目ID |
+| `version_id` | `BIGINT` | 否 | 与目标、关系组成同版本复合FK | 问卷版本ID |
+| `target_id` | `BIGINT` | 否 | 复合FK `fb_project_target` | 项目被评价人记录ID |
+| `target_user_id` | `BIGINT` | 否 | FK `sys_user.user_id`；与目标复合FK一致 | 被评价人用户ID |
+| `relation_id` | `BIGINT` | 否 | 复合FK `fb_relation` | 评价关系ID |
+| `evaluator_user_id` | `BIGINT` | 否 | FK `sys_user.user_id` | 评价人用户ID |
+
+业务唯一键：`(project_id, evaluator_user_id, target_user_id, relation_id)`，约束名`uq_fb_evaluator_selection_business_key`，与`fb_assignment`正式任务业务键一致。
+
+索引：
+
+- `ix_fb_evaluator_selection_project_version(project_id, version_id)`，用于聚合恢复和发布物化。
+- `ix_fb_evaluator_selection_evaluator_project(evaluator_user_id, project_id)`，用于按评价人复核计划来源。
+
+目标或关系在准备期被删除时，选择配置通过复合外键级联清理；正式任务仍使用`RESTRICT`保护历史数据。服务层只允许`DRAFT/PREPARING`聚合替换，版本冻结后不得修改选择配置。
+
+### 10.3 P5快照与发布对应
+
+| 领域要求 | 数据结构证据 |
+|---|---|
+| 准备期选择可恢复 | `fb_evaluator_selection`保存项目、版本、目标、关系和评价人ID |
+| 发布前不制造正式待办 | 准备期只写选择表，`fb_assignment`在发布事务内首次物化 |
+| 自评不可伪造 | 服务层按每个`fb_project_target`派生`REL_SELF`选择，客户端不提交自评选择 |
+| 发布时人员快照 | 事务内从有效`sys_user/sys_dept`刷新`fb_project_target`和`fb_assignment`姓名/部门字段 |
+| 发布规则可复算 | 关系、目标、选择和任务与同一`version_id`关联，`scoring_rule_snapshot`记录规则版本和权重 |
+| 发布后不可覆盖 | 项目`ACTIVE`且版本`FROZEN`后，所有配置写服务拒绝修改 |
+
+结构验证器已从13张表、184个字段升级为14张表、196个字段；所有新增表、字段、约束和索引均有中文注释或稳定名称并与SQLAlchemy模型一致。完整API、默认关系、数据范围、锁顺序和门禁见[P5技术预检](./12-p5-publication-precheck.md)。

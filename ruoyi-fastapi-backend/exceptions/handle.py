@@ -4,6 +4,7 @@ from pydantic_validation_decorator import FieldValidationError
 
 from exceptions.exception import (
     AuthException,
+    ConflictException,
     FileRangeNotSatisfiableException,
     LoginException,
     ModelValidatorException,
@@ -58,6 +59,10 @@ def handle_exception(app: FastAPI) -> None:
     async def service_warning_handler(request: Request, exc: ServiceWarning) -> Response:
         logger.warning(exc.message)
         return ResponseUtil.failure(data=exc.data, msg=exc.message)
+
+    @app.exception_handler(ConflictException)
+    async def conflict_exception_handler(request: Request, exc: ConflictException) -> Response:
+        return ResponseUtil.conflict(data=exc.data, msg=exc.message)
 
     # 文件Range范围不可满足异常
     @app.exception_handler(FileRangeNotSatisfiableException)

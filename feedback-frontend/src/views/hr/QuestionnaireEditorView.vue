@@ -12,11 +12,13 @@ import QuestionPropertiesPanel from '@/components/feedback/questions/QuestionPro
 import QuestionRenderer from '@/components/feedback/questions/QuestionRenderer.vue'
 import { getQuestionTypeDefinition } from '@/components/feedback/questions/questionTypeRegistry'
 import { useQuestionnaireDraftStore } from '@/stores/questionnaireDraft'
+import { usePermissionStore } from '@/stores/permission'
 import { calculateRawMaxScore } from '@/utils/questionnaireDraft'
 
 const route = useRoute()
 const router = useRouter()
 const draftStore = useQuestionnaireDraftStore()
+const permissionStore = usePermissionStore()
 const questionnaireFormRef = ref()
 const propertiesRef = ref()
 const previewVisible = ref(false)
@@ -158,6 +160,13 @@ onBeforeUnmount(() => draftStore.reset())
         <span v-if="draftStore.dirty" class="dirty-state">有未保存修改</span>
         <span v-else-if="draftStore.lastSavedAt" class="saved-state">草稿已保存</span>
         <el-button :disabled="!draft" @click="openPreview">电脑 / 手机预览</el-button>
+        <el-button
+          v-if="permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish'])"
+          :disabled="!draft || draftStore.dirty"
+          @click="router.push(`/hr/projects/${projectId}/publication`)"
+        >
+          配置人员与发布
+        </el-button>
         <el-button type="primary" :loading="draftStore.saving" :disabled="!draft" @click="saveDraft">
           保存草稿
         </el-button>

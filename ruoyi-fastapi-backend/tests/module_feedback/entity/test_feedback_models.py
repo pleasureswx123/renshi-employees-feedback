@@ -11,6 +11,7 @@ from module_feedback.entity.do import (  # noqa: F401
     FbAnswer,
     FbAnswerSheet,
     FbAssignment,
+    FbEvaluatorSelection,
     FbIndicator,
     FbIndicatorQuestion,
     FbProject,
@@ -33,11 +34,13 @@ EXPECTED_TABLES = {
     'fb_indicator_question',
     'fb_relation',
     'fb_project_target',
+    'fb_evaluator_selection',
     'fb_assignment',
     'fb_answer_sheet',
     'fb_answer',
     'fb_score_result',
 }
+EXPECTED_SELECTION_COLUMN_COUNT = 12
 
 
 def test_all_p2_models_map_without_relationship_warnings() -> None:
@@ -82,6 +85,7 @@ def test_immutable_submission_tables_do_not_define_soft_delete() -> None:
 def test_key_business_constraints_are_present_in_metadata() -> None:
     expected_constraints = {
         'fb_assignment': {'uq_fb_assignment_business_key', 'ck_fb_assignment_status'},
+        'fb_evaluator_selection': {'uq_fb_evaluator_selection_business_key'},
         'fb_answer': {'uq_fb_answer_sheet_question', 'ck_fb_answer_value_channel'},
         'fb_questionnaire_page': {
             'uq_fb_questionnaire_page_version_sort',
@@ -103,6 +107,20 @@ def test_key_business_constraints_are_present_in_metadata() -> None:
 def test_project_detail_relationships_require_explicit_eager_loading() -> None:
     assert FbProject.questionnaire_versions.property.lazy == 'raise'
     assert FbProject.targets.property.lazy == 'raise'
+    assert FbProjectTarget.evaluator_selections.property.lazy == 'raise'
+    assert FbEvaluatorSelection.relation.property.lazy == 'raise'
+    assert FbEvaluatorSelection.target_snapshot.property.lazy == 'raise'
     assert FbQuestionnaireVersion.pages.property.lazy == 'raise'
     assert FbQuestionnairePage.questions.property.lazy == 'raise'
     assert FbQuestion.options.property.lazy == 'raise'
+
+
+def test_evaluator_selection_uses_aggregate_lock_and_cascade_references() -> None:
+    table = Base.metadata.tables['fb_evaluator_selection']
+    assert 'lock_version' not in table.c
+    assert 'del_flag' not in table.c
+    assert len(table.c) == EXPECTED_SELECTION_COLUMN_COUNT
+    foreign_keys = {constraint.name: constraint.ondelete for constraint in table.foreign_key_constraints}
+    assert foreign_keys['fk_fb_evaluator_selection_relation'] == 'CASCADE'
+    assert foreign_keys['fk_fb_evaluator_selection_target'] == 'CASCADE'
+    assert foreign_keys['fk_fb_evaluator_selection_project'] == 'RESTRICT'

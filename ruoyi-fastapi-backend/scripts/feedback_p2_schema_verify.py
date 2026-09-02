@@ -1,4 +1,4 @@
-"""验证P2/P4评价业务PostgreSQL结构和可逆迁移链。"""
+"""验证P2/P4/P5评价业务PostgreSQL结构和可逆迁移链。"""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 import sys
 import uuid
 from contextlib import closing
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,8 @@ from scripts.feedback_p0_database_precheck import (  # noqa: E402
 BASELINE_REVISION = '20260902_01_feedback_baseline'
 DOMAIN_REVISION = '20260902_02_feedback_domain'
 DESIGNER_REVISION = '20260902_03_feedback_designer'
+PUBLICATION_REVISION = '20260902_04_feedback_publication'
+FIXED_RELATION_COUNT = 5
 EXPECTED_TABLES = {
     'fb_project',
     'fb_questionnaire_version',
@@ -40,6 +43,7 @@ EXPECTED_TABLES = {
     'fb_indicator_question',
     'fb_relation',
     'fb_project_target',
+    'fb_evaluator_selection',
     'fb_assignment',
     'fb_answer_sheet',
     'fb_answer',
@@ -60,6 +64,7 @@ NUMERIC_12_4_COLUMNS = {
 }
 REQUIRED_CONSTRAINTS = {
     'uq_fb_assignment_business_key',
+    'uq_fb_evaluator_selection_business_key',
     'uq_fb_answer_sheet_question',
     'uq_fb_questionnaire_page_version_sort',
     'uq_fb_questionnaire_page_version_code',
@@ -75,11 +80,27 @@ DESIGNER_COLUMNS = {
     ('fb_questionnaire_version', 'description_doc'),
     ('fb_questionnaire_page', 'page_code'),
 }
+PUBLICATION_COLUMNS = {
+    ('fb_evaluator_selection', 'selection_id'),
+    ('fb_evaluator_selection', 'project_id'),
+    ('fb_evaluator_selection', 'version_id'),
+    ('fb_evaluator_selection', 'target_id'),
+    ('fb_evaluator_selection', 'target_user_id'),
+    ('fb_evaluator_selection', 'relation_id'),
+    ('fb_evaluator_selection', 'evaluator_user_id'),
+    ('fb_evaluator_selection', 'create_by'),
+    ('fb_evaluator_selection', 'create_time'),
+    ('fb_evaluator_selection', 'update_by'),
+    ('fb_evaluator_selection', 'update_time'),
+    ('fb_evaluator_selection', 'remark'),
+}
 REQUIRED_INDEXES = {
     'ix_fb_project_status_create_time',
     'ix_fb_assignment_evaluator_status',
     'ix_fb_assignment_target_status',
     'ix_fb_assignment_project_status',
+    'ix_fb_evaluator_selection_project_version',
+    'ix_fb_evaluator_selection_evaluator_project',
     'ix_fb_answer_sheet_project_submitted',
     'ix_fb_score_result_project_target',
     'uq_fb_score_indicator_relation',
@@ -98,6 +119,11 @@ def parse_args() -> argparse.Namespace:
         '--designer-migration-cycle',
         action='store_true',
         help='用一条P3结构测试数据执行P4升级、降级和再升级',
+    )
+    cycle_group.add_argument(
+        '--publication-migration-cycle',
+        action='store_true',
+        help='用一组P4项目、页面和目标数据执行P5升级、降级和再升级',
     )
     parser.add_argument('--yes', action='store_true', help='确认在空的反馈测试库执行迁移循环')
     return parser.parse_args()
@@ -263,8 +289,8 @@ def cleanup_designer_migration_fixture(database_name: str, project_id: int) -> N
 def run_designer_migration_cycle(database_name: str) -> dict[str, Any]:
     """在空测试库执行P3→P4→P3→P4的有数据迁移往返。"""
     ensure_feedback_tables_empty(database_name)
-    if get_current_revision(database_name) != DESIGNER_REVISION:
-        raise RuntimeError(f'迁移往返必须从{DESIGNER_REVISION}开始')
+    if get_current_revision(database_name) != PUBLICATION_REVISION:
+        raise RuntimeError(f'迁移往返必须从{PUBLICATION_REVISION}开始')
 
     marker = f'P4迁移往返-{uuid.uuid4()}'
     project_id: int | None = None
@@ -272,6 +298,7 @@ def run_designer_migration_cycle(database_name: str) -> dict[str, Any]:
     first_page_code: str | None = None
     second_page_code: str | None = None
     try:
+        run_alembic(database_name, 'downgrade', DESIGNER_REVISION)
         run_alembic(database_name, 'downgrade', DOMAIN_REVISION)
         project_id, _, page_id = insert_designer_migration_fixture(database_name, marker)
         run_alembic(database_name, 'upgrade', DESIGNER_REVISION)
@@ -286,8 +313,8 @@ def run_designer_migration_cycle(database_name: str) -> dict[str, Any]:
         if second_page_code != first_page_code or second_doc is not None:
             raise RuntimeError('再次升级未保持确定性的page_code回填结果')
     finally:
-        if get_current_revision(database_name) != DESIGNER_REVISION:
-            run_alembic(database_name, 'upgrade', DESIGNER_REVISION)
+        if get_current_revision(database_name) != PUBLICATION_REVISION:
+            run_alembic(database_name, 'upgrade', PUBLICATION_REVISION)
         if project_id is not None:
             cleanup_designer_migration_fixture(database_name, project_id)
 
@@ -297,6 +324,234 @@ def run_designer_migration_cycle(database_name: str) -> dict[str, Any]:
         'toRevision': DESIGNER_REVISION,
         'firstPageCode': first_page_code,
         'secondPageCode': second_page_code,
+        'restoredRevision': get_current_revision(database_name),
+        'fixtureCleaned': True,
+    }
+
+
+def insert_publication_migration_fixture(database_name: str, marker: str) -> tuple[int, int, int, int]:
+    """在P4结构下插入项目、页面和目标，用于验证P5固定关系与选择表。"""
+    with closing(connect_database(database_name)) as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT user_id FROM sys_user WHERE del_flag = '0' AND status = '0' ORDER BY user_id LIMIT 1")
+        user_row = cursor.fetchone()
+        if user_row is None:
+            raise RuntimeError('P5迁移往返测试需要至少一个可用的系统用户')
+        user_id = int(user_row[0])
+        cursor.execute(
+            """
+            INSERT INTO fb_project(project_name, owner_user_id, create_by, update_by)
+            VALUES (%s, %s, 'p5-migration-test', 'p5-migration-test')
+            RETURNING project_id
+            """,
+            (marker, user_id),
+        )
+        project_id = int(cursor.fetchone()[0])
+        cursor.execute(
+            """
+            INSERT INTO fb_questionnaire_version(
+                project_id, version_no, title, create_by, update_by
+            )
+            VALUES (%s, 1, 'P5迁移往返问卷', 'p5-migration-test', 'p5-migration-test')
+            RETURNING version_id
+            """,
+            (project_id,),
+        )
+        version_id = int(cursor.fetchone()[0])
+        cursor.execute(
+            """
+            INSERT INTO fb_questionnaire_page(
+                version_id, page_code, page_title, sort_order, create_by, update_by
+            )
+            VALUES (%s, %s, 'P4既有页面', 1, 'p5-migration-test', 'p5-migration-test')
+            """,
+            (version_id, f'P_{uuid.uuid4().hex}'),
+        )
+        cursor.execute(
+            """
+            INSERT INTO fb_project_target(
+                project_id, version_id, target_user_id, target_user_name,
+                only_self_evaluation, create_by, update_by
+            )
+            VALUES (%s, %s, %s, 'P5迁移测试用户', true, 'p5-migration-test', 'p5-migration-test')
+            RETURNING target_id
+            """,
+            (project_id, version_id, user_id),
+        )
+        target_id = int(cursor.fetchone()[0])
+        connection.commit()
+        return project_id, version_id, target_id, user_id
+
+
+def read_publication_default_relations(database_name: str, version_id: int) -> list[tuple[Any, ...]]:
+    """读取迁移为指定草稿建立的固定关系。"""
+    with closing(connect_database(database_name)) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT relation_code, relation_type, relation_name,
+                   is_enabled, participates_in_score, weight, sort_order
+            FROM fb_relation
+            WHERE version_id = %s
+            ORDER BY sort_order
+            """,
+            (version_id,),
+        )
+        return list(cursor.fetchall())
+
+
+def assert_publication_default_relations(rows: list[tuple[Any, ...]]) -> list[str]:
+    """断言五个固定关系及自评强制语义完整。"""
+    expected = [
+        ('REL_SUPERVISOR', 'SUPERVISOR', '上级', False, False, 1),
+        ('REL_PEER', 'PEER', '同级', False, False, 2),
+        ('REL_SUBORDINATE', 'SUBORDINATE', '下级', False, False, 3),
+        ('REL_SELF', 'SELF', '自己', True, False, 4),
+        ('REL_OTHER', 'OTHER', '其他', False, False, 5),
+    ]
+    normalized = [
+        (
+            str(code),
+            str(relation_type),
+            str(name),
+            bool(enabled),
+            bool(scores),
+            Decimal(str(weight)),
+            int(sort_order),
+        )
+        for code, relation_type, name, enabled, scores, weight, sort_order in rows
+    ]
+    expected_with_weight = [(*item[:5], Decimal('0.0000'), item[5]) for item in expected]
+    if normalized != expected_with_weight:
+        raise RuntimeError(f'P5固定关系回填结果不符合约定：{normalized}')
+    return [item[0] for item in normalized]
+
+
+def insert_publication_selection_fixture(
+    database_name: str,
+    project_id: int,
+    version_id: int,
+    target_id: int,
+    user_id: int,
+) -> int:
+    """写入一条自评选择，验证P5复合外键和新表生命周期。"""
+    with closing(connect_database(database_name)) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO fb_evaluator_selection(
+                project_id, version_id, target_id, target_user_id,
+                relation_id, evaluator_user_id, create_by, update_by
+            )
+            SELECT %s, %s, %s, %s, relation_id, %s,
+                   'p5-migration-test', 'p5-migration-test'
+            FROM fb_relation
+            WHERE project_id = %s AND version_id = %s AND relation_code = 'REL_SELF'
+            RETURNING selection_id
+            """,
+            (project_id, version_id, target_id, user_id, user_id, project_id, version_id),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            raise RuntimeError('P5迁移后没有可用于自评选择的REL_SELF关系')
+        connection.commit()
+        return int(row[0])
+
+
+def verify_publication_downgrade(database_name: str, project_id: int, version_id: int, target_id: int) -> None:
+    """确认降级只移除选择表，保留P4数据和已回填固定关系。"""
+    with closing(connect_database(database_name)) as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT to_regclass('public.fb_evaluator_selection')")
+        if cursor.fetchone()[0] is not None:
+            raise RuntimeError('降级到P4后仍存在评价人选择配置表')
+        cursor.execute(
+            """
+            SELECT EXISTS(
+                SELECT 1
+                FROM fb_project_target
+                WHERE project_id = %s AND version_id = %s AND target_id = %s
+            )
+            """,
+            (project_id, version_id, target_id),
+        )
+        if not bool(cursor.fetchone()[0]):
+            raise RuntimeError('降级到P4时误删了既有项目目标数据')
+        cursor.execute(
+            'SELECT COUNT(*) FROM fb_relation WHERE project_id = %s AND version_id = %s', (project_id, version_id)
+        )
+        if int(cursor.fetchone()[0]) != FIXED_RELATION_COUNT:
+            raise RuntimeError('降级到P4后固定关系数量发生变化')
+
+
+def cleanup_publication_migration_fixture(database_name: str, project_id: int) -> None:
+    """清理由脚本创建的精确P5迁移测试项目。"""
+    with closing(connect_database(database_name)) as connection, connection.cursor() as cursor:
+        cursor.execute('DELETE FROM fb_evaluator_selection WHERE project_id = %s', (project_id,))
+        cursor.execute('DELETE FROM fb_project_target WHERE project_id = %s', (project_id,))
+        cursor.execute('DELETE FROM fb_questionnaire_version WHERE project_id = %s', (project_id,))
+        cursor.execute(
+            """
+            DELETE FROM fb_project
+            WHERE project_id = %s AND create_by = 'p5-migration-test'
+            """,
+            (project_id,),
+        )
+        if cursor.rowcount != 1:
+            connection.rollback()
+            raise RuntimeError('P5迁移测试项目清理目标不唯一，已回滚')
+        connection.commit()
+
+
+def run_publication_migration_cycle(database_name: str) -> dict[str, Any]:
+    """在空测试库执行P4→P5→P4→P5的有数据迁移往返。"""
+    ensure_feedback_tables_empty(database_name)
+    if get_current_revision(database_name) != PUBLICATION_REVISION:
+        raise RuntimeError(f'迁移往返必须从{PUBLICATION_REVISION}开始')
+
+    marker = f'P5迁移往返-{uuid.uuid4()}'
+    project_id: int | None = None
+    version_id: int | None = None
+    target_id: int | None = None
+    first_relation_codes: list[str] = []
+    second_relation_codes: list[str] = []
+    selection_id: int | None = None
+    try:
+        run_alembic(database_name, 'downgrade', DESIGNER_REVISION)
+        project_id, version_id, target_id, user_id = insert_publication_migration_fixture(database_name, marker)
+        run_alembic(database_name, 'upgrade', PUBLICATION_REVISION)
+        first_relation_codes = assert_publication_default_relations(
+            read_publication_default_relations(database_name, version_id)
+        )
+        selection_id = insert_publication_selection_fixture(
+            database_name,
+            project_id,
+            version_id,
+            target_id,
+            user_id,
+        )
+
+        run_alembic(database_name, 'downgrade', DESIGNER_REVISION)
+        verify_publication_downgrade(database_name, project_id, version_id, target_id)
+        run_alembic(database_name, 'upgrade', PUBLICATION_REVISION)
+        second_relation_codes = assert_publication_default_relations(
+            read_publication_default_relations(database_name, version_id)
+        )
+        with closing(connect_database(database_name)) as connection, connection.cursor() as cursor:
+            cursor.execute('SELECT COUNT(*) FROM fb_evaluator_selection WHERE project_id = %s', (project_id,))
+            if int(cursor.fetchone()[0]) != 0:
+                raise RuntimeError('P5再次升级后选择表不为空')
+    finally:
+        if get_current_revision(database_name) != PUBLICATION_REVISION:
+            run_alembic(database_name, 'upgrade', PUBLICATION_REVISION)
+        if project_id is not None:
+            cleanup_publication_migration_fixture(database_name, project_id)
+
+    return {
+        'database': database_name,
+        'fromRevision': DESIGNER_REVISION,
+        'toRevision': PUBLICATION_REVISION,
+        'firstRelationCodes': first_relation_codes,
+        'secondRelationCodes': second_relation_codes,
+        'selectionCreated': selection_id is not None,
+        'selectionRemovedByDowngrade': True,
+        'restoredRevision': get_current_revision(database_name),
         'fixtureCleaned': True,
     }
 
@@ -355,7 +610,60 @@ def verify_model_column_contract(column_rows: list[tuple[Any, ...]]) -> int:
     return len(model_columns)
 
 
-def verify_schema(database_name: str) -> dict[str, Any]:
+def verify_default_relation_contract(cursor: Any) -> int:
+    """验证每个可编辑草稿具备固定关系，且自评强制语义未被破坏。"""
+    cursor.execute(
+        """
+        SELECT v.project_id, v.version_id, r.relation_code, r.relation_type,
+               r.is_enabled, r.participates_in_score, r.weight
+        FROM fb_questionnaire_version v
+        JOIN fb_project p ON p.project_id = v.project_id
+        LEFT JOIN fb_relation r
+          ON r.project_id = v.project_id AND r.version_id = v.version_id
+        WHERE v.status = 'DRAFT'
+          AND p.status = 'PREPARING'
+          AND p.del_flag = '0'
+        ORDER BY v.project_id, v.version_id, r.relation_id
+        """
+    )
+    rows = list(cursor.fetchall())
+    relations_by_version: dict[tuple[int, int], dict[str, tuple[Any, ...]]] = {}
+    for project_id_value, version_id_value, code, relation_type, enabled, scores, weight in rows:
+        version_key = (int(project_id_value), int(version_id_value))
+        relations_by_version.setdefault(version_key, {})
+        if code is not None:
+            relations_by_version[version_key][str(code)] = (
+                str(relation_type),
+                bool(enabled),
+                bool(scores),
+                Decimal(str(weight)),
+            )
+
+    expected_types = {
+        'REL_SUPERVISOR': 'SUPERVISOR',
+        'REL_PEER': 'PEER',
+        'REL_SUBORDINATE': 'SUBORDINATE',
+        'REL_SELF': 'SELF',
+        'REL_OTHER': 'OTHER',
+    }
+    for version_key, relations in relations_by_version.items():
+        missing = sorted(set(expected_types) - set(relations))
+        if missing:
+            raise RuntimeError(f'可编辑草稿缺少固定关系：{version_key} -> {missing}')
+        invalid_types = {
+            code: {'actual': relations[code][0], 'expected': relation_type}
+            for code, relation_type in expected_types.items()
+            if relations[code][0] != relation_type
+        }
+        if invalid_types:
+            raise RuntimeError(f'固定关系类型不一致：{version_key} -> {invalid_types}')
+        _self_type, self_enabled, self_scores, self_weight = relations['REL_SELF']
+        if not self_enabled or self_scores or self_weight != Decimal('0.0000'):
+            raise RuntimeError(f'自己关系语义不一致：{version_key}')
+    return len(relations_by_version)
+
+
+def verify_schema(database_name: str) -> dict[str, Any]:  # noqa: PLR0912
     repository_head = get_repository_head()
     current_revision = get_current_revision(database_name)
     if current_revision != repository_head:
@@ -420,6 +728,9 @@ def verify_schema(database_name: str) -> dict[str, Any]:
         missing_designer_columns = sorted(DESIGNER_COLUMNS - set(column_types))
         if missing_designer_columns:
             raise RuntimeError(f'缺少P4问卷设计器字段：{missing_designer_columns}')
+        missing_publication_columns = sorted(PUBLICATION_COLUMNS - set(column_types))
+        if missing_publication_columns:
+            raise RuntimeError(f'缺少P5发布配置字段：{missing_publication_columns}')
         for key in NUMERIC_12_4_COLUMNS:
             if column_types.get(key) != ('numeric', 12, 4):
                 raise RuntimeError(f'正式分数或权重字段不是NUMERIC(12,4)：{key} -> {column_types.get(key)}')
@@ -459,7 +770,8 @@ def verify_schema(database_name: str) -> dict[str, Any]:
         indexes = {str(row[0]) for row in cursor.fetchall()}
         missing_indexes = sorted(REQUIRED_INDEXES - indexes)
         if missing_indexes:
-            raise RuntimeError(f'缺少P2关键索引：{missing_indexes}')
+            raise RuntimeError(f'缺少评价业务关键索引：{missing_indexes}')
+        draft_version_count = verify_default_relation_contract(cursor)
 
     return {
         'ok': True,
@@ -471,6 +783,9 @@ def verify_schema(database_name: str) -> dict[str, Any]:
         'numeric12Scale4Count': len(NUMERIC_12_4_COLUMNS),
         'designerRevision': DESIGNER_REVISION,
         'designerColumnCount': len(DESIGNER_COLUMNS),
+        'publicationRevision': PUBLICATION_REVISION,
+        'publicationColumnCount': len(PUBLICATION_COLUMNS),
+        'draftVersionDefaultRelationCount': draft_version_count,
         'requiredConstraintCount': len(REQUIRED_CONSTRAINTS),
         'requiredIndexCount': len(REQUIRED_INDEXES),
         'immutableTablesWithoutSoftDelete': sorted(IMMUTABLE_TABLES),
@@ -479,18 +794,24 @@ def verify_schema(database_name: str) -> dict[str, Any]:
 
 def main() -> int:
     args = parse_args()
-    cycle_requested = args.migration_cycle or args.designer_migration_cycle
+    cycle_requested = args.migration_cycle or args.designer_migration_cycle or args.publication_migration_cycle
     database_name = validate_database_name(args.database, cycle=cycle_requested)
     cycle_result = None
     if cycle_requested:
         if not args.yes:
             raise RuntimeError('执行迁移循环必须显式传入--yes')
-        cycle_result = (
-            run_migration_cycle(database_name) if args.migration_cycle else run_designer_migration_cycle(database_name)
-        )
+        if args.migration_cycle:
+            cycle_result = run_migration_cycle(database_name)
+            cycle_key = 'migrationCycle'
+        elif args.designer_migration_cycle:
+            cycle_result = run_designer_migration_cycle(database_name)
+            cycle_key = 'designerMigrationCycle'
+        else:
+            cycle_result = run_publication_migration_cycle(database_name)
+            cycle_key = 'publicationMigrationCycle'
     payload = verify_schema(database_name)
     if cycle_result is not None:
-        payload['designerMigrationCycle' if args.designer_migration_cycle else 'migrationCycle'] = cycle_result
+        payload[cycle_key] = cycle_result
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 

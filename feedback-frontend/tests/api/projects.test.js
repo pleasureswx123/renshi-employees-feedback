@@ -5,9 +5,13 @@ vi.mock('@/utils/request', () => ({ default: request }))
 
 const {
   createProject,
+  getPublicationConfig,
   getQuestionnaireDraft,
   listProjects,
+  listParticipantOptions,
+  publishProject,
   removeProject,
+  savePublicationConfig,
   saveQuestionnaireDraft,
   updateProject
 } = await import('@/api/feedback/projects')
@@ -52,6 +56,36 @@ describe('评价项目API', () => {
       method: 'put',
       data: draft,
       headers: { repeatInterval: 1500 }
+    })
+  })
+
+  it('P5人员、聚合配置和发布使用固定接口及防重复提交间隔', async () => {
+    const config = { projectLockVersion: 2, versionId: 8, versionLockVersion: 3 }
+    await listParticipantOptions(12, { pageNum: 1, keyword: '张' })
+    await getPublicationConfig(12)
+    await savePublicationConfig(12, config)
+    await publishProject(12, config)
+
+    expect(request).toHaveBeenNthCalledWith(1, {
+      url: '/feedback/projects/12/participant-options',
+      method: 'get',
+      params: { pageNum: 1, keyword: '张' }
+    })
+    expect(request).toHaveBeenNthCalledWith(2, {
+      url: '/feedback/projects/12/publication-config',
+      method: 'get'
+    })
+    expect(request).toHaveBeenNthCalledWith(3, {
+      url: '/feedback/projects/12/publication-config',
+      method: 'put',
+      data: config,
+      headers: { repeatInterval: 1500 }
+    })
+    expect(request).toHaveBeenNthCalledWith(4, {
+      url: '/feedback/projects/12/publish',
+      method: 'post',
+      data: config,
+      headers: { repeatInterval: 3000 }
     })
   })
 })
