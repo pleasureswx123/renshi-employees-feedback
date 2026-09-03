@@ -38,9 +38,16 @@ export const usePermissionStore = defineStore('permission', () => {
     return false
   }
 
+  function hrWorkspacePath() {
+    if (hasPermission('feedback:project:list')) return '/hr/projects'
+    if (hasPermission('feedback:progress:view')) return '/hr/progress'
+    return null
+  }
+
   function availableWorkspaces() {
+    const hrPath = hrWorkspacePath()
     return [
-      canAccessWorkspace('hr') ? { key: 'hr', label: 'HR 工作台', path: '/hr/projects' } : null,
+      hrPath ? { key: 'hr', label: 'HR 工作台', path: hrPath } : null,
       canAccessWorkspace('employee')
         ? { key: 'employee', label: '员工工作台', path: hasPermission('feedback:task:view') ? '/employee/todos' : hasPermission('feedback:history:view') ? '/employee/reviews' : '/403' }
         : null
@@ -55,6 +62,7 @@ export const usePermissionStore = defineStore('permission', () => {
     hasPermission,
     hasAnyPermission,
     canAccessWorkspace,
+    hrWorkspacePath,
     availableWorkspaces,
     defaultPath
   }

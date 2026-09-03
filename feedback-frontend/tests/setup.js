@@ -7,9 +7,10 @@ class ResizeObserverMock {
 }
 
 globalThis.ResizeObserver = ResizeObserverMock
+globalThis.scrollTo = () => {}
 globalThis.matchMedia =
   globalThis.matchMedia ||
-  vi.fn().mockImplementation(query => ({
+  (query => ({
     matches: false,
     media: query,
     onchange: null,

@@ -18,11 +18,21 @@ const permissionStore = usePermissionStore()
 const loggingOut = ref(false)
 
 const workspaces = computed(() => permissionStore.availableWorkspaces())
+const activeMenu = computed(() => {
+  if (route.meta.activeMenu === '/hr/projects' && !permissionStore.hasPermission('feedback:project:list')) {
+    return '/hr/progress'
+  }
+  return route.meta.activeMenu || route.path
+})
 const menuItems = computed(() => {
   if (props.workspace === 'hr') {
-    return permissionStore.hasPermission('feedback:project:list')
-      ? [{ path: '/hr/projects', label: '评价项目' }]
-      : []
+    if (permissionStore.hasPermission('feedback:project:list')) {
+      return [{ path: '/hr/projects', label: '评价项目' }]
+    }
+    if (permissionStore.hasPermission('feedback:progress:view')) {
+      return [{ path: '/hr/progress', label: '回收进度' }]
+    }
+    return []
   }
   return [
     permissionStore.hasPermission('feedback:task:view')
@@ -68,13 +78,13 @@ async function handleLogout() {
       </div>
     </el-header>
     <nav class="mobile-workspace-nav" aria-label="工作台导航">
-      <el-menu :default-active="route.path" mode="horizontal" :ellipsis="false" router>
+      <el-menu :default-active="activeMenu" mode="horizontal" :ellipsis="false" router>
         <el-menu-item v-for="item in menuItems" :key="item.path" :index="item.path">{{ item.label }}</el-menu-item>
       </el-menu>
     </nav>
     <el-container>
       <el-aside width="220px" class="workspace-aside">
-        <el-menu :default-active="route.path" router>
+        <el-menu :default-active="activeMenu" router>
           <el-menu-item v-for="item in menuItems" :key="item.path" :index="item.path">
             {{ item.label }}
           </el-menu-item>

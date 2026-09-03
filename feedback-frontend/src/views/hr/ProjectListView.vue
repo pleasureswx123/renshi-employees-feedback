@@ -32,7 +32,7 @@ const projectRules = {
 const statusOptions = [
   { value: ProjectStatus.PREPARING, label: '准备阶段', type: 'info' },
   { value: ProjectStatus.ACTIVE, label: '进行阶段', type: 'success' },
-  { value: ProjectStatus.COMPLETED, label: '已完成', type: '' }
+  { value: ProjectStatus.COMPLETED, label: '已完成', type: 'info' }
 ]
 
 function statusMeta(status) {
@@ -209,6 +209,14 @@ onMounted(loadProjects)
               @click="router.push(`/hr/projects/${row.projectId}/publication`)"
             >
               {{ row.status === ProjectStatus.PREPARING ? '配置并发布' : '查看发布配置' }}
+            </el-button>
+            <el-button
+              v-if="[ProjectStatus.ACTIVE, ProjectStatus.COMPLETED].includes(row.status) && permissionStore.hasPermission('feedback:progress:view')"
+              type="primary"
+              link
+              @click="router.push(`/hr/projects/${row.projectId}/progress`)"
+            >
+              回收进度
             </el-button>
             <el-button
               v-if="row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:project:edit')"

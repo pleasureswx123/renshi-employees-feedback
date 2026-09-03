@@ -1,0 +1,58 @@
+<script setup>
+import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+const formRef = ref()
+const form = reactive({ projectId: null })
+
+function validateProjectId(_rule, value, callback) {
+  if (!Number.isInteger(value) || value < 1) return callback(new Error('项目ID必须为正整数'))
+  callback()
+}
+
+const rules = {
+  projectId: [{ validator: validateProjectId, trigger: 'change' }]
+}
+
+async function openProgress() {
+  try {
+    await formRef.value?.validate()
+  } catch {
+    return
+  }
+  await router.push(`/hr/projects/${form.projectId}/progress`)
+}
+</script>
+
+<template>
+  <section class="progress-entry-page">
+    <header>
+      <h1>回收进度</h1>
+      <p>输入项目ID后读取服务端真实回收数据；最终访问范围仍由后端校验。</p>
+    </header>
+    <el-card shadow="never" class="entry-card">
+      <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+        <el-form-item label="项目ID" prop="projectId">
+          <el-input-number
+            v-model="form.projectId"
+            :min="1"
+            :step="1"
+            step-strictly
+            :controls="false"
+            placeholder="输入有权查看的项目ID"
+            @keyup.enter="openProgress"
+          />
+        </el-form-item>
+        <el-button type="primary" @click="openProgress">查看回收进度</el-button>
+      </el-form>
+    </el-card>
+  </section>
+</template>
+
+<style scoped>
+.progress-entry-page { display: grid; max-width: 720px; gap: 20px; }
+.progress-entry-page h1 { margin: 0 0 8px; color: #0f172a; }
+.progress-entry-page p { margin: 0; color: #64748b; line-height: 1.7; }
+.entry-card :deep(.el-input-number) { width: 100%; }
+</style>

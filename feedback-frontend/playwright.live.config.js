@@ -1,7 +1,10 @@
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from '@playwright/test'
 
-const backend = fileURLToPath(new URL('../ruoyi-fastapi-backend', import.meta.url))
+const backend = process.env.FEEDBACK_BACKEND_ROOT
+  ? resolve(process.env.FEEDBACK_BACKEND_ROOT)
+  : fileURLToPath(new URL('../ruoyi-fastapi-backend', import.meta.url))
 const python = process.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python'
 
 export default defineConfig({

@@ -66,3 +66,30 @@ export function publishProject(projectId, data) {
     headers: { repeatInterval: 3000 }
   })
 }
+
+export function getProjectProgress(projectId, params) {
+  return request({
+    url: `/feedback/projects/${projectId}/progress`,
+    method: 'get',
+    params,
+    suppressErrorMessage: true
+  })
+}
+
+export function getCompletionPrecheck(projectId) {
+  return request({
+    url: `/feedback/projects/${projectId}/completion-precheck`,
+    method: 'get',
+    suppressErrorMessage: true
+  })
+}
+
+export function completeProject(projectId, data) {
+  return request({
+    url: `/feedback/projects/${projectId}/complete`,
+    method: 'post',
+    data,
+    headers: { repeatInterval: 3000 },
+    suppressErrorMessage: true
+  })
+}
