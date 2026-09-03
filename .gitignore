@@ -157,3 +157,6 @@ cython_debug/
 /.playwright-cli/
 /output/playwright/
 /ruoyi-fastapi-backend/.tmp/
+
+# P9备份、执行计划与测试回执，仅保留脱敏后的文档证据
+/.tmp/

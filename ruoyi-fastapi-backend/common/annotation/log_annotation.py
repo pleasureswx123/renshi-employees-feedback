@@ -300,6 +300,13 @@ class Log:
         except FileRangeNotSatisfiableException:
             raise
         except Exception as e:
+            if func.__module__.startswith('module_feedback.'):
+                # SQL异常可能携带答案和参数，评价接口仅记录异常类型与既有请求追踪。
+                logger.bind(event='feedback_request_failed', exception_type=type(e).__name__).error('评价请求处理失败')
+                return JSONResponse(
+                    status_code=500,
+                    content={'code': 500, 'msg': '处理失败，请稍后重试', 'success': False},
+                )
             if self.request_log_mode == 'none' and self.response_log_mode == 'none':
                 logger.error('敏感接口处理失败：{}', type(e).__name__)
                 return ResponseUtil.error(msg='处理失败，请稍后重试')

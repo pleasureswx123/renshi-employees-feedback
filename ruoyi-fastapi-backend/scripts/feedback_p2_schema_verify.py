@@ -22,6 +22,7 @@ from config.database import Base  # noqa: E402
 from module_feedback import entity as _feedback_entity  # noqa: E402, F401
 from module_feedback.entity import do as _feedback_do  # noqa: E402, F401
 from scripts.feedback_p0_database_precheck import (  # noqa: E402
+    DataBaseConfig,
     connect_database,
     get_current_revision,
     get_repository_head,
@@ -119,7 +120,7 @@ IMMUTABLE_TABLES = {'fb_answer_sheet', 'fb_answer', 'fb_score_result', 'fb_proje
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='验证评价业务PostgreSQL结构')
-    parser.add_argument('--database', default='ruoyi_feedback_test', help='只允许反馈开发库或测试库')
+    parser.add_argument('--database', default='ruoyi_feedback_test', help='反馈隔离库，或只读检查当前配置库')
     cycle_group = parser.add_mutually_exclusive_group()
     cycle_group.add_argument('--migration-cycle', action='store_true', help='先降级到P0基线再重新升级到head')
     cycle_group.add_argument(
@@ -138,6 +139,10 @@ def parse_args() -> argparse.Namespace:
 
 def validate_database_name(database_name: str, *, cycle: bool) -> str:
     normalized = database_name.strip()
+    if normalized == DataBaseConfig.default_source.db_database:
+        if cycle:
+            raise ValueError('当前配置库只允许只读验证，禁止执行迁移循环')
+        return normalized
     allowed_suffixes = ('_dev', '_test')
     if not normalized.startswith('ruoyi_feedback_') or not normalized.endswith(allowed_suffixes):
         raise ValueError('只允许验证ruoyi_feedback_dev或ruoyi_feedback_test一类的隔离数据库')

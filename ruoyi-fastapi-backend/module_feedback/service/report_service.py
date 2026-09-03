@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -78,6 +79,14 @@ class FeedbackReportService:
         )
 
     @staticmethod
+    def _keys_by_target(keys: list) -> dict[int, list]:
+        # 一次分组保留全部结果行，逐人完整性校验仍会检查重复、缺项和计算版本。
+        grouped = defaultdict(list)
+        for key in keys:
+            grouped[key.target_id].append(key)
+        return grouped
+
+    @staticmethod
     def _complete_keys(version: Any, keys: list) -> bool:
         expected = {('PERSON_TOTAL', None, None), ('COVERAGE', None, None)}
         for indicator in version.indicators:
@@ -107,10 +116,12 @@ class FeedbackReportService:
             version = await FeedbackPublicationDao.get_version_document(db, project_id, version_id)
             if version is None or version.status != 'FROZEN':
                 raise cls.problem(409, 'REPORT_INPUT_INVALID', '冻结问卷不可用')
-            keys = await FeedbackReportDao.result_keys(db, project_id, version_id, {t.target_id for t in targets})
+            keys = cls._keys_by_target(
+                await FeedbackReportDao.result_keys(db, project_id, version_id, {t.target_id for t in targets})
+            )
             missing = []
             for target in targets:
-                target_keys = [key for key in keys if key.target_id == target.target_id]
+                target_keys = keys.get(target.target_id, [])
                 if not target_keys:
                     missing.append(target)
                 elif not cls._complete_keys(version, target_keys):
@@ -164,11 +175,8 @@ class FeedbackReportService:
         version_id = project.current_questionnaire_version_id
         ids = {target.target_id for target in targets}
         version = await FeedbackPublicationDao.get_version_document(db, project_id, version_id)
-        keys = await FeedbackReportDao.result_keys(db, project_id, version_id, ids)
-        ready = all(
-            cls._complete_keys(version, [key for key in keys if key.target_id == target.target_id])
-            for target in targets
-        )
+        keys = cls._keys_by_target(await FeedbackReportDao.result_keys(db, project_id, version_id, ids))
+        ready = all(cls._complete_keys(version, keys.get(target.target_id, [])) for target in targets)
         tasks = await FeedbackReportDao.tasks(db, project_id, version_id, ids)
         submitted = sum(task.status == 'SUBMITTED' for task in tasks)
         rows, total = await FeedbackReportDao.team_rows(db, project_id, version_id, ids, query) if ready else ([], 0)

@@ -18,6 +18,7 @@ from sqlalchemy import delete, select, update  # noqa: E402
 from common.enums import RedisInitKeyConfig  # noqa: E402
 from config.env import RedisConfig  # noqa: E402
 from module_admin.entity.do.dept_do import SysDept  # noqa: E402
+from module_admin.entity.do.log_do import SysOperLog  # noqa: E402
 from module_admin.entity.do.menu_do import SysMenu  # noqa: E402
 from module_admin.entity.do.role_do import SysRole, SysRoleMenu  # noqa: E402
 from module_admin.entity.do.user_do import SysUser, SysUserRole  # noqa: E402
@@ -168,6 +169,9 @@ async def prepare(path: Path) -> None:  # noqa: PLR0915
                 ('report_hr', 4, '1', ['feedback:report:view']),
             ]
             role_specs[0][3].append('feedback:report:view')
+            role_specs[2][3].extend(
+                ['feedback:project:add', 'feedback:questionnaire:edit', 'feedback:participant:manage']
+            )
             for kind, user_index, data_scope, allowed in role_specs:
                 role = SysRole(
                     role_name=f'P6验收{kind}',
@@ -266,6 +270,17 @@ async def inspect_or_cleanup(path: Path, *, cleanup: bool) -> None:
                     )
                 ).all()
             )
+            operation_logs = list(
+                await db.scalars(
+                    select(SysOperLog).where(
+                        SysOperLog.oper_name.in_(
+                            [state['hr'], state['employee'], state['report_hr'], state['partial_hr']]
+                        ),
+                        SysOperLog.method.like('module_feedback.%'),
+                    )
+                )
+            )
+            audit_text = '\n'.join(f'{row.oper_param} {row.json_result} {row.error_msg}' for row in operation_logs)
             summary = []
             for task in tasks:
                 sheet = await FeedbackAnswerDao.get_by_assignment_id(db, task.assignment_id)
@@ -290,6 +305,20 @@ async def inspect_or_cleanup(path: Path, *, cleanup: bool) -> None:
                         'projectCompletedBy': project.completed_by,
                         'projectCompletedTime': iso_or_none(project.completed_time),
                         'projectCompletionReason': project.completion_reason,
+                        'operationAudit': {
+                            'successfulTitles': sorted({row.title for row in operation_logs if row.status == 0}),
+                            'sensitiveDataAbsent': not any(
+                                value in audit_text
+                                for value in (
+                                    state['password'],
+                                    'P9仅原始答案权限可见的建议',
+                                    'textValue',
+                                    'numericValue',
+                                    'authorization',
+                                    'access_token',
+                                )
+                            ),
+                        },
                         'tasks': summary,
                         'scoreResults': [
                             {
@@ -326,6 +355,15 @@ async def inspect_or_cleanup(path: Path, *, cleanup: bool) -> None:
                 )
             )
             if cleanup:
+                # P9浏览器创建的项目只能匹配本夹具HR和固定唯一名称。
+                extra_project_ids = list(
+                    await db.scalars(
+                        select(FbProject.project_id).where(
+                            FbProject.owner_user_id == state['user_ids'][3],
+                            FbProject.project_name == f'P9验收-{state["user_ids"][3]}',
+                        )
+                    )
+                )
                 role_keys = list(
                     (await db.scalars(select(SysRole.role_key).where(SysRole.role_id.in_(state['role_ids'])))).all()
                 )
@@ -336,6 +374,8 @@ async def inspect_or_cleanup(path: Path, *, cleanup: bool) -> None:
                 await db.execute(delete(SysRole).where(SysRole.role_id.in_(state['role_ids'])))
                 await db.commit()
         if cleanup:
+            for project_id in extra_project_ids:
+                await cleanup_p6_project(factory, {'project_id': project_id, 'user_ids': []})
             await cleanup_p6_project(factory, state)
             await restore_captcha(state['oldCaptcha'])
             await async_path.unlink()

@@ -108,10 +108,7 @@ def handle_exception(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def request_validation_exception_handler(request: Request, exc: RequestValidationError) -> Response:
         path = request.url.path
-        is_p7_route = path.startswith('/feedback/projects/') and path.endswith(
-            ('/progress', '/completion-precheck', '/complete')
-        )
-        if is_p7_route:
+        if path.startswith('/feedback/'):
             safe_errors = [{'type': error['type'], 'loc': error['loc'], 'msg': error['msg']} for error in exc.errors()]
             if path.endswith('/complete'):
                 try:
@@ -147,5 +144,16 @@ def handle_exception(app: FastAPI) -> None:
     # 处理其他异常
     @app.exception_handler(Exception)
     async def exception_handler(request: Request, exc: Exception) -> Response:
+        if request.url.path.startswith('/feedback/'):
+            logger.bind(
+                event='feedback_request_failed',
+                exception_type=type(exc).__name__,
+                request_id=TraceCtx.get_request_id() or None,
+                trace_id=TraceCtx.get_trace_id() or None,
+            ).error('评价请求处理失败')
+            return JSONResponse(
+                status_code=500,
+                content={'code': 500, 'msg': '处理失败，请稍后重试', 'success': False},
+            )
         logger.exception(exc)
         return ResponseUtil.error(msg=str(exc))

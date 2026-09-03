@@ -22,4 +22,9 @@ async def test_init_create_table_uses_registry_connection(monkeypatch: pytest.Mo
 
     await init_create_table(log_success_enabled=False)
 
-    connection.run_sync.assert_awaited_once_with(Base.metadata.create_all)
+    call = connection.run_sync.await_args
+    assert call.args == (Base.metadata.create_all,)
+    assert all(not table.name.startswith('fb_') for table in call.kwargs['tables'])
+    assert set(call.kwargs['tables']) == {
+        table for table in Base.metadata.tables.values() if not table.name.startswith('fb_')
+    }

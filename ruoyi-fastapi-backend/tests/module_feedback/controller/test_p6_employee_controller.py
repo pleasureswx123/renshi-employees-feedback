@@ -124,7 +124,7 @@ async def test_logged_submission_preserves_status_and_never_records_answer_body(
                 'answers': [{'questionId': 1, 'textValue': secret}],
             },
         )
-    expected = {'conflict': 409, 'not_found': 404, 'unexpected': 200}
+    expected = {'conflict': 409, 'not_found': 404, 'unexpected': 500}
     assert response.status_code == expected[failure]
     assert service.call_args.args[1:3] == (3, USER_ID)
     log = logs.call_args.args[1]

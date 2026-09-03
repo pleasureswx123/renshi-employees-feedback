@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 
 from scripts.feedback_p2_schema_verify import (
@@ -51,7 +53,14 @@ def test_schema_verifier_covers_all_feedback_tables_and_key_gates() -> None:
     assert ('fb_evaluator_selection', 'evaluator_user_id') in PUBLICATION_COLUMNS
 
 
-def test_migration_cycle_is_restricted_to_feedback_test_database() -> None:
+def test_migration_cycle_is_restricted_to_feedback_test_database(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        'scripts.feedback_p2_schema_verify.DataBaseConfig',
+        SimpleNamespace(default_source=SimpleNamespace(db_database='current-feedback')),
+    )
+    assert validate_database_name('current-feedback', cycle=False) == 'current-feedback'
+    with pytest.raises(ValueError, match='只允许只读验证'):
+        validate_database_name('current-feedback', cycle=True)
     assert validate_database_name('ruoyi_feedback_test', cycle=True) == 'ruoyi_feedback_test'
     assert validate_database_name('ruoyi_feedback_dev', cycle=False) == 'ruoyi_feedback_dev'
     with pytest.raises(ValueError, match='只允许在_test'):

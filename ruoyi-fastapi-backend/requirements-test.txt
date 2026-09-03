@@ -1,3 +1,5 @@
 # 在项目独立虚拟环境中安装；业务运行依赖仍使用requirements-pg.txt。
 pytest==8.4.2
 pytest-asyncio==1.2.0
+# 仅供既有公共模块的SQLite内存单元测试；评价业务仍使用真实PostgreSQL测试。
+aiosqlite==0.21.0

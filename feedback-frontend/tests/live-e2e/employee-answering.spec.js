@@ -373,3 +373,133 @@ test('真实HR发布、员工答题、HR完成关闭未交任务并保持已提�
   await page.getByRole('button', { name: '退出登录', exact: true }).click()
   expect(pageErrors).toEqual([])
 })
+
+async function realApi(page, method, path, body) {
+  return page.evaluate(async ({ method, path, body }) => {
+    const part = document.cookie.split('; ').find(item => item.startsWith('Feedback-Token='))
+    const token = decodeURIComponent(part.split('=').slice(1).join('='))
+    const response = await fetch(`/dev-api${path}`, {
+      method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    })
+    return { status: response.status, body: await response.json(), requestId: response.headers.get('request-id') }
+  }, { method, path, body })
+}
+
+test('P9真实创建项目、跨用户拒绝及下级不适用和缺失关系报告验收', async ({ page }) => {
+  test.setTimeout(180000)
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await login(page, state.hr)
+  await expect(page).toHaveURL(/\/hr\/projects$/)
+  const health = await realApi(page, 'GET', '/feedback/health')
+  expect(health.body.data).toMatchObject({ status: 'ready', phase: 'P9', schemaRevision: '20260903_08_feedback_scoring' })
+  await page.getByRole('button', { name: '创建项目', exact: true }).click()
+  const createDialog = page.getByRole('dialog', { name: '创建评价项目' })
+  await createDialog.getByLabel('项目名称', { exact: true }).fill(`P9验收-${state.user_ids[3]}`)
+  await createDialog.getByRole('button', { name: '创建并编辑问卷' }).click()
+  await expect(page).toHaveURL(/\/hr\/projects\/\d+\/editor$/)
+  const projectId = Number(new URL(page.url()).pathname.split('/')[3])
+  const base = `/feedback/projects/${projectId}`
+  const draft = (await realApi(page, 'GET', `${base}/questionnaire-draft`)).body.data
+  // 配置通过真实鉴权HTTP持久化；五题型编辑交互沿用独立组件和既有浏览器门禁。
+  const saved = await realApi(page, 'PUT', `${base}/questionnaire-draft`, {
+    versionId: draft.versionId, lockVersion: draft.lockVersion, title: 'P9关系缺失验收',
+    pages: [{ pageCode: 'P_MAIN', pageTitle: '评价', sortOrder: 1, questions: [
+      { questionCode: 'Q_SCORE', questionType: 'NUMERIC_INPUT', title: '完成质量', isRequired: true, isScored: true, minScore: '0', maxScore: '100', decimalPlaces: 0, config: {}, options: [], sortOrder: 1 },
+      { questionCode: 'Q_TEXT', questionType: 'TEXT', title: '具体建议', isRequired: true, isScored: false, config: { maxLength: 100 }, options: [], sortOrder: 2 }
+    ] }],
+    indicators: [{ indicatorCode: 'I_ALL', indicatorName: '综合表现', weight: '100', sortOrder: 1, questionCodes: ['Q_SCORE'] }]
+  })
+  expect(saved.body.code).toBe(200)
+  const config = (await realApi(page, 'GET', `${base}/publication-config`)).body.data
+  const relations = config.relations.map(relation => {
+    const value = Object.fromEntries(['relationCode', 'relationType', 'relationName', 'isEnabled', 'participatesInScore', 'weight', 'sortOrder'].map(key => [key, relation[key]]))
+    if (['REL_PEER', 'REL_SUBORDINATE'].includes(value.relationCode)) Object.assign(value, { isEnabled: true, participatesInScore: true, weight: '50' })
+    return value
+  })
+  const configured = await realApi(page, 'PUT', `${base}/publication-config`, {
+    projectLockVersion: config.projectLockVersion, versionId: config.versionId, versionLockVersion: config.versionLockVersion,
+    targets: [state.user_ids[0], state.user_ids[2]].map(targetUserId => ({ targetUserId })), relations,
+    evaluatorSelections: [
+      ...[state.user_ids[0], state.user_ids[2]].map(targetUserId => ({ targetUserId, relationCode: 'REL_PEER', evaluatorUserIds: [state.user_ids[1]] })),
+      { targetUserId: state.user_ids[2], relationCode: 'REL_SUBORDINATE', evaluatorUserIds: [state.user_ids[1]] }
+    ]
+  })
+  expect(configured.body.code).toBe(200)
+  await page.goto(`/hr/projects/${projectId}/publication`)
+  await page.getByRole('button', { name: '发布项目', exact: true }).click()
+  const publishDialog = page.getByRole('dialog', { name: '确认发布项目' })
+  await expect(publishDialog).toContainText('生成5项任务')
+  await publishDialog.getByRole('button', { name: '确认发布', exact: true }).click()
+  await expect(page.getByText('已冻结只读')).toBeVisible()
+  const progress = (await realApi(page, 'GET', `${base}/progress`)).body.data
+  const foreignTask = progress.rows.find(row => row.evaluatorUserId === state.user_ids[0]).assignmentId
+  await page.getByRole('button', { name: '退出登录', exact: true }).click()
+
+  await login(page, state.employee)
+  await expect(page).toHaveURL(/\/employee\/todos$/)
+  expect((await realApi(page, 'GET', `/feedback/employee/tasks/${foreignTask}`)).status).toBe(404)
+  expect((await realApi(page, 'GET', `${base}/publication-config`)).body.code).toBe(403)
+  const injected = await realApi(page, 'GET', `/feedback/employee/projects?evaluatorUserId=${state.user_ids[0]}`)
+  expect(injected.status).toBe(422)
+  expect(injected.body.data.code).toBe('VALIDATION_ERROR')
+  for (let index = 0; index < 2; index += 1) {
+    await page.goto(`/employee/todos/${projectId}`)
+    const peer = page.locator('.employee-task-card').filter({ hasText: '同级评价' }).filter({ has: page.getByRole('button', { name: '开始评价', exact: true }) }).first()
+    await peer.getByRole('button', { name: '开始评价', exact: true }).click()
+    await page.locator('.el-input-number input').fill('80')
+    await page.locator('.el-input-number input').press('Tab')
+    await page.locator('.answer-page textarea').fill('P9仅原始答案权限可见的建议')
+    await confirmSubmit(page)
+  }
+  await page.getByRole('button', { name: '退出登录', exact: true }).click()
+  await login(page, state.hr)
+  await expect(page).toHaveURL(/\/hr\/projects$/)
+  await page.goto(`/hr/projects/${projectId}/progress`)
+  await page.getByRole('button', { name: '完成项目', exact: true }).click()
+  const completion = page.getByRole('dialog', { name: '完成项目实时预检' })
+  await completion.getByLabel('完成原因').fill('P9验收：保留不适用与缺失关系区别')
+  await completion.locator('label.el-checkbox').click()
+  await completion.getByRole('button', { name: '确认完成项目', exact: true }).click()
+  await expect(page.getByText('项目已完成', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '查看报告', exact: true }).click()
+  await page.getByRole('button', { name: '生成报告', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '团队排名与明细' })).toBeVisible()
+  await expect(page.locator('.summary')).toContainText('2 / 5')
+  await expect(page.getByRole('button', { name: /导出|下载|Excel|CSV/ })).toHaveCount(0)
+  const reports = []
+  for (const targetUserId of [state.user_ids[0], state.user_ids[2]]) {
+    const response = await realApi(page, 'GET', `${base}/reports/${targetUserId}`)
+    expect(response.body.code).toBe(200)
+    expect(response.requestId).toBeTruthy()
+    expect(JSON.stringify(response.body)).not.toContain('P9仅原始答案权限可见的建议')
+    reports.push(response.body.data)
+  }
+  expect(reports.map(report => report.expectedCount)).toEqual([2, 3])
+  expect(reports.map(report => report.score)).toEqual(['80.00', '80.00'])
+  const subordinate = reports.map(report => report.indicators[0].relations.find(row => row.relationType === 'SUBORDINATE'))
+  expect(subordinate.map(row => row.status)).toEqual(['NOT_APPLICABLE', 'MISSING'])
+  for (const report of reports) {
+    const peer = report.indicators[0].relations.find(row => row.relationType === 'PEER')
+    expect(peer.originalWeight).toBe('50.00')
+    expect(peer.effectiveWeight).toBe('100.00')
+  }
+  await page.getByRole('button', { name: '个人报告', exact: true }).first().click()
+  const drawer = page.getByRole('dialog', { name: '个人报告', exact: true })
+  await expect(drawer).toContainText('不适用')
+  await page.screenshot({ path: '../output/playwright/p9-not-applicable-report.png', fullPage: true, animations: 'disabled' })
+  await drawer.locator('.el-drawer__close-btn').click()
+  await page.getByRole('button', { name: '个人报告', exact: true }).nth(1).click()
+  const missingRelation = drawer.getByRole('row', { name: /^下级 缺失关系/ })
+  await expect(missingRelation.getByRole('cell', { name: '50.00', exact: true })).toBeVisible()
+  await expect(missingRelation.getByRole('cell', { name: '0.00', exact: true })).toBeVisible()
+  await page.screenshot({ path: '../output/playwright/p9-missing-relation-report.png', fullPage: true, animations: 'disabled' })
+  await expect.poll(() => {
+    const audit = JSON.parse(fixture('inspect').split(/\r?\n/).find(line => line.startsWith('{"projectId"'))).operationAudit
+    expect(audit.sensitiveDataAbsent).toBe(true)
+    return audit.successfulTitles
+  }, { timeout: 15000 }).toEqual(expect.arrayContaining(['评价项目发布', '评价答卷提交', '评价项目完成', '评价报告生成', '已提交评价原始答案']))
+  expect(errors).toEqual([])
+})

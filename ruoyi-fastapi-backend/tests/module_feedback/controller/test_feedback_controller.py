@@ -11,6 +11,7 @@ from common.constant import HttpStatusConstant
 from exceptions.exception import AuthException
 from module_admin.service.login_service import LoginService
 from module_feedback.controller.feedback_controller import feedback_controller, get_feedback_module_health
+from module_feedback.service.schema_service import FEEDBACK_SCHEMA_REVISION, FeedbackSchemaService
 
 
 def get_health_route() -> APIRoute:
@@ -25,7 +26,7 @@ def test_feedback_health_route_uses_fixed_prefix_and_pre_auth() -> None:
     route = get_health_route()
 
     assert route.methods == {'GET'}
-    assert len(route.dependant.dependencies) == 1
+    assert any(dependency.name == 'db' for dependency in route.dependant.dependencies)
     assert isinstance(route.dependant.dependencies[0].call, PreAuth)
 
 
@@ -62,13 +63,22 @@ async def test_feedback_health_accepts_authenticated_user() -> None:
 
 @pytest.mark.asyncio
 async def test_feedback_health_response_is_read_only_phase_probe() -> None:
-    response = await inspect.unwrap(get_feedback_module_health)()
+    data = {
+        'module': 'feedback',
+        'status': 'ready',
+        'phase': 'P9',
+        'apiPrefix': '/feedback',
+        'schemaRevision': FEEDBACK_SCHEMA_REVISION,
+    }
+    with patch.object(FeedbackSchemaService, 'health', new=AsyncMock(return_value=data)):
+        response = await inspect.unwrap(get_feedback_module_health)(object())
     payload = json.loads(response.body)
 
     assert payload['code'] == HttpStatusConstant.SUCCESS
     assert payload['data'] == {
         'module': 'feedback',
         'status': 'ready',
-        'phase': 'P3',
+        'phase': 'P9',
         'apiPrefix': '/feedback',
+        'schemaRevision': FEEDBACK_SCHEMA_REVISION,
     }

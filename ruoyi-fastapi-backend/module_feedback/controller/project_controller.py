@@ -79,7 +79,13 @@ async def list_feedback_projects(
     response_model=DataResponseModel[ProjectDetailModel],
     dependencies=[UserInterfaceAuthDependency('feedback:project:add')],
 )
-@Log(title='评价项目', business_type=BusinessType.INSERT)
+@Log(
+    title='评价项目',
+    business_type=BusinessType.INSERT,
+    request_log_mode='none',
+    response_log_mode='include',
+    response_include_fields=('code', 'data.projectId'),
+)
 async def create_feedback_project(
     request: Request,
     page_object: ProjectCreateModel,
@@ -121,7 +127,13 @@ async def get_feedback_questionnaire_draft(
     response_model=DataResponseModel[QuestionnaireDraftModel],
     dependencies=[UserInterfaceAuthDependency('feedback:questionnaire:edit')],
 )
-@Log(title='问卷草稿', business_type=BusinessType.UPDATE)
+@Log(
+    title='问卷草稿',
+    business_type=BusinessType.UPDATE,
+    request_log_mode='include',
+    response_log_mode='none',
+    request_include_fields=('path_params.project_id', 'json_body.versionId', 'json_body.lockVersion'),
+)
 async def save_feedback_questionnaire_draft(
     request: Request,
     project_id: Annotated[int, Path(ge=1, description='评价项目ID')],
@@ -198,7 +210,13 @@ async def get_feedback_publication_config(
     response_model=DataResponseModel[PublicationConfigModel],
     dependencies=[UserInterfaceAuthDependency('feedback:participant:manage')],
 )
-@Log(title='发布配置', business_type=BusinessType.UPDATE)
+@Log(
+    title='发布配置',
+    business_type=BusinessType.UPDATE,
+    request_log_mode='include',
+    response_log_mode='none',
+    request_include_fields=('path_params.project_id', 'json_body.versionId', 'json_body.projectLockVersion'),
+)
 async def save_feedback_publication_config(
     request: Request,
     project_id: Annotated[int, Path(ge=1, description='评价项目ID')],
@@ -231,7 +249,20 @@ async def save_feedback_publication_config(
     response_model=DataResponseModel[PublishResultModel],
     dependencies=[UserInterfaceAuthDependency('feedback:project:publish')],
 )
-@Log(title='评价项目发布', business_type=BusinessType.UPDATE)
+@Log(
+    title='评价项目发布',
+    business_type=BusinessType.UPDATE,
+    request_log_mode='include',
+    response_log_mode='include',
+    request_include_fields=('path_params.project_id', 'json_body.versionId', 'json_body.projectLockVersion'),
+    response_include_fields=(
+        'code',
+        'data.projectId',
+        'data.versionId',
+        'data.assignmentCount',
+        'data.alreadyPublished',
+    ),
+)
 async def publish_feedback_project(
     request: Request,
     project_id: Annotated[int, Path(ge=1, description='评价项目ID')],
@@ -302,7 +333,7 @@ async def get_feedback_project_progress(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception('读取评价项目进度失败，project_id={}', project_id)
+        logger.bind(exception_type=type(exc).__name__).error('读取评价项目进度失败，project_id={}', project_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -353,7 +384,7 @@ async def get_feedback_project_completion_precheck(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception('评价项目完成预检失败，project_id={}', project_id)
+        logger.bind(exception_type=type(exc).__name__).error('评价项目完成预检失败，project_id={}', project_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -452,7 +483,8 @@ async def complete_feedback_project(
             failure_stage=exc.stage,
             request_id=TraceCtx.get_request_id() or None,
             trace_id=TraceCtx.get_trace_id() or None,
-        ).opt(exception=exc.__cause__ or exc).error('评价项目完成失败')
+            exception_type=type(exc.__cause__ or exc).__name__,
+        ).error('评价项目完成失败')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -469,7 +501,8 @@ async def complete_feedback_project(
             failure_stage='service_call',
             request_id=TraceCtx.get_request_id() or None,
             trace_id=TraceCtx.get_trace_id() or None,
-        ).opt(exception=exc).error('评价项目完成失败')
+            exception_type=type(exc).__name__,
+        ).error('评价项目完成失败')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -505,7 +538,13 @@ async def get_feedback_project_detail(
     response_model=DataResponseModel[ProjectDetailModel],
     dependencies=[UserInterfaceAuthDependency('feedback:project:edit')],
 )
-@Log(title='评价项目', business_type=BusinessType.UPDATE)
+@Log(
+    title='评价项目',
+    business_type=BusinessType.UPDATE,
+    request_log_mode='include',
+    response_log_mode='none',
+    request_include_fields=('path_params.project_id',),
+)
 async def update_feedback_project(
     request: Request,
     project_id: Annotated[int, Path(ge=1, description='评价项目ID')],
@@ -533,7 +572,13 @@ async def update_feedback_project(
     response_model=ResponseBaseModel,
     dependencies=[UserInterfaceAuthDependency('feedback:project:remove')],
 )
-@Log(title='评价项目', business_type=BusinessType.DELETE)
+@Log(
+    title='评价项目',
+    business_type=BusinessType.DELETE,
+    request_log_mode='include',
+    response_log_mode='none',
+    request_include_fields=('path_params.project_id',),
+)
 async def delete_feedback_project(
     request: Request,
     project_id: Annotated[int, Path(ge=1, description='评价项目ID')],

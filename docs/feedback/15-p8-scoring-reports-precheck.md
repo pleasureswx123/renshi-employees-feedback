@@ -84,7 +84,9 @@
 
 非阻塞提示：既有 `async_lru` 测试事件循环提示、第三方 VueUse PURE 注释提示及构建大 chunk 提示仍存在。性能与打包基线由 P9 继续检查。
 
-## 7. 当前本地环境边界
+## 7. P8验收时的本地环境边界（历史记录）
+
+**P9后续更新（2026-09-03）**：下列内容保留P8验收时的事实。P8已本地提交为`b59e62b`；P9已完成当前开发库备份、副本接管/故障回滚演练及原库严格迁移接管，当前`ruoyi-fastapi`已达到P8 head，原有记录摘要保持不变，`.env.dev`未改动。最新状态和回执见[P9验收报告](./16-p9-release-acceptance.md)。
 
 **已验证**：用户当前 `.env.dev` 指向 `ruoyi-fastapi`，该库已有 15 张评价表，但没有 `alembic_version` 表，且 `fb_score_result.score/effective_weight` 仍为 `NUMERIC(12,4)`。本次保留该库和用户配置，没有给它直接 stamp 或试跑迁移。现有本地服务因此不能视为 P8 运行验收环境。
 

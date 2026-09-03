@@ -1,6 +1,6 @@
 # 计划文件清单
 
-本清单同时登记已落地文件和下一阶段计划。标记“计划”的路径尚未创建，不代表已经实现；P8计分与基础报告文件已落地，功能完成状态与直接验证证据以实施路线图为准。
+本清单登记已落地文件。P9安全、迁移、性能和验收文件已落地，功能完成状态、测试遗留项与直接验证证据以实施路线图和P9验收报告为准。
 
 ## 1. 后端
 
@@ -23,6 +23,7 @@ ruoyi-fastapi-backend/
 │  │  ├─ answer_service.py                  # 已存在：P6草稿/提交事务、乐观锁、幂等与快照
 │  │  ├─ progress_service.py                # 已存在：P7统计、数据范围、预检和手动完成事务
 │  │  ├─ report_service.py                  # 已存在：P8范围、精度门禁、幂等生成事务和报告投影
+│  │  ├─ schema_service.py                  # 已存在：P9迁移版本与正式得分精度就绪门禁
 │  │  └─ scoring_input.py                   # 已存在：P8冻结输入与已提交原始分一致性校验
 │  ├─ dao/
 │  │  ├─ project_dao.py                     # 已存在：项目查询、锁定和持久化
@@ -33,6 +34,7 @@ ruoyi-fastapi-backend/
 │  │  ├─ employee_dao.py                    # 已存在：P6本人任务分页统计与项目/任务锁
 │  │  ├─ progress_dao.py                    # 已存在：P7进度聚合、明细分页、项目/任务锁和完成审计
 │  │  ├─ score_result_dao.py                # 已存在：计分结果查询
+│  │  ├─ schema_dao.py                      # 已存在：P9只读查询实际Alembic版本
 │  │  └─ report_dao.py                      # 已存在：P8范围内结果、精度检查、并列排名和提交答案查询
 │  ├─ entity/do/
 │  │  ├─ mixins.py                          # 已存在：审计和乐观锁字段
@@ -80,22 +82,27 @@ ruoyi-fastapi-backend/
 ├─ scripts/
 │  ├─ feedback_p0_database_precheck.py       # 已存在：独立开发/测试库与Redis隔离预检
 │  ├─ feedback_p2_schema_verify.py           # 已存在：领域结构、注释和迁移往返验证
-│  ├─ feedback_p6_e2e_fixture.py             # 已存在：P6至P8隔离库夹具、权限/审计/报告对账和精确清理
+│  ├─ feedback_p6_e2e_fixture.py             # 已存在：P6至P9隔离库夹具、权限/审计/报告对账和精确清理
+│  ├─ feedback_p9_api_audit.py               # 已存在：28个实际路由权限和数据范围审计
+│  ├─ feedback_p9_migration.py               # 已存在：只读审计、一致快照备份恢复、严格接管与原行摘要校验
+│  ├─ feedback_p9_performance.py             # 已存在：真实服务性能数据集与EXPLAIN ANALYZE采集
 │  └─ feedback_p6_e2e_server.py              # 已存在：完整应用的隔离库E2E启动器
 ├─ requirements-test.txt                    # 已存在：项目虚拟环境测试依赖
 ├─ tests/scripts/
 │  └─ test_feedback_p0_database_precheck.py  # 已存在：P0预检脚本直接测试
 └─ tests/module_feedback/
-   ├─ controller/                            # 已存在：模块入口、项目、草稿、P7完成及P8报告HTTP/权限测试
+   ├─ controller/                            # 已存在：模块入口、项目、草稿、P7完成、P8报告及P9全路由权限/脱敏测试
    ├─ calculators/                           # 已存在：P8手算、多人多指标、缺失、自评、零分与精度测试
    ├─ enums/                                 # 已存在：枚举契约测试
-   ├─ service/                               # 已存在：状态门禁及P3至P8真实PostgreSQL服务/并发/报告对账
+   ├─ service/                               # 已存在：状态门禁、P3至P8真实服务/并发/报告及P9五种数据范围/就绪检查
    ├─ entity/                                # 已存在：模型、约束元数据、P3/P4 VO及P5固定关系测试
    ├─ dao/                                   # 已存在：DAO单元及真实PostgreSQL事务测试
-   └─ migration/                             # 已存在：结构、P6权限、P7审计、P8精度往返及模型扫描门禁
+   └─ migration/                             # 已存在：结构、权限/审计/精度保护及P9全新库备份恢复/接管失败回滚
 ```
 
 具体拆分可以随实现调整，但Controller、Service、DAO、实体、计算器和发布校验职责不得混在单一大文件中。
+
+P9还修改公共`common/aspect/data_scope.py`、`common/annotation/log_annotation.py`、`exceptions/handle.py`与`config/lifecycle.py`，分别修复空角色范围、安全日志/错误边界和评价表不得绕过Alembic创建；公共生命周期有直接回归。
 
 ## 2. 平台前端
 
@@ -196,7 +203,7 @@ feedback-frontend/
    ├─ stores/                                # 已存在：权限、P4草稿、P5发布、P6答题、P7进度和P8报告隔离测试
    ├─ utils/                                 # 已存在：四位定点数和P5配置协议测试
    ├─ e2e/                                   # 已存在：登录、P4、P5发布及P7进度/完成浏览器测试（Mock接口）
-   └─ live-e2e/employee-answering.spec.js    # 已存在：P6至P8真实发布、答题、完成、报告、权限和数据库对账
+   └─ live-e2e/employee-answering.spec.js    # 已存在：P6至P9两条真实闭环，覆盖场景A至F、权限和数据库/审计对账
 ```
 
 ## 3. 管理端
@@ -226,7 +233,12 @@ docs/feedback/
 ├─ 12-p5-publication-precheck.md
 ├─ 13-p6-answering-precheck.md
 ├─ 14-p7-progress-completion-precheck.md
-└─ 15-p8-scoring-reports-precheck.md
+├─ 15-p8-scoring-reports-precheck.md
+├─ 16-p9-release-acceptance.md
+├─ 17-operations-runbook.md
+└─ evidence/
+   ├─ p9-api-matrix.md
+   └─ p9-performance.json
 ```
 
 ## 5. 文件创建原则

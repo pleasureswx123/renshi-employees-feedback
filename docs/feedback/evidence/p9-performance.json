@@ -1,0 +1,1071 @@
+{
+  "date": "2026-09-03",
+  "environment": {
+    "os": "Windows",
+    "python": "3.11.15",
+    "client": "SQLAlchemy + asyncpg",
+    "postgresql": "17.11"
+  },
+  "note": "本机独立库、预热一次后测量三次；复测期间还有前端回归负载。样本不代表生产吞吐或延迟承诺。",
+  "runs": {
+    "200-before": {
+      "targets": 200,
+      "assignments": 800,
+      "submitted": 200,
+      "generationMs": 355.709,
+      "operations": {
+        "employeeTodos": {
+          "warmupMs": 12.484,
+          "elapsedMs": [
+            4.392,
+            2.314,
+            2.063
+          ],
+          "queryCounts": [
+            2,
+            2,
+            2
+          ],
+          "rows": 1,
+          "medianMs": 2.314,
+          "plans": [
+            {
+              "executionMs": 0.087,
+              "planningMs": 0.104,
+              "rootRows": 1,
+              "nodes": {
+                "Aggregate": 2,
+                "Nested Loop": 1,
+                "Seq Scan": 2
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.096,
+              "planningMs": 0.103,
+              "rootRows": 1,
+              "nodes": {
+                "Limit": 1,
+                "Sort": 1,
+                "Nested Loop": 1,
+                "Seq Scan": 2,
+                "Aggregate": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            }
+          ]
+        },
+        "progress": {
+          "warmupMs": 57.12,
+          "elapsedMs": [
+            9.195,
+            8.766,
+            8.154
+          ],
+          "queryCounts": [
+            8,
+            8,
+            8
+          ],
+          "rows": 20,
+          "medianMs": 8.766,
+          "plans": [
+            {
+              "executionMs": 0.019,
+              "planningMs": 0.035,
+              "rootRows": 1,
+              "nodes": {
+                "LockRows": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.027,
+              "planningMs": 0.038,
+              "rootRows": 200,
+              "nodes": {
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.337,
+              "planningMs": 0.249,
+              "rootRows": 800,
+              "nodes": {
+                "LockRows": 1,
+                "Index Scan": 1
+              },
+              "indexes": [
+                "pk_fb_assignment"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.354,
+              "planningMs": 0.256,
+              "rootRows": 2,
+              "nodes": {
+                "Sort": 1,
+                "Aggregate": 1,
+                "Hash Join": 1,
+                "Seq Scan": 1,
+                "Hash": 1,
+                "Index Scan": 1
+              },
+              "indexes": [
+                "uq_fb_relation_project_version_id"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.202,
+              "planningMs": 0.136,
+              "rootRows": 2,
+              "nodes": {
+                "Aggregate": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.319,
+              "planningMs": 0.303,
+              "rootRows": 1,
+              "nodes": {
+                "Aggregate": 1,
+                "Hash Join": 2,
+                "Seq Scan": 2,
+                "Hash": 2,
+                "Index Only Scan": 1
+              },
+              "indexes": [
+                "uq_fb_relation_project_version_id"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.784,
+              "planningMs": 0.271,
+              "rootRows": 20,
+              "nodes": {
+                "Limit": 1,
+                "Sort": 1,
+                "Hash Join": 2,
+                "Seq Scan": 2,
+                "Hash": 2,
+                "Index Scan": 1
+              },
+              "indexes": [
+                "uq_fb_relation_project_version_id"
+              ],
+              "diskSorts": 0
+            }
+          ]
+        },
+        "reports": {
+          "warmupMs": 106.159,
+          "elapsedMs": [
+            104.144,
+            105.211,
+            104.89
+          ],
+          "queryCounts": [
+            15,
+            15,
+            15
+          ],
+          "rows": 20,
+          "medianMs": 104.89,
+          "plans": [
+            {
+              "executionMs": 0.02,
+              "planningMs": 0.042,
+              "rootRows": 1,
+              "nodes": {
+                "LockRows": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.041,
+              "planningMs": 0.048,
+              "rootRows": 200,
+              "nodes": {
+                "Sort": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.024,
+              "planningMs": 0.035,
+              "rootRows": 200,
+              "nodes": {
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.012,
+              "planningMs": 0.046,
+              "rootRows": 1,
+              "nodes": {
+                "Index Scan": 1
+              },
+              "indexes": [
+                "uq_fb_questionnaire_version_project_id"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.01,
+              "planningMs": 0.042,
+              "rootRows": 2,
+              "nodes": {
+                "Index Scan": 1
+              },
+              "indexes": [
+                "uq_fb_questionnaire_page_version_sort"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.01,
+              "planningMs": 0.045,
+              "rootRows": 1,
+              "nodes": {
+                "Index Scan": 1
+              },
+              "indexes": [
+                "uq_fb_indicator_version_sort"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.018,
+              "planningMs": 0.102,
+              "rootRows": 5,
+              "nodes": {
+                "Nested Loop": 1,
+                "Index Scan": 2
+              },
+              "indexes": [
+                "pk_fb_questionnaire_version",
+                "uq_fb_relation_version_sort"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.033,
+              "planningMs": 0.107,
+              "rootRows": 5,
+              "nodes": {
+                "Sort": 1,
+                "Hash Join": 1,
+                "Seq Scan": 1,
+                "Hash": 1,
+                "Bitmap Heap Scan": 1,
+                "Bitmap Index Scan": 1
+              },
+              "indexes": [
+                "pk_fb_questionnaire_page"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.017,
+              "planningMs": 0.076,
+              "rootRows": 5,
+              "nodes": {
+                "Nested Loop": 1,
+                "Index Scan": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [
+                "pk_fb_indicator"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.013,
+              "planningMs": 0.041,
+              "rootRows": 2,
+              "nodes": {
+                "Sort": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.178,
+              "planningMs": 0.24,
+              "rootRows": 1000,
+              "nodes": {
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.327,
+              "planningMs": 0.28,
+              "rootRows": 800,
+              "nodes": {
+                "Sort": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.274,
+              "planningMs": 0.388,
+              "rootRows": 1,
+              "nodes": {
+                "Aggregate": 1,
+                "Subquery Scan": 1,
+                "Hash Join": 1,
+                "Seq Scan": 2,
+                "Hash": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 2.033,
+              "planningMs": 0.378,
+              "rootRows": 20,
+              "nodes": {
+                "Limit": 1,
+                "Incremental Sort": 1,
+                "Subquery Scan": 1,
+                "WindowAgg": 1,
+                "Sort": 1,
+                "Hash Join": 1,
+                "Seq Scan": 2,
+                "Hash": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            }
+          ]
+        }
+      }
+    },
+    "1000-before": {
+      "targets": 1000,
+      "assignments": 4000,
+      "submitted": 1000,
+      "generationMs": 2113.507,
+      "operations": {
+        "employeeTodos": {
+          "warmupMs": 10.551,
+          "elapsedMs": [
+            5.939,
+            3.007,
+            3.329
+          ],
+          "queryCounts": [
+            2,
+            2,
+            2
+          ],
+          "rows": 1,
+          "medianMs": 3.329,
+          "plans": [
+            {
+              "executionMs": 0.283,
+              "planningMs": 0.127,
+              "rootRows": 1,
+              "nodes": {
+                "Aggregate": 2,
+                "Nested Loop": 1,
+                "Seq Scan": 1,
+                "Bitmap Heap Scan": 1,
+                "Bitmap Index Scan": 1
+              },
+              "indexes": [
+                "ix_fb_assignment_evaluator_status"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.316,
+              "planningMs": 0.129,
+              "rootRows": 1,
+              "nodes": {
+                "Limit": 1,
+                "Sort": 1,
+                "Nested Loop": 1,
+                "Seq Scan": 1,
+                "Aggregate": 1,
+                "Bitmap Heap Scan": 1,
+                "Bitmap Index Scan": 1
+              },
+              "indexes": [
+                "ix_fb_assignment_evaluator_status"
+              ],
+              "diskSorts": 0
+            }
+          ]
+        },
+        "progress": {
+          "warmupMs": 62.239,
+          "elapsedMs": [
+            36.673,
+            101.129,
+            26.672
+          ],
+          "queryCounts": [
+            8,
+            8,
+            8
+          ],
+          "rows": 20,
+          "medianMs": 36.673,
+          "plans": [
+            {
+              "executionMs": 0.035,
+              "planningMs": 0.109,
+              "rootRows": 1,
+              "nodes": {
+                "LockRows": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.1,
+              "planningMs": 0.043,
+              "rootRows": 1000,
+              "nodes": {
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 2.864,
+              "planningMs": 0.678,
+              "rootRows": 4000,
+              "nodes": {
+                "LockRows": 1,
+                "Sort": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 1.844,
+              "planningMs": 0.754,
+              "rootRows": 2,
+              "nodes": {
+                "Sort": 1,
+                "Aggregate": 1,
+                "Hash Join": 1,
+                "Seq Scan": 2,
+                "Hash": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 1.096,
+              "planningMs": 0.748,
+              "rootRows": 2,
+              "nodes": {
+                "Aggregate": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 9.727,
+              "planningMs": 0.886,
+              "rootRows": 1,
+              "nodes": {
+                "Aggregate": 1,
+                "Hash Join": 2,
+                "Seq Scan": 3,
+                "Hash": 2
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 17.712,
+              "planningMs": 0.876,
+              "rootRows": 20,
+              "nodes": {
+                "Limit": 1,
+                "Sort": 1,
+                "Hash Join": 2,
+                "Seq Scan": 3,
+                "Hash": 2
+              },
+              "indexes": [],
+              "diskSorts": 0
+            }
+          ]
+        },
+        "reports": {
+          "warmupMs": 2416.1,
+          "elapsedMs": [
+            2346.125,
+            2374.293,
+            2309.626
+          ],
+          "queryCounts": [
+            15,
+            15,
+            15
+          ],
+          "rows": 20,
+          "medianMs": 2346.125,
+          "plans": [
+            {
+              "executionMs": 0.029,
+              "planningMs": 0.068,
+              "rootRows": 1,
+              "nodes": {
+                "LockRows": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.136,
+              "planningMs": 0.057,
+              "rootRows": 1000,
+              "nodes": {
+                "Index Scan": 1
+              },
+              "indexes": [
+                "pk_fb_project_target"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.101,
+              "planningMs": 0.037,
+              "rootRows": 1000,
+              "nodes": {
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.014,
+              "planningMs": 0.049,
+              "rootRows": 1,
+              "nodes": {
+                "Index Scan": 1
+              },
+              "indexes": [
+                "uq_fb_questionnaire_version_project_id"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.015,
+              "planningMs": 0.053,
+              "rootRows": 2,
+              "nodes": {
+                "Index Scan": 1
+              },
+              "indexes": [
+                "uq_fb_questionnaire_page_version_sort"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.016,
+              "planningMs": 0.064,
+              "rootRows": 1,
+              "nodes": {
+                "Index Scan": 1
+              },
+              "indexes": [
+                "uq_fb_indicator_version_sort"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.029,
+              "planningMs": 0.121,
+              "rootRows": 5,
+              "nodes": {
+                "Sort": 1,
+                "Nested Loop": 1,
+                "Index Scan": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [
+                "pk_fb_questionnaire_version"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.038,
+              "planningMs": 0.13,
+              "rootRows": 5,
+              "nodes": {
+                "Sort": 1,
+                "Hash Join": 1,
+                "Seq Scan": 1,
+                "Hash": 1,
+                "Bitmap Heap Scan": 1,
+                "Bitmap Index Scan": 1
+              },
+              "indexes": [
+                "pk_fb_questionnaire_page"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.018,
+              "planningMs": 0.078,
+              "rootRows": 5,
+              "nodes": {
+                "Nested Loop": 1,
+                "Index Scan": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [
+                "pk_fb_indicator"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.014,
+              "planningMs": 0.043,
+              "rootRows": 2,
+              "nodes": {
+                "Sort": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.988,
+              "planningMs": 0.656,
+              "rootRows": 5000,
+              "nodes": {
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 1.816,
+              "planningMs": 0.684,
+              "rootRows": 4000,
+              "nodes": {
+                "Sort": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 1.509,
+              "planningMs": 0.858,
+              "rootRows": 1,
+              "nodes": {
+                "Aggregate": 1,
+                "Subquery Scan": 1,
+                "Hash Join": 1,
+                "Seq Scan": 2,
+                "Hash": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 17.17,
+              "planningMs": 0.846,
+              "rootRows": 20,
+              "nodes": {
+                "Limit": 1,
+                "Incremental Sort": 1,
+                "Subquery Scan": 1,
+                "WindowAgg": 1,
+                "Sort": 1,
+                "Hash Join": 1,
+                "Seq Scan": 2,
+                "Hash": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            }
+          ]
+        }
+      }
+    },
+    "1000-after": {
+      "targets": 1000,
+      "assignments": 4000,
+      "submitted": 1000,
+      "generationMs": 2245.521,
+      "operations": {
+        "employeeTodos": {
+          "warmupMs": 59.119,
+          "elapsedMs": [
+            18.367,
+            15.146,
+            13.764
+          ],
+          "queryCounts": [
+            2,
+            2,
+            2
+          ],
+          "rows": 1,
+          "medianMs": 15.146,
+          "plans": [
+            {
+              "executionMs": 1.026,
+              "planningMs": 0.546,
+              "rootRows": 1,
+              "nodes": {
+                "Aggregate": 2,
+                "Nested Loop": 1,
+                "Seq Scan": 2
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 1.113,
+              "planningMs": 0.588,
+              "rootRows": 1,
+              "nodes": {
+                "Limit": 1,
+                "Sort": 1,
+                "Nested Loop": 1,
+                "Seq Scan": 2,
+                "Aggregate": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            }
+          ]
+        },
+        "progress": {
+          "warmupMs": 144.759,
+          "elapsedMs": [
+            73.086,
+            190.137,
+            49.76
+          ],
+          "queryCounts": [
+            8,
+            8,
+            8
+          ],
+          "rows": 20,
+          "medianMs": 73.086,
+          "plans": [
+            {
+              "executionMs": 0.06,
+              "planningMs": 0.159,
+              "rootRows": 1,
+              "nodes": {
+                "LockRows": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.142,
+              "planningMs": 0.072,
+              "rootRows": 1000,
+              "nodes": {
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 3.398,
+              "planningMs": 0.754,
+              "rootRows": 4000,
+              "nodes": {
+                "LockRows": 1,
+                "Sort": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 2.432,
+              "planningMs": 0.817,
+              "rootRows": 2,
+              "nodes": {
+                "Sort": 1,
+                "Aggregate": 1,
+                "Hash Join": 1,
+                "Seq Scan": 2,
+                "Hash": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 1.409,
+              "planningMs": 0.867,
+              "rootRows": 2,
+              "nodes": {
+                "Aggregate": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 3.262,
+              "planningMs": 1.893,
+              "rootRows": 1,
+              "nodes": {
+                "Aggregate": 1,
+                "Hash Join": 2,
+                "Seq Scan": 3,
+                "Hash": 2
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 6.486,
+              "planningMs": 1.757,
+              "rootRows": 20,
+              "nodes": {
+                "Limit": 1,
+                "Sort": 1,
+                "Hash Join": 2,
+                "Seq Scan": 3,
+                "Hash": 2
+              },
+              "indexes": [],
+              "diskSorts": 0
+            }
+          ]
+        },
+        "reports": {
+          "warmupMs": 158.88,
+          "elapsedMs": [
+            150.241,
+            197.506,
+            150.98
+          ],
+          "queryCounts": [
+            15,
+            15,
+            15
+          ],
+          "rows": 20,
+          "medianMs": 150.98,
+          "plans": [
+            {
+              "executionMs": 0.024,
+              "planningMs": 0.064,
+              "rootRows": 1,
+              "nodes": {
+                "LockRows": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.173,
+              "planningMs": 0.058,
+              "rootRows": 1000,
+              "nodes": {
+                "Sort": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.1,
+              "planningMs": 0.034,
+              "rootRows": 1000,
+              "nodes": {
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.014,
+              "planningMs": 0.046,
+              "rootRows": 1,
+              "nodes": {
+                "Index Scan": 1
+              },
+              "indexes": [
+                "uq_fb_questionnaire_version_project_id"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.015,
+              "planningMs": 1.621,
+              "rootRows": 2,
+              "nodes": {
+                "Index Scan": 1
+              },
+              "indexes": [
+                "uq_fb_questionnaire_page_version_sort"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.013,
+              "planningMs": 0.058,
+              "rootRows": 1,
+              "nodes": {
+                "Index Scan": 1
+              },
+              "indexes": [
+                "uq_fb_indicator_version_sort"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.029,
+              "planningMs": 0.123,
+              "rootRows": 5,
+              "nodes": {
+                "Sort": 1,
+                "Nested Loop": 1,
+                "Index Scan": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [
+                "pk_fb_questionnaire_version"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.044,
+              "planningMs": 1.648,
+              "rootRows": 5,
+              "nodes": {
+                "Sort": 1,
+                "Hash Join": 1,
+                "Seq Scan": 1,
+                "Hash": 1,
+                "Bitmap Heap Scan": 1,
+                "Bitmap Index Scan": 1
+              },
+              "indexes": [
+                "pk_fb_questionnaire_page"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.023,
+              "planningMs": 0.728,
+              "rootRows": 5,
+              "nodes": {
+                "Nested Loop": 1,
+                "Index Scan": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [
+                "pk_fb_indicator"
+              ],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.018,
+              "planningMs": 1.228,
+              "rootRows": 2,
+              "nodes": {
+                "Sort": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 0.958,
+              "planningMs": 0.598,
+              "rootRows": 5000,
+              "nodes": {
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 1.67,
+              "planningMs": 0.623,
+              "rootRows": 4000,
+              "nodes": {
+                "Sort": 1,
+                "Seq Scan": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 1.347,
+              "planningMs": 0.808,
+              "rootRows": 1,
+              "nodes": {
+                "Aggregate": 1,
+                "Subquery Scan": 1,
+                "Hash Join": 1,
+                "Seq Scan": 2,
+                "Hash": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            },
+            {
+              "executionMs": 19.269,
+              "planningMs": 1.066,
+              "rootRows": 20,
+              "nodes": {
+                "Limit": 1,
+                "Incremental Sort": 1,
+                "Subquery Scan": 1,
+                "WindowAgg": 1,
+                "Sort": 1,
+                "Hash Join": 1,
+                "Seq Scan": 2,
+                "Hash": 1
+              },
+              "indexes": [],
+              "diskSorts": 0
+            }
+          ]
+        }
+      }
+    }
+  }
+}

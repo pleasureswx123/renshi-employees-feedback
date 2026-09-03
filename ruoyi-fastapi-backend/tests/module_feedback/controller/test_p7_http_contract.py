@@ -285,8 +285,10 @@ async def test_p7_completion_unknown_failure_logs_stable_stage_and_safe_code(
         failure_stage='commit',
         request_id='request-failed-9',
         trace_id='trace-failed-9',
+        exception_type='ProjectCompletionExecutionError',
     )
     bound_logger.error.assert_called_once_with('评价项目完成失败')
+    bound_logger.opt.assert_not_called()
 
 
 @pytest.mark.asyncio

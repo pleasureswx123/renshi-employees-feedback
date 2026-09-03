@@ -20,7 +20,9 @@ async def init_create_table(
         message = '🔎 初始化平台数据库元数据...' if stage == 'platform' else '🔎 同步插件实体表...'
         logger.bind(database_init_stage=stage).info(message)
     async with DataSourceRegistry.connection() as connection:
-        await connection.run_sync(Base.metadata.create_all)
+        # 评价核心表由Alembic管理，启动与插件同步均不得绕过迁移链创建这些表。
+        platform_tables = [table for table in Base.metadata.tables.values() if not table.name.startswith('fb_')]
+        await connection.run_sync(Base.metadata.create_all, tables=platform_tables)
     if log_success_enabled:
         message = '✅️ 平台数据库元数据初始化完成' if stage == 'platform' else '✅️ 插件实体表同步完成'
         logger.bind(database_init_stage=stage).info(message)
