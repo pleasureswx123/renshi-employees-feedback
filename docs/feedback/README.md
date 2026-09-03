@@ -15,6 +15,7 @@
 11. [P4完整问卷设计器与指标技术预检](./11-p4-questionnaire-designer-precheck.md)
 12. [P5人员关系、发布冻结与任务生成决策收口与技术预检](./12-p5-publication-precheck.md)
 13. [P6员工答题决策收口与技术预检](./13-p6-answering-precheck.md)
+14. [P7回收进度与HR手动完成契约收口与技术预检](./14-p7-progress-completion-precheck.md)
 
 ## 文档维护规则
 
@@ -27,7 +28,7 @@
 
 ## 当前阶段
 
-截至2026-09-02，P0至P6已经完成并通过各自阶段门禁；下一实施阶段是P7“回收进度与HR手动完成”：
+截至2026-09-03，P0至P7已经完成并通过各自阶段门禁；下一实施阶段是P8“计分与基础报告”：
 
 - 工程边界、首期范围、计分、权限和数据模型关键决策已经书面收口。
 - `feedback-frontend` 已接通RuoYi登录、当前用户、退出、权限和传输加密契约，并建立HR/员工双工作台。
@@ -41,4 +42,5 @@
 - P6已在真实`fb_assignment`上实现本人待办、五题型分页答题、逐人暂存/提交及只读历史；完整应用和PostgreSQL已验证一名员工独立提交两名被评价人的闭环。
 - P6新增总分扩容与权限目录迁移，双库head为`20260902_06_feedback_permissions`；不自动给现有账号授权，不建立平行身份体系。
 - P6已验证项目完成后拒绝写入；实际HR完成API/页面属于P7，百分制汇总与报告属于P8，整个平台上线验收属于P9。
-- P0至P6执行证据见[实施路线图阶段验收记录](./09-implementation-roadmap.md)，P6协议、自动化命令和真实浏览器证据见[P6技术预检与验收](./13-p6-answering-precheck.md)。
+- P7已交付统计与明细筛选、双层数据范围、完成预检、不可逆手动完成、P6/P7并发控制、完成审计和HR进度页面，并通过真实PostgreSQL与浏览器验收。
+- P0至P7执行证据见[实施路线图阶段验收记录](./09-implementation-roadmap.md)，P6协议和真实浏览器证据见[P6技术预检与验收](./13-p6-answering-precheck.md)，P7协议和验收证据见[P7契约收口与技术预检](./14-p7-progress-completion-precheck.md)。
