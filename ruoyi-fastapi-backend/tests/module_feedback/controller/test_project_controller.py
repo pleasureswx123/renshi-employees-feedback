@@ -20,8 +20,12 @@ EXPECTED_ROUTES = {
     ],
     ('PUT', '/feedback/projects/{project_id}/publication-config'): 'feedback:participant:manage',
     ('POST', '/feedback/projects/{project_id}/publish'): 'feedback:project:publish',
+    ('GET', '/feedback/projects/{project_id}/progress'): 'feedback:progress:view',
+    ('GET', '/feedback/projects/{project_id}/completion-precheck'): 'feedback:project:complete',
+    ('POST', '/feedback/projects/{project_id}/complete'): 'feedback:project:complete',
 }
 EXPECTED_USER_SCOPE_COUNT = 3
+EXPECTED_TARGET_SCOPE_COUNT = 3
 
 
 def test_project_routes_use_fixed_permissions_and_data_scope() -> None:
@@ -47,9 +51,12 @@ def test_project_routes_bind_feedback_project_data_scope_aliases() -> None:
     assert scoped_dependencies
     project_scopes = [item for item in scoped_dependencies if item.query_alias.__tablename__ == 'fb_project']
     user_scopes = [item for item in scoped_dependencies if item.query_alias.__tablename__ == 'sys_user']
+    target_scopes = [item for item in scoped_dependencies if item.query_alias.__tablename__ == 'fb_project_target']
 
     assert project_scopes
     assert all(item.user_alias == 'owner_user_id' for item in project_scopes)
     assert all(item.dept_alias == 'owner_dept_id' for item in project_scopes)
     assert len(user_scopes) == EXPECTED_USER_SCOPE_COUNT
     assert all(item.user_alias == 'user_id' and item.dept_alias == 'dept_id' for item in user_scopes)
+    assert len(target_scopes) == EXPECTED_TARGET_SCOPE_COUNT
+    assert all(item.user_alias == 'target_user_id' and item.dept_alias == 'target_dept_id' for item in target_scopes)

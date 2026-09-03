@@ -3,10 +3,11 @@ import json
 from collections.abc import Iterator
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import Request
+from fastapi.responses import JSONResponse
 from loguru import logger as _logger
 
 from common.annotation.log_annotation import Log, RequestLogFieldRoot, ResponseLogFieldRoot
@@ -407,6 +408,34 @@ def test_log_handles_missing_user_agent_without_error() -> None:
     assert login_log['loginLocation'] == '内网IP'
     assert login_log['browser'] == 'Other'
     assert login_log['os'] == 'Other'
+
+
+def test_login_log_queue_failure_is_not_silently_swallowed() -> None:
+    request = Request(
+        {
+            'type': 'http',
+            'method': 'POST',
+            'path': '/login-probe',
+            'headers': [(b'content-type', b'application/octet-stream')],
+            'path_params': {},
+            'query_string': b'',
+        }
+    )
+    log_decorator = Log(title='登录测试', business_type=BusinessType.OTHER, log_type='login')
+
+    @log_decorator
+    async def login_probe(request: Request, form_data: SimpleNamespace) -> JSONResponse:
+        return JSONResponse(content={'code': 200, 'msg': '登录成功'})
+
+    with (
+        patch.object(log_decorator, '_get_oper_location', AsyncMock(return_value='内网IP')),
+        patch(
+            'common.annotation.log_annotation.LogQueueService.enqueue_login_log',
+            AsyncMock(side_effect=RuntimeError('登录日志写入失败')),
+        ),
+        pytest.raises(RuntimeError, match='登录日志写入失败'),
+    ):
+        asyncio.run(login_probe(request=request, form_data=SimpleNamespace(username='tester')))
 
 
 def test_build_log_text_with_summary_mode() -> None:

@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Request, Response
-from fastapi.exceptions import HTTPException
+from fastapi.exceptions import HTTPException, RequestValidationError
 from pydantic_validation_decorator import FieldValidationError
 
+from common.context import RequestContext
 from exceptions.exception import (
     AuthException,
     ConflictException,
@@ -12,6 +13,7 @@ from exceptions.exception import (
     ServiceException,
     ServiceWarning,
 )
+from middlewares.trace_middleware.ctx import TraceCtx
 from utils.log_util import logger
 from utils.response_util import JSONResponse, ResponseUtil, jsonable_encoder
 
@@ -82,9 +84,65 @@ def handle_exception(app: FastAPI) -> None:
     # 处理其他http请求异常
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException) -> Response:
+        if isinstance(exc.detail, dict) and exc.detail.get('code'):
+            detail = dict(exc.detail)
+            message = str(detail.pop('message', detail['code']))
+            return JSONResponse(
+                content=jsonable_encoder(
+                    {
+                        'code': exc.status_code,
+                        'msg': message,
+                        'success': False,
+                        'data': detail,
+                    }
+                ),
+                status_code=exc.status_code,
+                headers=exc.headers,
+            )
         return JSONResponse(
-            content=jsonable_encoder({'code': exc.status_code, 'msg': exc.detail}), status_code=exc.status_code
+            content=jsonable_encoder({'code': exc.status_code, 'msg': exc.detail}),
+            status_code=exc.status_code,
+            headers=exc.headers,
         )
+
+    @app.exception_handler(RequestValidationError)
+    async def request_validation_exception_handler(request: Request, exc: RequestValidationError) -> Response:
+        path = request.url.path
+        is_p7_route = path.startswith('/feedback/projects/') and path.endswith(
+            ('/progress', '/completion-precheck', '/complete')
+        )
+        if is_p7_route:
+            safe_errors = [{'type': error['type'], 'loc': error['loc'], 'msg': error['msg']} for error in exc.errors()]
+            if path.endswith('/complete'):
+                try:
+                    operator_user_id = RequestContext.get_current_user().user.user_id
+                except Exception:
+                    operator_user_id = None
+                raw_project_id = request.path_params.get('project_id')
+                project_id = (
+                    int(raw_project_id) if str(raw_project_id).isascii() and str(raw_project_id).isdigit() else None
+                )
+                logger.bind(
+                    event='feedback_project_completion_failed',
+                    project_id=project_id,
+                    operator_user_id=operator_user_id,
+                    problem_code='VALIDATION_ERROR',
+                    failure_stage='request_validation',
+                    request_id=TraceCtx.get_request_id() or None,
+                    trace_id=TraceCtx.get_trace_id() or None,
+                ).warning('评价项目完成请求校验失败')
+            return JSONResponse(
+                content=jsonable_encoder(
+                    {
+                        'code': 422,
+                        'msg': '请求参数校验失败',
+                        'success': False,
+                        'data': {'code': 'VALIDATION_ERROR', 'validationErrors': safe_errors},
+                    }
+                ),
+                status_code=422,
+            )
+        return JSONResponse(content=jsonable_encoder({'detail': exc.errors()}), status_code=422)
 
     # 处理其他异常
     @app.exception_handler(Exception)

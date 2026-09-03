@@ -3,7 +3,7 @@ from typing import Any
 
 from sqlalchemy import delete, select, true
 
-from module_feedback.entity.do import FbAnswer, FbAnswerSheet
+from module_feedback.entity.do import FbAnswer, FbAnswerSheet, FbProjectCompletionAudit
 from module_feedback.entity.vo import PublicationConfigSaveModel, PublishRequestModel, QuestionnaireDraftSaveModel
 from module_feedback.entity.vo.employee_vo import AnswerDraftSaveModel, AnswerSubmitModel
 from module_feedback.service import FeedbackPublicationService, FeedbackQuestionnaireService
@@ -176,6 +176,9 @@ async def create_p6_project(
 
 async def cleanup_p6_project(factory: Any, state: dict) -> None:
     async with factory() as db:
+        await db.execute(
+            delete(FbProjectCompletionAudit).where(FbProjectCompletionAudit.project_id == state['project_id'])
+        )
         sheets = select(FbAnswerSheet.sheet_id).where(FbAnswerSheet.project_id == state['project_id'])
         await db.execute(delete(FbAnswer).where(FbAnswer.sheet_id.in_(sheets)))
         await db.execute(delete(FbAnswerSheet).where(FbAnswerSheet.project_id == state['project_id']))

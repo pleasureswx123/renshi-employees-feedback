@@ -1,6 +1,13 @@
 """评价业务接口模型。"""
 
 from module_feedback.entity.vo.indicator_vo import IndicatorDraftModel
+from module_feedback.entity.vo.progress_vo import (
+    CompletionPrecheckModel,
+    ProgressPageModel,
+    ProgressQueryModel,
+    ProjectCompleteRequestModel,
+    ProjectCompleteResultModel,
+)
 from module_feedback.entity.vo.project_vo import (
     ProjectCreateModel,
     ProjectDetailModel,
@@ -47,6 +54,7 @@ from module_feedback.entity.vo.questionnaire_vo import (
 )
 
 __all__ = [
+    'CompletionPrecheckModel',
     'EmptyQuestionConfigModel',
     'EvaluatorSelectionModel',
     'EvaluatorSelectionSaveModel',
@@ -55,6 +63,10 @@ __all__ = [
     'NumericInputQuestionDraftModel',
     'ParticipantOptionModel',
     'ParticipantOptionQueryModel',
+    'ProgressPageModel',
+    'ProgressQueryModel',
+    'ProjectCompleteRequestModel',
+    'ProjectCompleteResultModel',
     'ProjectCreateModel',
     'ProjectDetailModel',
     'ProjectPageQueryModel',

@@ -6,13 +6,14 @@ import uuid
 import pytest
 from sqlalchemy import text
 
-from scripts.feedback_p0_database_precheck import get_current_revision, get_repository_head, run_alembic
+from scripts.feedback_p0_database_precheck import get_current_revision, run_alembic
 from tests.module_feedback.service.test_p5_publication_flow_postgresql import create_test_session_factory
 
 pytestmark = pytest.mark.skipif(
     os.getenv('RUN_FEEDBACK_POSTGRES_TESTS') != '1', reason='仅显式启用隔离PostgreSQL时运行'
 )
 P6_SCHEMA = '20260902_05_feedback_answering'
+P6_PERMISSION_SCHEMA = '20260902_06_feedback_permissions'
 
 
 @pytest.mark.asyncio
@@ -80,7 +81,7 @@ async def test_permission_migration_preserves_existing_entries_never_grants_and_
             await db.commit()
         with pytest.raises(RuntimeError, match='权限已授予角色'):
             run_alembic('ruoyi_feedback_test', 'downgrade', P6_SCHEMA)
-        assert get_current_revision('ruoyi_feedback_test') == get_repository_head()
+        assert get_current_revision('ruoyi_feedback_test') == P6_PERMISSION_SCHEMA
         async with factory() as db:
             assert (
                 await db.scalar(text('SELECT count(*) FROM sys_role_menu WHERE role_id=:role'), {'role': role_id}) == 1
