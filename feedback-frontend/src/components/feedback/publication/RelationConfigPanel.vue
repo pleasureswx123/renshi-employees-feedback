@@ -76,8 +76,11 @@ function updateWeight(row, value) {
       </el-table-column>
       <el-table-column label="权重（%）" width="160">
         <template #default="{ row }">
+          <!-- 当前Element Plus版本仅在挂载时设置aria-disabled，禁用状态改变时重建并保留绑定值。 -->
           <el-input-number
+            :key="String(!editable || !row.participatesInScore || isSelf(row))"
             :model-value="Number(row.weight)"
+            :aria-label="`${row.relationName}权重（%）`"
             :min="0"
             :max="100"
             :precision="4"

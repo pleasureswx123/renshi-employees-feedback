@@ -92,10 +92,11 @@ function openEditDialog(row) {
 }
 
 async function submitProject() {
-  if (mutating.value) return
-  await projectFormRef.value?.validate()
+  if (mutating.value || !dialogVisible.value || !projectFormRef.value) return
   mutating.value = true
   try {
+    const valid = await projectFormRef.value.validate().catch(() => false)
+    if (!valid) return
     if (dialogMode.value === 'create') {
       const response = await createProject({
         projectName: projectForm.projectName,
@@ -115,6 +116,9 @@ async function submitProject() {
     ElMessage.success('项目已更新')
     dialogVisible.value = false
     await loadProjects()
+  } catch (error) {
+    // 请求拦截器负责接口错误提示，校验拒绝不会泄漏为未处理异常。
+    if (!error?.__requestClassified) ElMessage.error(error?.message || '项目保存失败，请重试')
   } finally {
     mutating.value = false
   }
@@ -258,11 +262,20 @@ onMounted(loadProjects)
       :title="dialogMode === 'create' ? '创建评价项目' : '编辑评价项目'"
       width="560px"
       destroy-on-close
+      :close-on-click-modal="!mutating"
+      :close-on-press-escape="!mutating"
+      :show-close="!mutating"
       @closed="resetProjectForm"
     >
-      <el-form ref="projectFormRef" :model="projectForm" :rules="projectRules" label-position="top">
+      <el-form
+        ref="projectFormRef"
+        :model="projectForm"
+        :rules="projectRules"
+        :disabled="mutating"
+        label-position="top"
+      >
         <el-form-item label="项目名称" prop="projectName">
-          <el-input v-model="projectForm.projectName" maxlength="200" show-word-limit />
+          <el-input v-model="projectForm.projectName" maxlength="200" show-word-limit @keyup.enter="submitProject" />
         </el-form-item>
         <el-form-item label="项目说明">
           <el-input

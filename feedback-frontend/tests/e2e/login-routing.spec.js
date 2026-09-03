@@ -118,5 +118,5 @@ test('员工单权限账号不能看到或直接访问HR工作台', async ({ pag
 
   await page.goto('/hr/projects')
   await expect(page).toHaveURL(/\/403$/)
-  await expect(page.getByText('暂无评价平台权限')).toBeVisible()
+  await expect(page.getByText('无权访问当前页面')).toBeVisible()
 })

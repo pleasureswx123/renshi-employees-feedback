@@ -1,0 +1,52 @@
+{
+  "projectId": 553,
+  "projectStatus": "COMPLETED",
+  "versionStatus": "FROZEN",
+  "tasks": {
+    "SUBMITTED": 2,
+    "CLOSED_INCOMPLETE": 3
+  },
+  "answerSheets": {
+    "SUBMITTED": 2,
+    "DRAFT": 1
+  },
+  "answerRows": 11,
+  "formalRawScores": [
+    "53.7500",
+    "104.0000"
+  ],
+  "resultRows": 20,
+  "personScores": {
+    "1448": "69.5000000",
+    "1450": "94.909090909090909090909090909090909090909090909091"
+  },
+  "completionRate": "40.00%",
+  "completionAudit": {
+    "before_total_count": 5,
+    "before_submitted_count": 2,
+    "before_draft_count": 1,
+    "before_pending_count": 2,
+    "closed_assignment_count": 3
+  },
+  "operationTitles": [
+    "发布配置",
+    "已提交评价原始答案",
+    "已提交评价答卷列表",
+    "本人评价历史",
+    "评价个人报告",
+    "评价团队报告",
+    "评价报告生成",
+    "评价报告项目",
+    "评价答卷提交",
+    "评价答卷暂存",
+    "评价项目",
+    "评价项目发布",
+    "评价项目完成",
+    "评价项目完成预检",
+    "评价项目进度",
+    "问卷草稿"
+  ],
+  "sensitiveDataAbsent": true,
+  "businessRowsSha256": "d5cb7490156b734b57f43a7c9fedc98405210a61e08084ebfab1a85531f4017f",
+  "readOnlyReentryPreservedRows": true
+}

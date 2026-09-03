@@ -1,5 +1,5 @@
 import ElementPlus from 'element-plus'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
 import PublicationPreviewPanel from '@/components/feedback/publication/PublicationPreviewPanel.vue'
@@ -66,5 +66,24 @@ describe('P5发布配置组件', () => {
     expect(wrapper.text()).not.toContain('增加自定义关系')
     expect(wrapper.text()).not.toContain('删除')
     expect(wrapper.findAll('input').every(input => input.attributes('disabled') !== undefined)).toBe(true)
+  })
+
+  it('关系启用和发布冻结后，权重输入的无障碍禁用状态与实际状态一致', async () => {
+    const wrapper = mount(RelationConfigPanel, {
+      global: { plugins: [ElementPlus] },
+      props: { relations: [{ ...relations[0], participatesInScore: false }], editable: true }
+    })
+    await flushPromises()
+    const input = () => wrapper.find('input[aria-label="同级权重（%）"]')
+    expect(input().attributes('aria-disabled')).toBe('true')
+    await wrapper.setProps({ relations: [{ ...relations[0], weight: '60.0000' }] })
+    expect(input().attributes('disabled')).toBeUndefined()
+    expect(input().attributes('aria-disabled')).toBe('false')
+    expect(input().element.value).toBe('60.0000')
+    await wrapper.setProps({ editable: false })
+    expect(input().attributes('disabled')).toBeDefined()
+    expect(input().attributes('aria-disabled')).toBe('true')
+    expect(input().element.value).toBe('60.0000')
+    wrapper.unmount()
   })
 })
