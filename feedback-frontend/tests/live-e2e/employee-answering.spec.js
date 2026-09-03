@@ -1,9 +1,12 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
 
-const backend = fileURLToPath(new URL('../../../ruoyi-fastapi-backend/', import.meta.url))
+const backend = process.env.FEEDBACK_BACKEND_ROOT
+  ? `${resolve(process.env.FEEDBACK_BACKEND_ROOT)}/`
+  : fileURLToPath(new URL('../../../ruoyi-fastapi-backend/', import.meta.url))
 const python = `${backend}${process.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python'}`
 const statePath = `${backend}.tmp/p6-live-automated.json`
 let state
@@ -66,7 +69,8 @@ test.afterAll(() => {
   if (state) fixture('cleanup')
 })
 
-test('真实HR发布、员工两人独立暂存提交、恢复、历史与数据库对账', async ({ page }) => {
+test('真实HR发布、员工答题、HR完成关闭未交任务并保持已提交答案不可变', async ({ page }) => {
+  test.setTimeout(240000)
   // 不拦截业务接口：使用完整RuoYi登录和真实PostgreSQL持久化。
   const pageErrors = []
   page.on('pageerror', error => pageErrors.push(error.message))
@@ -136,6 +140,173 @@ test('真实HR发布、员工两人独立暂存提交、恢复、历史与数据
   expect(database.tasks.filter(task => task.status === 'PENDING')).toHaveLength(2)
   await page.goto('/employee/todos')
   await expect(page.getByText('暂无待处理的评价任务')).toBeVisible()
+  await page.getByRole('button', { name: '退出登录', exact: true }).click()
+
+  await login(page, state.partial_hr)
+  await expect(page).toHaveURL(/\/hr\/projects$/)
+  await page.goto(`/employee/todos/${state.project_id}`)
+  await expect(page.getByText('我的进度：已提交 0/1 份')).toBeVisible()
+  await page.getByRole('button', { name: '开始评价', exact: true }).first().click()
+  const draftUrl = page.url()
+  await page.locator('label.el-radio').filter({ hasText: '很好' }).click()
+  await page.getByRole('button', { name: '下一页', exact: true }).click()
+  const draftResponsePromise = page.waitForResponse(
+    response => response.request().method() === 'PUT' && response.url().endsWith('/draft')
+  )
+  await page.getByRole('button', { name: '暂存答卷', exact: true }).click()
+  const savedDraft = (await (await draftResponsePromise).json()).data
+  await expect(page.getByText('答卷已暂存，可稍后继续填写')).toBeVisible()
+  const draftWriteContract = {
+    assignmentId: savedDraft.task.assignmentId,
+    payload: {
+      versionId: savedDraft.task.versionId,
+      lockVersion: savedDraft.lockVersion,
+      lastPageId: savedDraft.lastPageId,
+      answers: savedDraft.answers.map(answer => Object.fromEntries(
+        Object.entries({
+          questionId: answer.questionId,
+          optionId: answer.optionId,
+          numericValue: answer.numericValue,
+          textValue: answer.textValue,
+          reason: answer.reason
+        }).filter(([, value]) => value !== null && value !== undefined)
+      ))
+    }
+  }
+  const draftedDatabase = JSON.parse(
+    fixture('inspect').split('\n').find(line => line.startsWith('{"projectId"'))
+  )
+  expect(draftedDatabase.tasks.filter(task => task.status === 'DRAFT')).toHaveLength(1)
+  expect(draftedDatabase.tasks.filter(task => task.status === 'PENDING')).toHaveLength(1)
+  await page.goto(`/hr/projects/${state.project_id}/progress`)
+  await expect(page.getByRole('heading', { name: 'P5闭环', exact: false })).toBeVisible()
+  await expect(page.locator('.kpi-card').filter({ hasText: '应完成' })).toContainText('2')
+  await expect(page.getByRole('button', { name: '完成项目', exact: true })).toHaveCount(0)
+  const partialCompletion = await page.evaluate(async projectId => {
+    const tokenPart = document.cookie.split('; ').find(item => item.startsWith('Feedback-Token='))
+    const token = decodeURIComponent(tokenPart.split('=').slice(1).join('='))
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    const precheckResponse = await fetch(`/dev-api/feedback/projects/${projectId}/completion-precheck`, { headers })
+    const precheck = await precheckResponse.json()
+    const summary = precheck.data.summary
+    const response = await fetch(`/dev-api/feedback/projects/${projectId}/complete`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        projectLockVersion: precheck.data.projectLockVersion,
+        expectedSummary: {
+          totalCount: summary.totalCount,
+          pendingCount: summary.pendingCount,
+          draftCount: summary.draftCount,
+          submittedCount: summary.submittedCount,
+          closedIncompleteCount: summary.closedIncompleteCount
+        },
+        completionReason: '部分数据范围用户不允许完成项目'
+      })
+    })
+    return { status: response.status, body: await response.json() }
+  }, state.project_id)
+  expect(partialCompletion.status).toBe(403)
+  expect(partialCompletion.body.data.code).toBe('PROJECT_COMPLETION_SCOPE_FORBIDDEN')
+  await page.getByRole('button', { name: '退出登录', exact: true }).click()
+
+  await login(page, state.hr)
+  await expect(page).toHaveURL(/\/hr\/projects$/)
+  await page.goto(`/hr/projects/${state.project_id}/progress`)
+  await expect(page.getByRole('heading', { name: 'P5闭环', exact: false })).toBeVisible()
+  await expect(page.locator('.kpi-card').filter({ hasText: '应完成' })).toContainText('4')
+  await expect(page.locator('.kpi-card').filter({ hasText: '已提交' })).toContainText('2')
+  await expect(page.locator('.kpi-card').filter({ hasText: '已暂存' })).toContainText('1')
+  await expect(page.locator('.kpi-card').filter({ hasText: '未开始' })).toContainText('1')
+  await page.getByRole('button', { name: '完成项目', exact: true }).click()
+  const completionDrawer = page.getByRole('dialog', { name: '完成项目实时预检' })
+  await expect(completionDrawer).toContainText('已提交 2')
+  await expect(completionDrawer).toContainText('已暂存 1')
+  await expect(completionDrawer).toContainText('未开始 1')
+  await completionDrawer.getByLabel('完成原因').fill('P7真实验收：关闭未交任务并冻结已提交答卷')
+  await completionDrawer.locator('label.el-checkbox').click()
+  await completionDrawer.getByRole('button', { name: '确认完成项目', exact: true }).click()
+  await expect(page.getByText('项目已完成', { exact: true })).toBeVisible()
+  await expect(page.getByText('已完成', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '完成项目', exact: true })).toHaveCount(0)
+
+  const completedDatabase = JSON.parse(
+    fixture('inspect')
+      .split('\n')
+      .find(line => line.startsWith('{"projectId"'))
+  )
+  expect(completedDatabase.projectStatus).toBe('COMPLETED')
+  expect(completedDatabase.projectCompletedBy).toBe(state.user_ids[3])
+  expect(completedDatabase.projectCompletionReason).toBe('P7真实验收：关闭未交任务并冻结已提交答卷')
+  expect(completedDatabase.tasks.filter(task => task.status === 'SUBMITTED')).toHaveLength(2)
+  expect(completedDatabase.tasks.filter(task => task.status === 'CLOSED_INCOMPLETE')).toHaveLength(2)
+  expect(
+    completedDatabase.tasks.filter(task => task.status === 'CLOSED_INCOMPLETE' && task.answerCount === 1)
+  ).toHaveLength(1)
+  expect(completedDatabase.tasks.filter(task => task.status === 'SUBMITTED').every(task => task.answerCount === 5)).toBe(
+    true
+  )
+  for (const beforeTask of draftedDatabase.tasks.filter(task => task.status === 'SUBMITTED')) {
+    expect(completedDatabase.tasks.find(task => task.taskId === beforeTask.taskId)).toEqual(beforeTask)
+  }
+  const draftedTaskBeforeCompletion = draftedDatabase.tasks.find(task => task.status === 'DRAFT')
+  expect(completedDatabase.tasks.find(task => task.taskId === draftedTaskBeforeCompletion.taskId).answerSheet).toEqual(
+    draftedTaskBeforeCompletion.answerSheet
+  )
+  expect(completedDatabase.completionAudits).toEqual([
+    {
+      result: 'SUCCESS',
+      operatorUserId: state.user_ids[3],
+      beforeTotalCount: 4,
+      beforeSubmittedCount: 2,
+      beforeDraftCount: 1,
+      beforePendingCount: 1,
+      beforeClosedIncompleteCount: 0,
+      closedIncompleteCount: 2,
+      completionReason: 'P7真实验收：关闭未交任务并冻结已提交答卷',
+      completedTime: completedDatabase.projectCompletedTime
+    }
+  ])
+
+  await page.getByRole('button', { name: '退出登录', exact: true }).click()
+  await login(page, state.employee)
+  await expect(page).toHaveURL(/\/employee\/todos$/)
+  const firstAssignmentId = new URL(firstUrl).pathname.split('/').pop()
+  await page.goto(`/employee/reviews/${firstAssignmentId}`)
+  await expect(page.getByText('这份评价已提交，答案不可修改。')).toBeVisible()
+  await expect(page.getByPlaceholder(/原因/)).toHaveValue('第一人：主动配合')
+  await page.getByRole('button', { name: '退出登录', exact: true }).click()
+
+  await login(page, state.partial_hr)
+  await expect(page).toHaveURL(/\/hr\/projects$/)
+  const rejectedWrites = await page.evaluate(async contract => {
+    const tokenPart = document.cookie.split('; ').find(item => item.startsWith('Feedback-Token='))
+    const token = decodeURIComponent(tokenPart.split('=').slice(1).join('='))
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    const baseUrl = `/dev-api/feedback/employee/tasks/${contract.assignmentId}`
+    const draftResponse = await fetch(`${baseUrl}/draft`, {
+      method: 'PUT', headers, body: JSON.stringify(contract.payload)
+    })
+    const submitResponse = await fetch(`${baseUrl}/submit`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...contract.payload, submissionId: crypto.randomUUID() })
+    })
+    return {
+      draft: { status: draftResponse.status, body: await draftResponse.json() },
+      submit: { status: submitResponse.status, body: await submitResponse.json() }
+    }
+  }, draftWriteContract)
+  expect(rejectedWrites.draft.status).toBe(409)
+  expect(rejectedWrites.draft.body.data.code).toBe('PROJECT_CLOSED')
+  expect(rejectedWrites.submit.status).toBe(409)
+  expect(rejectedWrites.submit.body.data.code).toBe('PROJECT_CLOSED')
+  expect(JSON.parse(fixture('inspect').split('\n').find(line => line.startsWith('{"projectId"')))).toEqual(
+    completedDatabase
+  )
+  await page.goto(draftUrl)
+  await expect(page.getByRole('button', { name: '暂存答卷', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '提交本份评价', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: '退出登录', exact: true }).click()
   await expect(page).toHaveURL(/\/login$/)
   await page.goto(firstUrl)

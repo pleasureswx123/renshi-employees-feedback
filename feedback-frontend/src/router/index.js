@@ -23,6 +23,16 @@ const routes = [
     meta: { workspace: 'hr' },
     children: [
       {
+        path: 'progress',
+        name: 'hr-progress-entry',
+        component: () => import('@/views/hr/ProjectProgressEntryView.vue'),
+        meta: {
+          title: '回收进度入口',
+          workspace: 'hr',
+          permissions: ['feedback:progress:view']
+        }
+      },
+      {
         path: 'projects',
         name: 'hr-projects',
         component: () => import('@/views/hr/ProjectListView.vue'),
@@ -46,6 +56,17 @@ const routes = [
           title: '人员关系与发布',
           workspace: 'hr',
           permissions: ['feedback:participant:manage', 'feedback:project:publish']
+        }
+      },
+      {
+        path: 'projects/:projectId/progress',
+        name: 'hr-project-progress',
+        component: () => import('@/views/hr/ProjectProgressView.vue'),
+        meta: {
+          title: '回收进度',
+          workspace: 'hr',
+          permissions: ['feedback:progress:view'],
+          activeMenu: '/hr/projects'
         }
       }
     ]
