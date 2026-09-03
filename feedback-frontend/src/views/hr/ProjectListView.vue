@@ -219,6 +219,10 @@ onMounted(loadProjects)
               回收进度
             </el-button>
             <el-button
+              v-if="row.status === ProjectStatus.COMPLETED && permissionStore.hasPermission('feedback:report:view')"
+              type="primary" link @click="router.push(`/hr/projects/${row.projectId}/reports`)"
+            >查看报告</el-button>
+            <el-button
               v-if="row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:project:edit')"
               link
               @click="openEditDialog(row)"

@@ -168,6 +168,10 @@ onBeforeUnmount(() => { drawerVisible.value = false })
         <p class="page-description">统计与明细均来自服务端冻结任务；筛选只影响明细，不改变顶部全量统计。</p>
       </div>
       <div v-if="store.project" class="project-actions">
+        <el-button
+          v-if="store.project.projectStatus === 'COMPLETED' && permissionStore.hasPermission('feedback:report:view')"
+          type="primary" @click="$router.push(`/hr/projects/${route.params.projectId}/reports`)"
+        >查看报告</el-button>
         <el-tag :type="store.project.projectStatus === 'ACTIVE' ? 'success' : 'info'" size="large">
           {{ statusLabels[store.project.projectStatus] || store.project.projectStatus }}
         </el-tag>

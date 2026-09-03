@@ -11,7 +11,8 @@ export const HR_ENTRY_PERMISSIONS = Object.freeze([
   'feedback:questionnaire:edit',
   'feedback:participant:manage',
   'feedback:progress:view',
-  'feedback:report:view'
+  'feedback:report:view',
+  'feedback:answer:view'
 ])
 
 export const EMPLOYEE_ENTRY_PERMISSIONS = Object.freeze([
@@ -41,6 +42,8 @@ export const usePermissionStore = defineStore('permission', () => {
   function hrWorkspacePath() {
     if (hasPermission('feedback:project:list')) return '/hr/projects'
     if (hasPermission('feedback:progress:view')) return '/hr/progress'
+    if (hasPermission('feedback:report:view')) return '/hr/reports'
+    if (hasPermission('feedback:answer:view')) return '/hr/answers'
     return null
   }
 

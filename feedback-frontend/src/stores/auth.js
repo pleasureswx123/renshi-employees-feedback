@@ -4,6 +4,7 @@ import { getCurrentUser, login, logout } from '@/api/auth'
 import { getToken, removeToken, setToken } from '@/utils/auth'
 import { useAnswerSheetStore } from './answerSheet'
 import { useProjectProgressStore } from './projectProgress'
+import { useProjectReportsStore } from './projectReports'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -72,6 +73,7 @@ export const useAuthStore = defineStore('auth', {
     clearSession() {
       useAnswerSheetStore().reset()
       useProjectProgressStore().reset()
+      useProjectReportsStore().reset()
       removeToken()
       this.token = ''
       this.user = null

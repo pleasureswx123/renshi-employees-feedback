@@ -22,7 +22,7 @@ from module_admin.entity.do.menu_do import SysMenu  # noqa: E402
 from module_admin.entity.do.role_do import SysRole, SysRoleMenu  # noqa: E402
 from module_admin.entity.do.user_do import SysUser, SysUserRole  # noqa: E402
 from module_feedback.dao.answer_dao import FeedbackAnswerDao  # noqa: E402
-from module_feedback.entity.do import FbAssignment, FbProject, FbProjectCompletionAudit  # noqa: E402
+from module_feedback.entity.do import FbAssignment, FbProject, FbProjectCompletionAudit, FbScoreResult  # noqa: E402
 from tests.module_feedback.service.p6_helpers import cleanup_p6_project, create_p6_project  # noqa: E402
 from tests.module_feedback.service.test_p5_publication_flow_postgresql import create_test_session_factory  # noqa: E402
 from utils.pwd_util import PwdUtil  # noqa: E402
@@ -115,6 +115,17 @@ async def prepare(path: Path) -> None:  # noqa: PLR0915
             db.add(full_hr)
             await db.flush()
             state['user_ids'].append(int(full_hr.user_id))
+            report_hr = SysUser(
+                dept_id=owner.dept_id,
+                user_name=f'p8report-{uuid.uuid4().hex[:14]}',
+                nick_name='P8仅报告权限验收HR',
+                password=PwdUtil.get_password_hash(password),
+                status='0',
+                del_flag='0',
+            )
+            db.add(report_hr)
+            await db.flush()
+            state['user_ids'].append(int(report_hr.user_id))
             role_specs = [
                 (
                     'partial_hr',
@@ -150,9 +161,13 @@ async def prepare(path: Path) -> None:  # noqa: PLR0915
                         'feedback:project:publish',
                         'feedback:progress:view',
                         'feedback:project:complete',
+                        'feedback:report:view',
+                        'feedback:answer:view',
                     ],
                 ),
+                ('report_hr', 4, '1', ['feedback:report:view']),
             ]
+            role_specs[0][3].append('feedback:report:view')
             for kind, user_index, data_scope, allowed in role_specs:
                 role = SysRole(
                     role_name=f'P6验收{kind}',
@@ -198,6 +213,7 @@ async def prepare(path: Path) -> None:  # noqa: PLR0915
             'user_ids': state['user_ids'],
             'role_ids': role_ids,
             'hr': user_names[state['user_ids'][3]],
+            'report_hr': user_names[state['user_ids'][4]],
             'partial_hr': user_names[state['user_ids'][0]],
             'employee': user_names[state['user_ids'][1]],
             'password': password,
@@ -275,6 +291,21 @@ async def inspect_or_cleanup(path: Path, *, cleanup: bool) -> None:
                         'projectCompletedTime': iso_or_none(project.completed_time),
                         'projectCompletionReason': project.completion_reason,
                         'tasks': summary,
+                        'scoreResults': [
+                            {
+                                'targetUserId': row.target_user_id,
+                                'resultType': row.result_type,
+                                'score': str(row.score) if row.score is not None else None,
+                                'calculationVersion': row.calculation_version,
+                            }
+                            for row in await db.scalars(
+                                select(FbScoreResult)
+                                .where(
+                                    FbScoreResult.project_id == project.project_id,
+                                )
+                                .order_by(FbScoreResult.result_id)
+                            )
+                        ],
                         'completionAudits': [
                             {
                                 'result': audit.result,

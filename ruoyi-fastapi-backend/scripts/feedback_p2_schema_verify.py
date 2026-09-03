@@ -58,8 +58,10 @@ NUMERIC_12_4_COLUMNS = {
     ('fb_relation', 'weight'),
     ('fb_answer', 'numeric_value'),
     ('fb_answer', 'raw_score'),
-    ('fb_score_result', 'score'),
     ('fb_score_result', 'original_weight'),
+}
+UNBOUNDED_NUMERIC_COLUMNS = {
+    ('fb_score_result', 'score'),
     ('fb_score_result', 'effective_weight'),
 }
 REQUIRED_CONSTRAINTS = {
@@ -741,6 +743,9 @@ def verify_schema(database_name: str) -> dict[str, Any]:  # noqa: PLR0912
         for key in NUMERIC_12_4_COLUMNS:
             if column_types.get(key) != ('numeric', 12, 4):
                 raise RuntimeError(f'正式分数或权重字段不是NUMERIC(12,4)：{key} -> {column_types.get(key)}')
+        for key in UNBOUNDED_NUMERIC_COLUMNS:
+            if column_types.get(key) != ('numeric', None, None):
+                raise RuntimeError(f'正式计算结果必须保留完整NUMERIC精度：{key} -> {column_types.get(key)}')
         if column_types.get(('fb_answer_sheet', 'raw_total_score')) != ('numeric', 18, 4):
             raise RuntimeError('答卷原始总分必须为NUMERIC(18,4)，以容纳合法多题总分')
         floating_columns = sorted(
@@ -790,6 +795,7 @@ def verify_schema(database_name: str) -> dict[str, Any]:  # noqa: PLR0912
         'columnCommentCount': len(columns),
         'modelColumnContractCount': model_column_count,
         'numeric12Scale4Count': len(NUMERIC_12_4_COLUMNS),
+        'unboundedNumericCount': len(UNBOUNDED_NUMERIC_COLUMNS),
         'numeric18Scale4Count': 1,
         'designerRevision': DESIGNER_REVISION,
         'designerColumnCount': len(DESIGNER_COLUMNS),

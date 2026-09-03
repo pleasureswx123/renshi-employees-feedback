@@ -23,6 +23,26 @@ const routes = [
     meta: { workspace: 'hr' },
     children: [
       {
+        path: 'reports', name: 'hr-reports',
+        component: () => import('@/views/hr/ReportProjectsView.vue'),
+        meta: { title: '评价报告', workspace: 'hr', permissions: ['feedback:report:view'] }
+      },
+      {
+        path: 'projects/:projectId/reports', name: 'hr-project-reports',
+        component: () => import('@/views/hr/ProjectReportsView.vue'),
+        meta: { title: '项目报告', workspace: 'hr', permissions: ['feedback:report:view'], activeMenu: '/hr/reports' }
+      },
+      {
+        path: 'answers', name: 'hr-answers-entry',
+        component: () => import('@/views/hr/SubmittedAnswersView.vue'),
+        meta: { title: '原始答案', workspace: 'hr', permissions: ['feedback:answer:view'] }
+      },
+      {
+        path: 'projects/:projectId/answers', name: 'hr-project-answers',
+        component: () => import('@/views/hr/SubmittedAnswersView.vue'),
+        meta: { title: '原始答案', workspace: 'hr', permissions: ['feedback:answer:view'], activeMenu: '/hr/answers' }
+      },
+      {
         path: 'progress',
         name: 'hr-progress-entry',
         component: () => import('@/views/hr/ProjectProgressEntryView.vue'),

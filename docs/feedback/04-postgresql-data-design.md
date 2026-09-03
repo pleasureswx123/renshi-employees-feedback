@@ -19,6 +19,7 @@
 - 状态使用短字符串，并在代码中定义枚举。
 - 排序使用 `INTEGER`。
 - 单题分数、权重使用 `NUMERIC(12,4)`；P6将答卷原始总分`fb_answer_sheet.raw_total_score`扩为`NUMERIC(18,4)`，避免多道合法高分题求和溢出。
+- P8将正式结果`fb_score_result.score`和实际权重`effective_weight`改为无固定小数位`NUMERIC`，完整保留50位有效数字Decimal计算输出；配置权重仍为`NUMERIC(12,4)`。
 - 时间沿用现有项目的 `TIMESTAMP WITHOUT TIME ZONE` 约定。
 - 所有表和字段添加中文注释。
 
@@ -192,3 +193,9 @@ P5-00已新增revision `20260902_04_feedback_publication`，`down_revision`为`2
 - 仅答卷原始总分扩为`NUMERIC(18,4)`；单题分值、答案、权重仍为`NUMERIC(12,4)`。迁移保留原值，降级加锁并拒绝不可表示的总分，不修改历史revision。
 - 授权项迁移复用`sys_menu/sys_role_menu`体系，仅登记缺少的15项`feedback:*`权限，不自动分配角色。已有权限不覆盖；已被分配的迁移权限不得直接降级删除。
 - 迁移和字段契约、真实数据保值、权限保留及拒绝不安全降级的证据见[P6验收记录](./13-p6-answering-precheck.md#8-2026-09-02验收证据)。
+
+### 8.6 P8计分精度迁移
+
+新增`20260903_08_feedback_scoring`，依赖P7的`20260902_07_feedback_audit`。保留原结果、约束和中文注释，仅扩展`score/effective_weight`的NUMERIC精度。降级取得表锁后核对所有值；有任何值无法被四位小数精确表示时拒绝降级。没有删除或覆盖已提交答卷、答案或计算依据。
+
+P8结果首次生成在项目排他锁内逐目标检查完整性，单事务插入四种结果粒度。`PERSON_TOTAL.calculation_basis`保存发布配置、任务/答卷集合与原始题分、计算器版本、50位精度约定、中间指标分及不含原文的报告投影。重复生成返回既有结果，不能覆盖历史。

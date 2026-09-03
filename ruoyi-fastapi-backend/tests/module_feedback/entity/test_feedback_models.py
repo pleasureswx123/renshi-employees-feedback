@@ -76,6 +76,9 @@ def test_formal_scores_and_weights_use_exact_numeric_with_wide_sheet_total() -> 
     for table_name, column_name in numeric_columns:
         column_type = Base.metadata.tables[table_name].c[column_name].type
         assert isinstance(column_type, Numeric)
+        if table_name == 'fb_score_result' and column_name in {'score', 'effective_weight'}:
+            assert (column_type.precision, column_type.scale) == (None, None)
+            continue
         expected_precision = 18 if (table_name, column_name) == ('fb_answer_sheet', 'raw_total_score') else 12
         assert (column_type.precision, column_type.scale) == (expected_precision, 4)
 

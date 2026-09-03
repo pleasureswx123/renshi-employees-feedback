@@ -11,6 +11,7 @@ from scripts.feedback_p2_schema_verify import (
     PUBLICATION_REVISION,
     REQUIRED_CONSTRAINTS,
     REQUIRED_INDEXES,
+    UNBOUNDED_NUMERIC_COLUMNS,
     validate_database_name,
 )
 
@@ -28,7 +29,8 @@ def test_schema_verifier_covers_all_feedback_tables_and_key_gates() -> None:
         'fb_project_completion_audit',
     } <= EXPECTED_TABLES
     assert {'fb_answer_sheet', 'fb_answer', 'fb_score_result', 'fb_project_completion_audit'} == IMMUTABLE_TABLES
-    assert ('fb_score_result', 'score') in NUMERIC_12_4_COLUMNS
+    assert ('fb_score_result', 'score') in UNBOUNDED_NUMERIC_COLUMNS
+    assert ('fb_score_result', 'original_weight') in NUMERIC_12_4_COLUMNS
     assert 'uq_fb_assignment_business_key' in REQUIRED_CONSTRAINTS
     assert 'uq_fb_evaluator_selection_business_key' in REQUIRED_CONSTRAINTS
     assert 'uq_fb_answer_sheet_question' in REQUIRED_CONSTRAINTS

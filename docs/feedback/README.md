@@ -16,6 +16,7 @@
 12. [P5人员关系、发布冻结与任务生成决策收口与技术预检](./12-p5-publication-precheck.md)
 13. [P6员工答题决策收口与技术预检](./13-p6-answering-precheck.md)
 14. [P7回收进度与HR手动完成契约收口与技术预检](./14-p7-progress-completion-precheck.md)
+15. [P8计分与基础报告实施契约](./15-p8-scoring-reports-precheck.md)
 
 ## 文档维护规则
 
@@ -28,11 +29,11 @@
 
 ## 当前阶段
 
-截至2026-09-03，P0至P7已经完成并通过各自阶段门禁；下一实施阶段是P8“计分与基础报告”：
+截至2026-09-03，P0至P8已经完成并通过各自阶段门禁；下一实施阶段是P9“安全、性能、迁移与首期验收”。以下较早阶段的计数是当时验收快照，最新结构和回归结果见末尾P8记录：
 
 - 工程边界、首期范围、计分、权限和数据模型关键决策已经书面收口。
 - `feedback-frontend` 已接通RuoYi登录、当前用户、退出、权限和传输加密契约，并建立HR/员工双工作台。
-- 后端 `module_feedback` 已建立14张评价领域表、SQLAlchemy实体、异步DAO和状态机服务。
+- 后端 `module_feedback` 已建立15张评价领域表、SQLAlchemy实体、异步DAO和状态机服务。
 - P3完成项目草稿与单选题垂直切片，P4扩展为五题型、多页、受限富文本、指标和稳定绑定的完整问卷设计器。
 - P5新增`20260902_04_feedback_publication`和`fb_evaluator_selection`，完成候选人员、目标/关系/评价人聚合保存、自评派生、权威预览、组合校验、二次确认和冻结只读页面。
 - 发布由后端单事务完成人员快照刷新、计分规则快照、问卷冻结、唯一任务生成和项目状态切换；幂等、双会话并发和故障回滚已由真实PostgreSQL测试覆盖。
@@ -43,4 +44,6 @@
 - P6新增总分扩容与权限目录迁移，双库head为`20260902_06_feedback_permissions`；不自动给现有账号授权，不建立平行身份体系。
 - P6已验证项目完成后拒绝写入；实际HR完成API/页面属于P7，百分制汇总与报告属于P8，整个平台上线验收属于P9。
 - P7已交付统计与明细筛选、双层数据范围、完成预检、不可逆手动完成、P6/P7并发控制、完成审计和HR进度页面，并通过真实PostgreSQL与浏览器验收。
-- P0至P7执行证据见[实施路线图阶段验收记录](./09-implementation-roadmap.md)，P6协议和真实浏览器证据见[P6技术预检与验收](./13-p6-answering-precheck.md)，P7协议和验收证据见[P7契约收口与技术预检](./14-p7-progress-completion-precheck.md)。
+- P8已交付Decimal百分制计分、不可变结果与可复算依据、团队排名、个人表格报告和独立原始答案权限，并完成真实浏览器/后端/PostgreSQL对账。
+- P8最新验证：评价模块后端194项、前端28个文件146项、既有Mock浏览器16项及真实完整业务E2E 1项通过；双独立库迁移至`20260903_08_feedback_scoring`，15张表、213个字段/中文注释。当前`.env.dev`所指向的`ruoyi-fastapi`库未接管Alembic且仍使用旧精度，不能直接作为P8已验收运行环境。
+- P0至P8执行证据见[实施路线图阶段验收记录](./09-implementation-roadmap.md)，P6见[P6技术预检与验收](./13-p6-answering-precheck.md)，P7见[P7契约收口与技术预检](./14-p7-progress-completion-precheck.md)，P8计分、迁移、权限与本地库边界见[P8实施契约与验收](./15-p8-scoring-reports-precheck.md)。

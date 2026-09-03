@@ -279,9 +279,9 @@ fb_score_result
 | `result_type` | `VARCHAR(30)` | 否 | 四种结果粒度枚举 | 计分结果类型 |
 | `indicator_id` | `BIGINT` | 是 | 指标粒度结果必填 | 指标ID |
 | `relation_id` | `BIGINT` | 是 | 指标关系结果必填 | 评价关系ID |
-| `score` | `NUMERIC(12,4)` | 是 | `0..100`；数据不足时为空 | 百分制得分 |
+| `score` | `NUMERIC` | 是 | P8保留计算精度；`0..100`，数据不足时为空 | 百分制得分 |
 | `original_weight` | `NUMERIC(12,4)` | 是 | `0..100` | 发布快照中的原配置权重 |
-| `effective_weight` | `NUMERIC(12,4)` | 是 | `0..100` | 实际参与计算权重 |
+| `effective_weight` | `NUMERIC` | 是 | P8保留归一化精度；`0..100` | 实际参与计算权重 |
 | `expected_count` | `INTEGER` | 否 | `0`，且`>= 0` | 应完成任务数 |
 | `submitted_count` | `INTEGER` | 否 | `0`，且不大于应完成数 | 已提交任务数 |
 | `has_missing_data` | `BOOLEAN` | 否 | `false` | 是否存在缺失数据 |
@@ -395,4 +395,11 @@ fb_score_result
 - 提交原子保存答案、原始分、状态和时间；`submission_snapshot`保存`schemaVersion/submissionId/answerDigest/versionId/evaluatorUserId/targetUserId/relationId/scoringRule/questionScores`。只有规范化内容和幂等键同时相同的重试可返回已有提交。
 - `fb_answer.value_snapshot`冻结题目Code/题型/标题、所选选项Code/文案；原始文本与原因保留在独立字段。正式答卷、答案和依据不能删除或覆盖。
 - `20260902_06_feedback_permissions`仅在既有`sys_menu`登记15项`feedback:*`权限，不创建平行身份体系、不自动授予任何角色。既有同名权限不变；降级只删除本迁移标记的菜单，若已授予角色则拒绝删除。
-- 当前结构门禁仍为14张领域表、196个字段/中文注释、10项`NUMERIC(12,4)`和1项`NUMERIC(18,4)`。完整接口与并发协议见[P6技术预检](./13-p6-answering-precheck.md)。
+- P6验收时结构门禁为14张领域表、196个字段/中文注释、10项`NUMERIC(12,4)`和1项`NUMERIC(18,4)`。完整接口与并发协议见[P6技术预检](./13-p6-answering-precheck.md)。
+
+## 12. P7至P8当前结构增量
+
+- P7新增不可变完成审计表`fb_project_completion_audit`，字段和保护性降级契约见[P7技术预检](./14-p7-progress-completion-precheck.md)。
+- P8迁移`20260903_08_feedback_scoring`将`fb_score_result.score/effective_weight`改为不限定小数位的`NUMERIC`；原始题分、原权重和配置精度保持四位小数。降级先锁表，存在无法恢复为四位小数的值时拒绝降级。
+- P8双独立库当前结构门禁为15张领域表、213个字段/中文注释、8项`NUMERIC(12,4)`、1项`NUMERIC(18,4)`和2项不限定小数位的`NUMERIC`，16项关键约束和12项关键索引。
+- 结果按`calculation_version=feedback-score-v1`保存，`calculation_basis`记录冻结输入、提交答卷集合和精确中间值；后端只在对外展示时舍入两位小数。具体结构、对账和当前配置库限制见[P8实施契约](./15-p8-scoring-reports-precheck.md)。

@@ -26,13 +26,16 @@ const activeMenu = computed(() => {
 })
 const menuItems = computed(() => {
   if (props.workspace === 'hr') {
+    const items = []
     if (permissionStore.hasPermission('feedback:project:list')) {
-      return [{ path: '/hr/projects', label: '评价项目' }]
+      items.push({ path: '/hr/projects', label: '评价项目' })
     }
-    if (permissionStore.hasPermission('feedback:progress:view')) {
-      return [{ path: '/hr/progress', label: '回收进度' }]
+    else if (permissionStore.hasPermission('feedback:progress:view')) {
+      items.push({ path: '/hr/progress', label: '回收进度' })
     }
-    return []
+    if (permissionStore.hasPermission('feedback:report:view')) items.push({ path: '/hr/reports', label: '评价报告' })
+    if (permissionStore.hasPermission('feedback:answer:view')) items.push({ path: '/hr/answers', label: '原始答案' })
+    return items
   }
   return [
     permissionStore.hasPermission('feedback:task:view')
