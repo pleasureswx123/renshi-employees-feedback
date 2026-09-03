@@ -252,11 +252,19 @@ class Log:
                     operTime=oper_time,
                     costTime=int(cost_time),
                 )
-                await LogQueueService.enqueue_operation_log(request, operation_log, func_path)
+                await self._enqueue_log_safely(LogQueueService.enqueue_operation_log(request, operation_log, func_path))
 
             return result
 
         return wrapper
+
+    @staticmethod
+    async def _enqueue_log_safely(enqueue_operation: Awaitable[Any]) -> None:
+        """日志是旁路能力，队列故障不得改写已经形成的业务响应。"""
+        try:
+            await enqueue_operation
+        except Exception as enqueue_error:
+            logger.error(f'审计日志入队失败，业务响应保持不变: {type(enqueue_error).__name__}')
 
     async def _call_with_error_response(self, func: Callable, *args, **kwargs) -> Any:
         """保留业务错误协议，同时对高敏感接口隐藏异常中的请求正文。"""
@@ -271,6 +279,19 @@ class Log:
         except ConflictException as e:
             return ResponseUtil.conflict(data=e.data, msg=e.message)
         except HTTPException as e:
+            if isinstance(e.detail, dict) and e.detail.get('code'):
+                detail = dict(e.detail)
+                message = str(detail.pop('message', detail['code']))
+                return JSONResponse(
+                    status_code=e.status_code,
+                    headers=e.headers,
+                    content={
+                        'code': e.status_code,
+                        'msg': message,
+                        'success': False,
+                        'data': detail,
+                    },
+                )
             return JSONResponse(
                 status_code=e.status_code,
                 headers=e.headers,
@@ -985,14 +1006,17 @@ class Log:
         return status, error_msg
 
     @staticmethod
-    def _get_result_message(result_dict: dict[str, Any]) -> Any:
+    def _get_result_message(result_dict: dict[str, Any]) -> str:
         """
         获取响应结果中的消息字段，兼容 msg / message 两种写法
 
         :param result_dict: 操作结果字典
         :return: 消息内容
         """
-        return result_dict.get('msg') if result_dict.get('msg') is not None else result_dict.get('message')
+        value = result_dict.get('msg') if result_dict.get('msg') is not None else result_dict.get('message')
+        if value is None:
+            return ''
+        return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
 
     def _is_request_from_swagger_or_redoc(self, request: Request) -> tuple[bool, bool]:
         """

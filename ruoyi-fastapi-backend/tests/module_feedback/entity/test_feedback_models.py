@@ -15,6 +15,7 @@ from module_feedback.entity.do import (  # noqa: F401
     FbIndicator,
     FbIndicatorQuestion,
     FbProject,
+    FbProjectCompletionAudit,
     FbProjectTarget,
     FbQuestion,
     FbQuestionnairePage,
@@ -26,6 +27,7 @@ from module_feedback.entity.do import (  # noqa: F401
 
 EXPECTED_TABLES = {
     'fb_project',
+    'fb_project_completion_audit',
     'fb_questionnaire_version',
     'fb_questionnaire_page',
     'fb_question',
@@ -79,7 +81,7 @@ def test_formal_scores_and_weights_use_exact_numeric_with_wide_sheet_total() -> 
 
 
 def test_immutable_submission_tables_do_not_define_soft_delete() -> None:
-    for table_name in ('fb_answer_sheet', 'fb_answer', 'fb_score_result'):
+    for table_name in ('fb_answer_sheet', 'fb_answer', 'fb_score_result', 'fb_project_completion_audit'):
         assert 'del_flag' not in Base.metadata.tables[table_name].c
 
 
@@ -95,6 +97,12 @@ def test_key_business_constraints_are_present_in_metadata() -> None:
         'fb_question': {'uq_fb_question_page_sort', 'ck_fb_question_score_range'},
         'fb_indicator': {'ck_fb_indicator_weight'},
         'fb_relation': {'ck_fb_relation_weight'},
+        'fb_project_completion_audit': {
+            'ck_fb_project_completion_audit_result',
+            'ck_fb_project_completion_audit_counts_nonnegative',
+            'ck_fb_project_completion_audit_summary_identity',
+            'ck_fb_project_completion_audit_closed_count',
+        },
     }
     for table_name, expected_names in expected_constraints.items():
         constraints = {
@@ -103,6 +111,13 @@ def test_key_business_constraints_are_present_in_metadata() -> None:
             if isinstance(constraint, (CheckConstraint, UniqueConstraint))
         }
         assert expected_names <= constraints
+
+
+def test_completion_audit_has_one_success_per_project_and_no_mutation_columns() -> None:
+    table = Base.metadata.tables['fb_project_completion_audit']
+    assert FbProjectCompletionAudit.__tablename__ == table.name
+    assert 'uq_fb_project_completion_audit_success' in {index.name for index in table.indexes}
+    assert {'del_flag', 'update_by', 'update_time', 'remark'}.isdisjoint(table.c.keys())
 
 
 def test_project_detail_relationships_require_explicit_eager_loading() -> None:

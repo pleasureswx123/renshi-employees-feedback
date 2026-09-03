@@ -4,9 +4,12 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
+    Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -99,3 +102,71 @@ class FbProject(FeedbackAuditMixin, LockVersionMixin, Base):
     )
     targets = relationship('FbProjectTarget', back_populates='project', lazy='raise')
     assignments = relationship('FbAssignment', lazy='raise', viewonly=True)
+
+
+class FbProjectCompletionAudit(Base):
+    """项目不可逆完成的同事务业务审计。"""
+
+    __tablename__ = 'fb_project_completion_audit'
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ['project_id', 'version_id'],
+            ['fb_questionnaire_version.project_id', 'fb_questionnaire_version.version_id'],
+            name='fk_fb_project_completion_audit_project_version',
+            ondelete='RESTRICT',
+        ),
+        CheckConstraint("result = 'SUCCESS'", name='ck_fb_project_completion_audit_result'),
+        CheckConstraint(
+            'before_total_count >= 0 '
+            'AND before_submitted_count >= 0 '
+            'AND before_draft_count >= 0 '
+            'AND before_pending_count >= 0 '
+            'AND before_closed_incomplete_count >= 0 '
+            'AND closed_assignment_count >= 0',
+            name='ck_fb_project_completion_audit_counts_nonnegative',
+        ),
+        CheckConstraint(
+            'before_total_count = before_submitted_count + before_draft_count '
+            '+ before_pending_count + before_closed_incomplete_count',
+            name='ck_fb_project_completion_audit_summary_identity',
+        ),
+        CheckConstraint(
+            'closed_assignment_count = before_draft_count + before_pending_count',
+            name='ck_fb_project_completion_audit_closed_count',
+        ),
+        Index(
+            'uq_fb_project_completion_audit_success',
+            'project_id',
+            unique=True,
+            postgresql_where=text("result = 'SUCCESS'"),
+        ),
+        {'comment': '项目完成业务审计表'},
+    )
+
+    audit_id = Column(BigInteger, primary_key=True, autoincrement=True, comment='项目完成审计ID')
+    project_id = Column(
+        BigInteger,
+        ForeignKey('fb_project.project_id', name='fk_fb_project_completion_audit_project', ondelete='RESTRICT'),
+        nullable=False,
+        comment='评价项目ID',
+    )
+    version_id = Column(BigInteger, nullable=False, comment='完成时冻结问卷版本ID')
+    result = Column(String(20), nullable=False, server_default='SUCCESS', comment='完成结果')
+    operator_user_id = Column(
+        BigInteger,
+        ForeignKey('sys_user.user_id', name='fk_fb_project_completion_audit_operator_user', ondelete='RESTRICT'),
+        nullable=False,
+        comment='完成人用户ID',
+    )
+    operator_name = Column(String(64), nullable=False, comment='完成人账号快照')
+    request_id = Column(String(64), nullable=True, comment='请求ID')
+    trace_id = Column(String(64), nullable=True, comment='链路ID')
+    before_total_count = Column(Integer, nullable=False, comment='完成前任务总数')
+    before_submitted_count = Column(Integer, nullable=False, comment='完成前已提交任务数')
+    before_draft_count = Column(Integer, nullable=False, comment='完成前已暂存任务数')
+    before_pending_count = Column(Integer, nullable=False, comment='完成前未开始任务数')
+    before_closed_incomplete_count = Column(Integer, nullable=False, comment='完成前已关闭未完成任务数')
+    closed_assignment_count = Column(Integer, nullable=False, comment='本次关闭未完成任务数')
+    completion_reason = Column(String(500), nullable=False, comment='手动完成原因')
+    completed_time = Column(DateTime, nullable=False, comment='项目完成时间')
+    create_time = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP'), comment='审计记录创建时间')

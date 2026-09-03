@@ -35,6 +35,7 @@ PUBLICATION_REVISION = '20260902_04_feedback_publication'
 FIXED_RELATION_COUNT = 5
 EXPECTED_TABLES = {
     'fb_project',
+    'fb_project_completion_audit',
     'fb_questionnaire_version',
     'fb_questionnaire_page',
     'fb_question',
@@ -74,6 +75,10 @@ REQUIRED_CONSTRAINTS = {
     'ck_fb_assignment_status',
     'ck_fb_answer_value_channel',
     'ck_fb_score_result_dimensions',
+    'ck_fb_project_completion_audit_result',
+    'ck_fb_project_completion_audit_counts_nonnegative',
+    'ck_fb_project_completion_audit_summary_identity',
+    'ck_fb_project_completion_audit_closed_count',
 }
 DESIGNER_COLUMNS = {
     ('fb_questionnaire_version', 'description_doc'),
@@ -105,8 +110,9 @@ REQUIRED_INDEXES = {
     'uq_fb_score_indicator_relation',
     'uq_fb_score_indicator_composite',
     'uq_fb_score_person_result',
+    'uq_fb_project_completion_audit_success',
 }
-IMMUTABLE_TABLES = {'fb_answer_sheet', 'fb_answer', 'fb_score_result'}
+IMMUTABLE_TABLES = {'fb_answer_sheet', 'fb_answer', 'fb_score_result', 'fb_project_completion_audit'}
 
 
 def parse_args() -> argparse.Namespace:
