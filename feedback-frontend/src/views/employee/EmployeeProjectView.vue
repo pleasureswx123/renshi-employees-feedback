@@ -37,12 +37,16 @@ onBeforeUnmount(() => { requestId++ })
 
 <template>
   <section v-loading="loading" class="employee-project">
-    <el-button @click="router.push('/employee/todos')">返回我的待办</el-button>
-    <el-button :loading="loading" @click="load">刷新进度</el-button>
+    <div class="project-navigation">
+      <el-button @click="router.push('/employee/todos')">返回我的待办</el-button>
+      <el-button :loading="loading" @click="load">刷新进度</el-button>
+    </div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <template v-if="project">
-      <h1 class="page-heading">{{ project.projectName }}</h1>
-      <p class="page-description">每份评价独立提交；提交后不可修改，其他人的评价可以继续填写。</p>
+      <header class="workspace-page-header"><div>
+        <h1 class="page-heading">{{ project.projectName }}</h1>
+        <p class="page-description">每份评价独立提交；提交后不可修改，其他人的评价可以继续填写。</p>
+      </div></header>
       <el-alert v-if="project.projectStatus === 'COMPLETED'" title="项目已完成，未提交任务已关闭，不能继续答题。" type="info" :closable="false" />
       <el-card shadow="never" class="my-progress">
         <span>我的进度：已提交 {{ project.submittedCount }}/{{ project.totalCount }} 份</span>
@@ -57,11 +61,11 @@ onBeforeUnmount(() => { requestId++ })
 </template>
 
 <style scoped>
-.employee-project { max-width: 1000px; min-height: 240px; margin: auto; }
-.page-heading { margin-top: 24px; overflow-wrap: anywhere; }
-.my-progress { margin: 24px 0; }
+.employee-project { display: grid; gap: 18px; max-width: 1200px; min-height: 240px; margin: auto; }
+.project-navigation { display: flex; gap: 12px; flex-wrap: wrap; }
+.project-navigation .el-button { margin-left: 0; }
 .my-progress .el-progress { margin: 12px 0; }
 .my-progress small { color: #64748b; }
-.task-list { display: grid; gap: 16px; }
-.el-alert { margin-top: 16px; }
+.task-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 1000px) { .task-list { grid-template-columns: minmax(0, 1fr); } }
 </style>

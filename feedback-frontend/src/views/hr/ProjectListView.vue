@@ -11,9 +11,13 @@ import {
 } from '@/api/feedback/projects'
 import { ProjectStatus } from '@/constants/feedbackEnums'
 import { usePermissionStore } from '@/stores/permission'
+import WorkspaceIcon from '@/components/WorkspaceIcon.vue'
+import { formatTableDate } from '@/utils/displayFormat'
+import { useWorkspaceUiStore } from '@/stores/workspaceUi'
 
 const router = useRouter()
 const permissionStore = usePermissionStore()
+const ui = useWorkspaceUiStore()
 const loading = ref(false)
 const mutating = ref(false)
 const dialogVisible = ref(false)
@@ -30,7 +34,7 @@ const projectRules = {
   ]
 }
 const statusOptions = [
-  { value: ProjectStatus.PREPARING, label: '准备阶段', type: 'info' },
+  { value: ProjectStatus.PREPARING, label: '准备阶段', type: 'warning' },
   { value: ProjectStatus.ACTIVE, label: '进行阶段', type: 'success' },
   { value: ProjectStatus.COMPLETED, label: '已完成', type: 'info' }
 ]
@@ -146,22 +150,22 @@ onMounted(loadProjects)
 
 <template>
   <section class="project-page">
-    <header class="page-header">
+    <header class="page-header workspace-page-header">
       <div>
         <h1 class="page-heading">评价项目</h1>
-        <p class="page-description">创建并配置问卷、人员与关系；发布后可复核冻结配置。</p>
+        <p class="page-description">配置问卷与参评人员，发布评价并跟进回收进度。</p>
       </div>
       <el-button
         v-if="permissionStore.hasPermission('feedback:project:add')"
         type="primary"
         @click="openCreateDialog"
       >
-        创建项目
+        <WorkspaceIcon name="plus" />创建项目
       </el-button>
     </header>
 
     <el-card shadow="never">
-      <el-form :model="filters" inline class="filter-form">
+      <el-form :model="filters" inline class="filter-form workspace-filter">
         <el-form-item label="项目名称">
           <el-input
             v-model="filters.projectName"
@@ -181,22 +185,22 @@ onMounted(loadProjects)
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="loading" @click="handleSearch">查询</el-button>
-          <el-button :disabled="loading" @click="handleReset">重置</el-button>
+          <el-button type="primary" :loading="loading" @click="handleSearch"><WorkspaceIcon name="search" />查询</el-button>
+          <el-button :disabled="loading" @click="handleReset"><WorkspaceIcon name="refresh" />重置</el-button>
         </el-form-item>
       </el-form>
 
       <el-table v-loading="loading" :data="rows" empty-text="暂无评价项目">
-        <el-table-column prop="projectName" label="项目名称" min-width="220" show-overflow-tooltip />
-        <el-table-column label="状态" width="120">
+        <el-table-column prop="projectName" label="项目名称" min-width="200" show-overflow-tooltip />
+        <el-table-column label="状态" width="110">
           <template #default="{ row }">
             <el-tag :type="statusMeta(row.status).type">{{ statusMeta(row.status).label }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createBy" label="创建人" width="140" />
-        <el-table-column prop="createTime" label="创建时间" width="190" />
-        <el-table-column prop="updateTime" label="最近更新" width="190" />
-        <el-table-column label="操作" width="390" fixed="right">
+        <el-table-column prop="createBy" label="创建人" width="100" show-overflow-tooltip />
+        <el-table-column prop="createTime" label="创建时间" width="165" :formatter="formatTableDate" />
+        <el-table-column prop="updateTime" label="最近更新" width="165" :formatter="formatTableDate" />
+        <el-table-column label="操作" width="340" :fixed="ui.compact ? false : 'right'">
           <template #default="{ row }">
             <el-button
               v-if="row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:questionnaire:edit')"

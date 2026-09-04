@@ -24,6 +24,7 @@ from module_feedback.entity.vo import (
 )
 from module_feedback.enums import ProjectStatus, QuestionnaireVersionStatus
 from module_feedback.validators import get_publish_validation_issues
+from module_feedback.validators.questionnaire_validator import get_option_score_validation_issues
 
 
 class FeedbackQuestionnaireService:
@@ -55,7 +56,6 @@ class FeedbackQuestionnaireService:
                     'pageId': page.page_id,
                     'pageCode': page.page_code,
                     'pageTitle': page.page_title,
-                    'pageDescription': page.page_description,
                     'sortOrder': page.sort_order,
                     'questions': [
                         {
@@ -175,7 +175,6 @@ class FeedbackQuestionnaireService:
                 version_id=page_object.version_id,
                 page_code=page.page_code,
                 page_title=page.page_title,
-                page_description=page.page_description,
                 sort_order=page.sort_order,
                 create_by=operator_name,
                 update_by=operator_name,
@@ -247,6 +246,10 @@ class FeedbackQuestionnaireService:
                 raise ServiceException(message='问卷草稿版本不存在或已经冻结')
             if version.lock_version != page_object.lock_version:
                 raise ServiceException(message='问卷草稿已被其他用户修改，请刷新后重试')
+
+            option_issues = get_option_score_validation_issues(page_object)
+            if option_issues:
+                raise ServiceException(message=option_issues[0]['message'])
 
             version.title = page_object.title
             version.description = page_object.description

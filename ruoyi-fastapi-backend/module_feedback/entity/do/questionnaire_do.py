@@ -125,6 +125,7 @@ class FbQuestionnairePage(FeedbackAuditMixin, Base):
     )
     page_code = Column(String(64), nullable=False, comment='版本内稳定页面标识')
     page_title = Column(String(200), nullable=False, comment='页面标题')
+    # 历史兼容字段：业务不再读写，保留已冻结版本的原始数据。
     page_description = Column(Text, nullable=True, comment='页面说明')
     sort_order = Column(Integer, nullable=False, comment='页面顺序')
 

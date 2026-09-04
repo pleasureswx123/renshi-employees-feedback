@@ -11,6 +11,7 @@
     "build:docker": "vite build --mode docker",
     "build:stage": "vite build --mode staging",
     "test:plugin": "node tests/plugins/run-plugin-tests.js",
+    "test:dashboard": "node --test tests/dashboard/*.test.js",
     "preview": "vite preview"
   },
   "repository": {

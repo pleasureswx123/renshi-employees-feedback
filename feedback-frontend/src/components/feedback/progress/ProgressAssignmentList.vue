@@ -1,4 +1,6 @@
 <script setup>
+import { formatDateTime } from '@/utils/displayFormat'
+
 defineProps({
   rows: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false }
@@ -45,7 +47,7 @@ function displayTime(row) {
         </template>
       </el-table-column>
       <el-table-column label="状态时间" min-width="180">
-        <template #default="{ row }">{{ displayTime(row).replace?.('T', ' ') || displayTime(row) }}</template>
+        <template #default="{ row }">{{ formatDateTime(displayTime(row)) }}</template>
       </el-table-column>
     </el-table>
 
@@ -61,7 +63,7 @@ function displayTime(row) {
           <div><dt>评价人</dt><dd>{{ row.evaluatorName }}</dd></div>
           <div><dt>评价人部门</dt><dd>{{ row.evaluatorDeptName || '—' }}</dd></div>
           <div><dt>关系</dt><dd>{{ row.relationName }}</dd></div>
-          <div><dt>状态时间</dt><dd>{{ displayTime(row).replace?.('T', ' ') || displayTime(row) }}</dd></div>
+          <div><dt>状态时间</dt><dd>{{ formatDateTime(displayTime(row)) }}</dd></div>
         </dl>
       </article>
     </div>

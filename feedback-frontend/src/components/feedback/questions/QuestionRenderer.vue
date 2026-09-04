@@ -6,6 +6,7 @@ import { getQuestionTypeDefinition } from './questionTypeRegistry'
 const props = defineProps({
   question: { type: Object, required: true },
   mode: { type: String, default: 'preview' },
+  showHeading: { type: Boolean, default: true },
   modelValue: { type: Object, default: () => ({ optionCode: '', reason: '' }) }
 })
 
@@ -25,8 +26,8 @@ function updateAnswer(value) {
 
 <template>
   <section v-if="unansweredReadonly" class="unanswered-question">
-    <strong>{{ question.title }}</strong>
-    <p v-if="question.description">{{ question.description }}</p>
+    <strong v-if="showHeading">{{ question.title }}</strong>
+    <p v-if="showHeading && question.description">{{ question.description }}</p>
     <p>未作答</p>
   </section>
   <component
@@ -34,6 +35,7 @@ function updateAnswer(value) {
     v-else-if="definition"
     :question="question"
     :mode="mode"
+    :show-heading="showHeading"
     :model-value="modelValue"
     @update:model-value="updateAnswer"
   />

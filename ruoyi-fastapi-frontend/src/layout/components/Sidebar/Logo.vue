@@ -1,12 +1,12 @@
 <template>
   <div class="sidebar-logo-container" :class="{ 'collapse': collapse }">
     <transition name="sidebarLogoFade">
-      <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/">
-        <img v-if="logo" :src="logo" class="sidebar-logo" />
+      <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/" :title="title" :aria-label="title">
+        <img v-if="logo" :src="logo" alt="" class="sidebar-logo" />
         <h1 v-else class="sidebar-title">{{ title }}</h1>
       </router-link>
-      <router-link v-else key="expand" class="sidebar-logo-link" to="/">
-        <img v-if="logo" :src="logo" class="sidebar-logo" />
+      <router-link v-else key="expand" class="sidebar-logo-link" to="/" :title="title" :aria-label="title">
+        <img v-if="logo" :src="logo" alt="" class="sidebar-logo" />
         <h1 class="sidebar-title">{{ title }}</h1>
       </router-link>
     </transition>
@@ -14,7 +14,6 @@
 </template>
 
 <script setup>
-import logo from '@/assets/logo/logo.png'
 import useSettingsStore from '@/store/modules/settings'
 import variables from '@/assets/styles/variables.module.scss'
 
@@ -26,6 +25,7 @@ defineProps({
 })
 
 const title = import.meta.env.VITE_APP_TITLE;
+const logo = `${import.meta.env.BASE_URL}favicon.svg`;
 const settingsStore = useSettingsStore();
 const sideTheme = computed(() => settingsStore.sideTheme);
 

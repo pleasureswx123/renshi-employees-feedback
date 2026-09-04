@@ -1,3 +1,8 @@
+import CircleDotIcon from '@iconify-vue/lucide/circle-dot'
+import HashIcon from '@iconify-vue/lucide/hash'
+import PencilLineIcon from '@iconify-vue/lucide/pencil-line'
+import SlidersHorizontalIcon from '@iconify-vue/lucide/sliders-horizontal'
+import StarIcon from '@iconify-vue/lucide/star'
 import { markRaw } from 'vue'
 
 import {
@@ -44,14 +49,14 @@ function normalizeOption(option, index) {
     optionId: option?.optionId ?? null,
     optionCode: option?.optionCode || createStableCode('O'),
     optionLabel: option?.optionLabel ?? `选项${index + 1}`,
-    score: decimal(option?.score),
+    score: decimal(option?.score, 1),
     requiresReason: Boolean(option?.requiresReason),
     sortOrder: index + 1
   }
 }
 
 function validateCommon(question) {
-  return question.title?.trim() ? [] : ['请填写题目标题']
+  return question.title?.trim() ? [] : ['请填写题目内容']
 }
 
 function precisionValid(value, decimalPlaces) {
@@ -64,7 +69,7 @@ function normalizeSingleChoice(question = {}) {
     ? question.options
     : [
         { optionLabel: '选项1', score: 1 },
-        { optionLabel: '选项2', score: 0 }
+        { optionLabel: '选项2', score: 1 }
       ]
   return {
     ...commonQuestion(question, { questionType: 'SINGLE_CHOICE', title: '新的单选题' }),
@@ -84,7 +89,8 @@ function validateSingleChoice(question) {
   }
   question.options.forEach(option => {
     if (!option.optionLabel?.trim()) errors.push('单选题存在空选项')
-    if (compareDecimals(option.score, 0) < 0) errors.push('选项分值必须大于等于0')
+    if (compareDecimals(option.score, 1) < 0) errors.push('选项分值必须大于等于1')
+    if (!precisionValid(option.score, 0)) errors.push('单选题选项分值必须是整数')
   })
   return [...new Set(errors)]
 }
@@ -143,11 +149,14 @@ function cloneNormalized(normalize, question) {
 const singleChoice = {
   type: 'SINGLE_CHOICE',
   label: '单选题',
+  icon: markRaw(CircleDotIcon),
+  answerHint: '选择一个选项',
+  contentPlaceholder: '例如：他/她能否及时响应团队协作需求？',
   description: '从多个选项中选择一项，可配置分值和附加原因。',
   answerType: 'option',
   renderer: markRaw(SingleChoiceQuestion),
   propertyEditor: markRaw(SingleChoiceProperties),
-  createDefault: () => normalizeSingleChoice(),
+  createDefault: () => normalizeSingleChoice({ title: '', isRequired: true }),
   normalize: normalizeSingleChoice,
   validate: validateSingleChoice,
   serialize: normalizeSingleChoice,
@@ -162,11 +171,14 @@ const singleChoice = {
 const starRating = {
   type: 'STAR_RATING',
   label: '星级评分',
+  icon: markRaw(StarIcon),
+  answerHint: '点击星星评分',
+  contentPlaceholder: '例如：请评价他/她的团队协作表现',
   description: '使用2至10颗星快速评分，未点选时保持未作答。',
   answerType: 'number',
   renderer: markRaw(StarRatingQuestion),
   propertyEditor: markRaw(ScoreRangeProperties),
-  createDefault: () => starRating.normalize(),
+  createDefault: () => starRating.normalize({ title: '', isRequired: true }),
   normalize(question = {}) {
     return normalizeScoreRange(question, {
       questionType: 'STAR_RATING',
@@ -195,11 +207,14 @@ const starRating = {
 const numericInput = {
   type: 'NUMERIC_INPUT',
   label: '数字输入',
+  icon: markRaw(HashIcon),
+  answerHint: '输入分数',
+  contentPlaceholder: '例如：请为他/她的工作完成质量打分',
   description: '在限定区间和精度内输入正式分值。',
   answerType: 'number',
   renderer: markRaw(NumericInputQuestion),
   propertyEditor: markRaw(ScoreRangeProperties),
-  createDefault: () => numericInput.normalize(),
+  createDefault: () => numericInput.normalize({ title: '', isRequired: true, decimalPlaces: 0 }),
   normalize(question = {}) {
     const normalized = normalizeScoreRange(question, {
       questionType: 'NUMERIC_INPUT',
@@ -226,11 +241,14 @@ const numericInput = {
 const slider = {
   type: 'SLIDER',
   label: '滑动评分',
+  icon: markRaw(SlidersHorizontalIcon),
+  answerHint: '拖动滑块评分',
+  contentPlaceholder: '例如：请评价他/她主动承担工作的程度',
   description: '按指定步长滑动评分，并明确区分默认显示与已作答。',
   answerType: 'slider',
   renderer: markRaw(SliderQuestion),
   propertyEditor: markRaw(ScoreRangeProperties),
-  createDefault: () => slider.normalize(),
+  createDefault: () => slider.normalize({ title: '', isRequired: true, decimalPlaces: 0 }),
   normalize(question = {}) {
     const normalized = normalizeScoreRange(question, {
       questionType: 'SLIDER',
@@ -271,11 +289,14 @@ const slider = {
 const textQuestion = {
   type: 'TEXT',
   label: '问答题',
+  icon: markRaw(PencilLineIcon),
+  answerHint: '填写文字反馈',
+  contentPlaceholder: '例如：你认为他/她最值得保持的优点是什么？',
   description: '收集文字反馈，不参与正式计分。',
   answerType: 'text',
   renderer: markRaw(TextQuestion),
   propertyEditor: markRaw(TextProperties),
-  createDefault: () => textQuestion.normalize(),
+  createDefault: () => textQuestion.normalize({ title: '', isRequired: true }),
   normalize(question = {}) {
     return {
       ...commonQuestion(question, { questionType: 'TEXT', title: '新的问答题' }),

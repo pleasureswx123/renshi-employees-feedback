@@ -46,7 +46,7 @@ ruoyi-fastapi-backend/
 │  │  └─ score_do.py                        # 已存在：计分结果实体
 │  ├─ entity/vo/
 │  │  ├─ project_vo.py                      # 已存在：P3项目请求和响应协议
-│  │  ├─ questionnaire_vo.py                # 已存在：P4问卷页面、富文本和聚合草稿协议
+│  │  ├─ questionnaire_vo.py                # 已存在：P4页面标题/题目、问卷说明和聚合草稿协议
 │  │  ├─ questionnaire_question_vo.py       # 已存在：五种题型Pydantic判别联合
 │  │  ├─ indicator_vo.py                    # 已存在：指标及稳定题目Code绑定协议
 │  │  ├─ publication_vo.py                  # 已存在：P5人员候选、聚合配置、预览和发布协议
@@ -130,12 +130,13 @@ feedback-frontend/
 │  │  └─ feedbackEnums.js                   # 已存在：与后端/数据库一致的领域枚举
 │  ├─ components/
 │  │  ├─ WorkspaceSwitcher.vue              # 已存在：双工作台切换
+│  │  ├─ WorkspaceNavigation.vue            # 已存在：桌面侧栏与移动抽屉共用权限菜单
+│  │  ├─ WorkspaceIcon.vue                  # 已存在：工作台本地图标
 │  │  └─ feedback/
-│  │     ├─ QuestionnairePreviewDialog.vue  # 已存在：P4五题型电脑/手机预览
-│  │     ├─ QuestionnaireOutline.vue        # 已存在：多页大纲、排序和跨页移动
-│  │     ├─ QuestionTypePanel.vue           # 已存在：五种题型入口
+│  │     ├─ QuestionnaireOutline.vue        # 已存在：多页大纲、页面重命名、排序和跨页移动
+│  │     ├─ QuestionTypePanel.vue           # 已存在：五种题型图标入口与悬浮说明
 │  │     ├─ IndicatorPanel.vue              # 已存在：指标、权重和题目绑定
-│  │     ├─ RichTextEditor.vue              # 已存在：受限Tiptap JSON编辑与只读渲染
+│  │     ├─ RichTextEditor.vue              # 已存在：受限Tiptap JSON编辑、Iconify图标工具栏与只读渲染
 │  │     ├─ EmployeeTaskCard.vue             # 已存在：P6被评价人任务卡片与权限入口
 │  │     ├─ publication/                    # 已存在：P5目标、关系、评价人双栏和发布预览组件
 │  │     ├─ progress/                       # 已存在：P7进度KPI、明细列表和完成预检抽屉
@@ -143,8 +144,9 @@ feedback-frontend/
 │  │     └─ questions/
 │  │        ├─ questionTypeRegistry.js       # 已存在：五题型完整注册定义
 │  │        ├─ QuestionRenderer.vue          # 已存在：编辑/预览/员工答题/历史只读共用入口
-│  │        ├─ QuestionPropertiesPanel.vue  # 已存在：注册表驱动的属性面板
-│  │        ├─ SingleChoiceProperties.vue   # 已存在：单选题属性表单
+│  │        ├─ QuestionCanvasCard.vue        # 已存在：画布内编辑、选中题目图标操作和校验定位
+│  │        ├─ QuestionPropertiesPanel.vue  # 已存在：必答、计分、指标和所在页面规则
+│  │        ├─ SingleChoiceProperties.vue   # 已存在：画布内紧凑选项、分值、附加说明设置
 │  │        ├─ ScoreRangeProperties.vue     # 已存在：三种区间评分题属性表单
 │  │        ├─ TextProperties.vue           # 已存在：问答题属性表单
 │  │        ├─ SingleChoiceQuestion.vue      # 已存在：单选题编辑/只读渲染
@@ -153,7 +155,7 @@ feedback-frontend/
 │  │        ├─ SliderQuestion.vue            # 已存在：滑动题编辑/只读渲染
 │  │        └─ TextQuestion.vue              # 已存在：问答题编辑/只读渲染
 │  ├─ layouts/
-│  │  ├─ WorkspaceLayout.vue                # 已存在：共享工作台框架
+│  │  ├─ WorkspaceLayout.vue                # 已存在：深色侧栏、面包屑、折叠与响应式工作台框架
 │  │  ├─ HrLayout.vue                       # 已存在
 │  │  └─ EmployeeLayout.vue                 # 已存在
 │  ├─ router/
@@ -206,6 +208,14 @@ feedback-frontend/
    └─ live-e2e/employee-answering.spec.js    # 已存在：P6至P9两条真实闭环，覆盖场景A至F、权限和数据库/审计对账
 ```
 
+工作台统一样式及导航补充：
+
+- `feedback-frontend/src/styles/workspace.css`：标题、筛选区、表格、卡片、弹窗与窄屏样式，仅应用于工作台。
+- `feedback-frontend/src/stores/workspaceUi.js`：折叠侧栏与窄屏状态，只保存界面偏好。
+- `feedback-frontend/src/utils/workspaceNavigation.js`：按权限生成菜单及子页面定位，保留仅进度权限的独立入口。
+- `feedback-frontend/src/utils/displayFormat.js`：显示日期时间，去掉数据库小数秒，不推断或转换时区。
+- `feedback-frontend/tests/utils/workspaceNavigation.test.js`、`tests/components/ProjectProgressNavigation.test.js`：权限导航、面包屑、折叠、移动抽屉和时间显示回归。
+
 ## 3. 管理端
 
 `ruoyi-fastapi-frontend` 原则上只需要：
@@ -213,6 +223,23 @@ feedback-frontend/
 - 评价平台权限码和角色配置。
 - 必要的字典数据。
 - 如确有必要，增加评价模块运维入口；不放置评价业务工作台。
+
+管理端首页已替换为组织与权限概览，相关文件为：
+
+- `ruoyi-fastapi-frontend/src/views/dashboard/index.vue`：真实当前用户、按权限读取的统计、管理入口和评价平台跳转。
+- `ruoyi-fastapi-frontend/src/utils/managementOverview.js`：复用系统列表接口汇总数据、区分未授权/失败/零值、校验平台入口地址。
+- `ruoyi-fastapi-frontend/tests/dashboard/managementOverview.test.js`：权限、分页统计、异常状态和平台地址回归。
+- 管理端各 `.env.*` 的 `VITE_FEEDBACK_APP_URL`：独立评价平台访问地址；不包含身份令牌。
+
+两端登录页采用统一的项目标识与视觉，分别说明系统管理和 HR/员工评价职责：
+
+- `ruoyi-fastapi-frontend/src/views/login.vue`、`src/assets/styles/login-entry.css`：管理端登录，保留公司账号、验证码、记住密码及现有注册开关。
+- `feedback-frontend/src/views/auth/LoginView.vue`、`src/styles/login-entry.css`：评价端登录，按现有权限进入工作台。
+- 两端样式在各自工程内独立维护，不跨目录导入管理端源码；认证继续复用原 API、Store 与传输加密。
+- `feedback-frontend/tests/components/LoginView.test.js`：真实 Element Plus 表单校验、防重复登录、验证码异常/刷新、失败重试、跳转及卸载后的异步隔离回归。
+- `feedback-frontend/tests/components/QuestionnaireCanvasEditing.test.js`：画布编辑、题型参数、复制排序、删除确认、页面重命名、指标与跨页同步、保存校验和草稿恢复回归。
+
+- `feedback-frontend/src/components/feedback/QuestionnairePreviewContent.vue`：PC当前页实时预览，每页显示问卷标题与说明，切页保留试填状态，答题约束变化时清理；继续复用五题型渲染器。独立电脑/手机预览弹窗已移除。
 
 ## 4. 项目文档
 

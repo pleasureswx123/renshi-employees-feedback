@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import { decimalToNumber, normalizeDecimal, sumDecimals } from '@/utils/fixedDecimal'
+import { getQuestionTypeDefinition } from './questions/questionTypeRegistry'
 
 const props = defineProps({
   indicators: { type: Array, required: true },
@@ -78,7 +79,7 @@ const totalWeight = computed(() => sumDecimals(props.indicators.map(indicator =>
             <el-option
               v-for="question in questions"
               :key="question.questionCode"
-              :label="question.title"
+              :label="question.title.trim() || `${getQuestionTypeDefinition(question.questionType)?.label} · 待填写`"
               :value="question.questionCode"
             />
           </el-select>

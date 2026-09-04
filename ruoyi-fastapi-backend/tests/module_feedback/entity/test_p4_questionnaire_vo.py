@@ -5,7 +5,11 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
+from module_feedback.entity.do import FbQuestionnairePage, FbQuestionnaireVersion
 from module_feedback.entity.vo import QuestionnaireDraftSaveModel
+from module_feedback.entity.vo.employee_vo import EmployeeQuestionnaireModel
+from module_feedback.service.publication_service import FeedbackPublicationService
+from module_feedback.service.questionnaire_service import FeedbackQuestionnaireService
 from module_feedback.validators import calculate_question_max_score, get_publish_validation_issues
 
 EXPECTED_SCORED_QUESTION_COUNT = 4
@@ -62,7 +66,7 @@ def build_full_draft_payload() -> dict:
                             {
                                 'optionCode': 'O_NO',
                                 'optionLabel': '否',
-                                'score': '0.0000',
+                                'score': '1.0000',
                                 'sortOrder': 2,
                             },
                         ],
@@ -144,6 +148,83 @@ def build_full_draft_payload() -> dict:
             },
         ],
     }
+
+
+@pytest.mark.parametrize('field_name', ['pageDescription', 'page_description'])
+def test_page_contract_rejects_retired_page_description(field_name: str) -> None:
+    payload = build_full_draft_payload()
+    payload['pages'][0][field_name] = '不再支持的页面说明'
+
+    with pytest.raises(ValidationError) as exc_info:
+        QuestionnaireDraftSaveModel.model_validate(payload)
+
+    assert any(
+        error['loc'] == ('pages', 0, field_name) and error['type'] == 'extra_forbidden'
+        for error in exc_info.value.errors()
+    )
+
+
+def test_legacy_frozen_page_description_is_not_exposed_or_modified() -> None:
+    page = FbQuestionnairePage(
+        page_id=21,
+        version_id=20,
+        page_code='P_LEGACY',
+        page_title='历史分页',
+        page_description='保留的历史页面说明',
+        sort_order=1,
+        questions=[],
+    )
+    version = FbQuestionnaireVersion(
+        version_id=20,
+        lock_version=1,
+        status='FROZEN',
+        title='历史问卷',
+        description='全卷统一说明',
+        pages=[page],
+        indicators=[],
+    )
+
+    payload = FeedbackQuestionnaireService._document_payload(version)
+    employee = EmployeeQuestionnaireModel(
+        **{key: payload[key] for key in ('versionId', 'title', 'description', 'descriptionDoc', 'pages')}
+    )
+
+    assert payload['description'] == '全卷统一说明'
+    assert 'pageDescription' not in payload['pages'][0]
+    assert 'pageDescription' not in employee.model_dump(by_alias=True)['pages'][0]
+    assert page.page_description == '保留的历史页面说明'
+    assert version.status == 'FROZEN'
+
+
+@pytest.mark.parametrize(
+    ('score', 'issue_code'), [('0.0000', 'OPTION_SCORE_POSITIVE_REQUIRED'), ('4.5000', 'OPTION_SCORE_INTEGER_REQUIRED')]
+)
+def test_invalid_option_score_remains_readable_but_cannot_be_published(
+    monkeypatch: pytest.MonkeyPatch, score: str, issue_code: str
+) -> None:
+    payload = build_full_draft_payload()
+    payload['pages'][0]['questions'][0]['options'][0]['score'] = score
+    monkeypatch.setattr(FeedbackQuestionnaireService, '_document_payload', lambda _: payload)
+    frozen = FbQuestionnaireVersion(version_id=20, status='FROZEN')
+    document = FeedbackPublicationService._questionnaire_model(frozen)
+    assert document.pages[0].questions[0].options[0].score == Decimal(score)
+    issues = get_publish_validation_issues(document)
+    assert issues == [
+        {
+            'code': issue_code,
+            'path': 'pages.0.questions.0.options.0.score',
+            'message': '单选题“目标是否清晰”的选项“是”分值必须是大于等于1的整数',
+        }
+    ]
+    assert frozen.status == 'FROZEN'
+
+
+def test_option_score_defaults_to_one_when_omitted() -> None:
+    payload = build_full_draft_payload()
+    del payload['pages'][0]['questions'][0]['options'][0]['score']
+    document = QuestionnaireDraftSaveModel.model_validate(payload)
+    assert document.pages[0].questions[0].options[0].score == Decimal('1')
+    assert get_publish_validation_issues(document) == []
 
 
 def test_full_questionnaire_contract_supports_five_types_and_publish_readiness() -> None:

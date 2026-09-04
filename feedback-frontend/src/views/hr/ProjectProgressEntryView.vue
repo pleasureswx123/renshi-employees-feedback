@@ -27,9 +27,9 @@ async function openProgress() {
 
 <template>
   <section class="progress-entry-page">
-    <header>
-      <h1>回收进度</h1>
-      <p>输入项目ID后读取服务端真实回收数据；最终访问范围仍由后端校验。</p>
+    <header class="workspace-page-header">
+      <div><h1 class="page-heading">回收进度</h1>
+      <p class="page-description">输入项目编号，查看你有权限访问的评价进度。</p></div>
     </header>
     <el-card shadow="never" class="entry-card">
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">

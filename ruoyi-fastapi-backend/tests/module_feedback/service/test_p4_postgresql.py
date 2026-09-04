@@ -4,9 +4,11 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import delete, func, select, true
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.database import create_async_db_engine, create_async_session_factory
 from config.env import DataSourceSettings
+from exceptions.exception import ServiceException
 from module_admin.entity.do.user_do import SysUser
 from module_feedback.entity.do import (
     FbIndicator,
@@ -16,7 +18,7 @@ from module_feedback.entity.do import (
     FbQuestionnairePage,
     FbQuestionnaireVersion,
 )
-from module_feedback.entity.vo import ProjectCreateModel, QuestionnaireDraftSaveModel
+from module_feedback.entity.vo import ProjectCreateModel, QuestionnaireDraftModel, QuestionnaireDraftSaveModel
 from module_feedback.service import FeedbackProjectService, FeedbackQuestionnaireService
 from scripts.feedback_p0_database_precheck import build_source_payload
 
@@ -61,7 +63,7 @@ def build_full_save_payload(version_id: int, lock_version: int) -> Questionnaire
                         'sortOrder': 1,
                         'options': [
                             {'optionCode': 'O_YES', 'optionLabel': '是', 'score': '5.0000', 'sortOrder': 1},
-                            {'optionCode': 'O_NO', 'optionLabel': '否', 'score': '0.0000', 'sortOrder': 2},
+                            {'optionCode': 'O_NO', 'optionLabel': '否', 'score': '1.0000', 'sortOrder': 2},
                         ],
                     },
                     {
@@ -146,6 +148,20 @@ def build_full_save_payload(version_id: int, lock_version: int) -> Questionnaire
     )
 
 
+async def assert_invalid_option_score_rejected(
+    db: AsyncSession, project_id: int, saved: QuestionnaireDraftModel
+) -> None:
+    invalid = build_full_save_payload(saved.version_id, saved.lock_version)
+    for score in ('0', '4.5'):
+        invalid.pages[0].questions[0].options[0].score = Decimal(score)
+        with pytest.raises(ServiceException) as exc_info:
+            await FeedbackQuestionnaireService.save_draft(db, project_id, invalid, 'p4-test', true())
+        assert '分值必须是大于等于1的整数' in exc_info.value.message
+        unchanged = await FeedbackQuestionnaireService.get_draft(db, project_id, true())
+        assert unchanged.lock_version == saved.lock_version
+        assert unchanged.pages[0].questions[0].options[0].score == saved.pages[0].questions[0].options[0].score
+
+
 @pytest.mark.asyncio
 async def test_p4_full_questionnaire_round_trip_in_postgresql() -> None:
     source = DataSourceSettings(**build_source_payload('ruoyi_feedback_test'))
@@ -188,13 +204,27 @@ async def test_p4_full_questionnaire_round_trip_in_postgresql() -> None:
             assert saved.is_publish_ready is True
             assert saved.validation_issues == []
             assert saved.description == '填写说明\n请依据实际表现完成评价。'
+            assert all('pageDescription' not in page for page in saved.model_dump(by_alias=True)['pages'])
             assert all(page.page_id is not None for page in saved.pages)
             assert all(question.question_id is not None for page in saved.pages for question in page.questions)
             assert all(indicator.indicator_id is not None for indicator in saved.indicators)
 
+            await assert_invalid_option_score_rejected(db, project_id, saved)
+
         async with session_factory() as db:
             restored = await FeedbackQuestionnaireService.get_draft(db, project_id, true())
             assert restored.is_publish_ready is True
+            assert restored.description_doc == saved.description_doc
+            legacy_descriptions = list(
+                (
+                    await db.scalars(
+                        select(FbQuestionnairePage.page_description).where(
+                            FbQuestionnairePage.version_id == restored.version_id
+                        )
+                    )
+                ).all()
+            )
+            assert legacy_descriptions == [None] * EXPECTED_PAGE_COUNT
             assert [page.page_code for page in restored.pages] == ['P_CORE', 'P_MORE']
             assert [question.question_type for page in restored.pages for question in page.questions] == [
                 'SINGLE_CHOICE',

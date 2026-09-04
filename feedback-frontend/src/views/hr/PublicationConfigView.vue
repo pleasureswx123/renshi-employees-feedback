@@ -91,12 +91,21 @@ onBeforeUnmount(() => publicationStore.reset())
 
 <template>
   <section v-loading="publicationStore.loading" class="publication-page">
-    <header class="page-header">
-      <div class="heading-block">
-        <el-button link @click="router.push('/hr/projects')">返回项目列表</el-button>
-        <div>
-          <p>{{ config?.projectName || '评价项目' }}</p>
+    <header class="workspace-page-header workspace-detail-header">
+      <div class="workspace-detail-heading">
+        <el-button class="workspace-detail-back" text aria-label="返回项目列表" title="返回项目列表" @click="router.push('/hr/projects')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m10 6-6 6 6 6M4 12h16" />
+          </svg>
+          <span>返回</span>
+        </el-button>
+        <el-divider direction="vertical" class="workspace-detail-divider" />
+        <div class="workspace-detail-title">
           <h1>人员关系与发布</h1>
+          <p class="workspace-detail-project">
+            <span class="workspace-detail-project-label">所属项目</span>
+            <span class="workspace-detail-project-name" :title="config?.projectName || '评价项目'">{{ config?.projectName || '评价项目' }}</span>
+          </p>
         </div>
       </div>
       <div v-if="config" class="header-status">
@@ -117,7 +126,7 @@ onBeforeUnmount(() => publicationStore.reset())
     />
     <el-alert
       v-else
-      title="先保存配置并处理后端返回的全部问题，再执行不可逆发布。"
+      title="选择被评价人、设置评价关系并分配评价人，保存配置后即可检查发布条件。"
       type="info"
       :closable="false"
       show-icon
@@ -180,7 +189,7 @@ onBeforeUnmount(() => publicationStore.reset())
       <div v-if="config.editable" class="action-bar">
         <div>
           <strong>发布后不可修改</strong>
-          <span>任务只会在后端发布事务内生成。</span>
+          <span>发布后将生成评价任务，参评人员可在「我的待办」中填写。</span>
         </div>
         <div class="action-buttons">
           <el-button
@@ -208,19 +217,16 @@ onBeforeUnmount(() => publicationStore.reset())
 
 <style scoped>
 .publication-page { display: grid; gap: 16px; padding-bottom: 96px; }
-.page-header, .heading-block, .header-status, .action-bar, .action-buttons { display: flex; align-items: center; gap: 14px; }
-.page-header, .action-bar { justify-content: space-between; }
-.heading-block p, .heading-block h1 { margin: 0; }
-.heading-block p { margin-bottom: 3px; color: #64748b; font-size: 13px; }
-.heading-block h1 { color: #111827; font-size: 22px; }
+.header-status, .action-bar, .action-buttons { display: flex; align-items: center; gap: 14px; }
+.header-status { flex-shrink: 0; flex-wrap: wrap; }
+.action-bar { justify-content: space-between; }
 .dirty-state { color: #e6a23c; font-size: 13px; }
 .saved-state { color: #67c23a; font-size: 13px; }
 .action-bar { position: sticky; bottom: 12px; z-index: 8; padding: 14px 18px; border: 1px solid #dbeafe; border-radius: 10px; background: rgb(255 255 255 / 96%); box-shadow: 0 8px 28px rgb(15 23 42 / 12%); backdrop-filter: blur(8px); }
 .action-bar > div:first-child { display: grid; gap: 3px; }
 .action-bar span { color: #64748b; font-size: 12px; }
 @media (max-width: 760px) {
-  .page-header, .action-bar { align-items: flex-start; flex-direction: column; }
-  .header-status { flex-wrap: wrap; }
+  .action-bar { align-items: flex-start; flex-direction: column; }
   .action-buttons { width: 100%; }
   .action-buttons :deep(.el-button) { flex: 1; }
 }

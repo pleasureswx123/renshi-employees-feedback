@@ -4,6 +4,7 @@ import { decimalToNumber } from '@/utils/fixedDecimal'
 const props = defineProps({
   question: { type: Object, required: true },
   mode: { type: String, default: 'preview' },
+  showHeading: { type: Boolean, default: true },
   modelValue: { type: Object, default: () => ({ value: null }) }
 })
 
@@ -16,11 +17,11 @@ function changeValue(value) {
 
 <template>
   <section class="question-block">
-    <div class="question-heading">
+    <div v-if="showHeading" class="question-heading">
       <span v-if="question.isRequired" class="required-mark" aria-label="必答">*</span>
       <strong>{{ question.title }}</strong>
     </div>
-    <p v-if="question.description" class="question-description">{{ question.description }}</p>
+    <p v-if="showHeading && question.description" class="question-description">{{ question.description }}</p>
     <el-input-number
       :model-value="modelValue?.value ?? (mode === 'preview' ? question.config?.defaultValue : null)"
       :min="decimalToNumber(question.minScore)"
@@ -31,7 +32,7 @@ function changeValue(value) {
       aria-label="数字评分"
       @change="changeValue"
     />
-    <small class="range-hint">允许范围：{{ question.minScore }} 至 {{ question.maxScore }}</small>
+    <small class="range-hint">允许范围：{{ decimalToNumber(question.minScore).toFixed(question.decimalPlaces) }} 至 {{ decimalToNumber(question.maxScore).toFixed(question.decimalPlaces) }}</small>
     <small v-if="mode === 'answer' && question.config?.defaultValue != null && modelValue?.value == null" class="range-hint">
       参考默认值：{{ question.config.defaultValue }}；请输入分值后才会记录答案
     </small>

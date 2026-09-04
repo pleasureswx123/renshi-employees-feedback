@@ -27,7 +27,7 @@ function search() {
     <div class="section-heading">
       <div>
         <h2>1. 选择被评价人</h2>
-        <p>候选人员由后端按当前账号的数据范围分页返回。</p>
+        <p>按姓名或账号查找本轮被评价人，添加到已选名单。</p>
       </div>
       <el-tag type="info">已选 {{ selectedTargets.length }} 人</el-tag>
     </div>

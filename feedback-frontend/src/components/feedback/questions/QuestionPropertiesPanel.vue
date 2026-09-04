@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed } from 'vue'
 
 import { getQuestionTypeDefinition } from './questionTypeRegistry'
 
@@ -7,61 +7,26 @@ const props = defineProps({
   question: { type: Object, required: true },
   pages: { type: Array, required: true },
   currentPageCode: { type: String, required: true },
-  canMoveUp: { type: Boolean, default: false },
-  canMoveDown: { type: Boolean, default: false }
+  indicators: { type: Array, default: () => [] },
+  disabled: { type: Boolean, default: false }
 })
-const emit = defineEmits(['change', 'delete', 'duplicate', 'move-up', 'move-down', 'move-to-page'])
-const commonFormRef = ref()
-const specificRef = ref()
+const emit = defineEmits(['change', 'move-to-page', 'set-indicator'])
 const definition = computed(() => getQuestionTypeDefinition(props.question.questionType))
-const rules = { title: [{ required: true, message: '请填写题目标题', trigger: 'blur' }] }
+const indicatorCode = computed(() => props.indicators.find(item => item.questionCodes.includes(props.question.questionCode))?.indicatorCode || '')
 
 function changeQuestion(patch) {
-  emit('change', { ...props.question, ...patch })
+  if (!props.disabled) emit('change', { ...props.question, ...patch })
 }
-
-async function validate() {
-  await nextTick()
-  await commonFormRef.value?.validate()
-  return specificRef.value?.validate?.()
-}
-
-defineExpose({ validate })
 </script>
 
 <template>
   <div class="properties-panel">
     <div class="panel-heading">
-      <div><p>题目属性</p><strong>{{ definition?.label }}</strong></div>
-      <div class="question-actions">
-        <el-button plain @click="emit('duplicate')">复制</el-button>
-        <el-button :disabled="!canMoveUp" @click="emit('move-up')">上移</el-button>
-        <el-button :disabled="!canMoveDown" @click="emit('move-down')">下移</el-button>
-        <el-button type="danger" plain @click="emit('delete')">删除</el-button>
-      </div>
+      <el-tag size="small" effect="plain">{{ definition?.label }}</el-tag>
+      <strong :title="question.title">{{ question.title.trim() || '待填写题目内容' }}</strong>
     </div>
 
-    <el-form ref="commonFormRef" :model="question" :rules="rules" label-position="top">
-      <el-form-item label="题目标题" prop="title">
-        <el-input
-          :model-value="question.title"
-          maxlength="2000"
-          show-word-limit
-          type="textarea"
-          :rows="3"
-          @input="changeQuestion({ title: $event })"
-        />
-      </el-form-item>
-      <el-form-item label="题目说明">
-        <el-input
-          :model-value="question.description"
-          maxlength="5000"
-          type="textarea"
-          :rows="2"
-          placeholder="可选，补充答题口径"
-          @input="changeQuestion({ description: $event })"
-        />
-      </el-form-item>
+    <el-form :model="question" :disabled="disabled" label-position="top">
       <div class="switch-row">
         <el-form-item label="必答">
           <el-switch :model-value="question.isRequired" @change="changeQuestion({ isRequired: $event })" />
@@ -74,6 +39,18 @@ defineExpose({ validate })
           />
         </el-form-item>
       </div>
+      <el-form-item v-if="question.isScored && question.questionType !== 'TEXT'" label="评价指标">
+        <el-select
+          :model-value="indicatorCode"
+          clearable
+          placeholder="选择所属指标"
+          aria-label="题目评价指标"
+          @change="emit('set-indicator', question.questionCode, $event || '')"
+        >
+          <el-option v-for="indicator in indicators" :key="indicator.indicatorCode" :label="indicator.indicatorName" :value="indicator.indicatorCode" />
+        </el-select>
+        <small v-if="!indicators.length" class="field-hint">先在“评价指标”中添加指标。</small>
+      </el-form-item>
       <el-form-item label="所在页面">
         <el-select
           :model-value="currentPageCode"
@@ -90,23 +67,18 @@ defineExpose({ validate })
       </el-form-item>
     </el-form>
 
-    <el-divider />
-    <component
-      :is="definition?.propertyEditor"
-      v-if="definition?.propertyEditor"
-      ref="specificRef"
-      :question="question"
-      @change="emit('change', $event)"
-    />
+    <p class="editing-hint">在画布中直接修改题目内容和题型参数。</p>
   </div>
 </template>
 
 <style scoped>
 .properties-panel { display: grid; gap: 16px; }
-.panel-heading, .question-actions, .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.panel-heading { align-items: flex-start; }
-.panel-heading p { margin: 0 0 3px; color: #909399; font-size: 12px; }
-.question-actions { flex-wrap: wrap; justify-content: flex-end; }
+.panel-heading, .switch-row { display: flex; align-items: center; gap: 10px; }
+.switch-row { justify-content: space-between; }
+.panel-heading strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.panel-heading :deep(.el-tag) { flex: none; }
+.editing-hint { margin: 0; color: #909399; font-size: 12px; line-height: 1.6; }
+.field-hint { color: #909399; line-height: 1.6; margin-top: 5px; }
 .switch-row :deep(.el-form-item) { margin-bottom: 16px; }
 :deep(.el-select) { width: 100%; }
 </style>

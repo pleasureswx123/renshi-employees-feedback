@@ -23,7 +23,6 @@ function normalizePage(page, index) {
     pageId: page?.pageId ?? null,
     pageCode: page?.pageCode || createStableCode('P'),
     pageTitle: page?.pageTitle ?? `第${index + 1}页`,
-    pageDescription: page?.pageDescription ?? '',
     sortOrder: index + 1,
     questions: (page?.questions || []).map((question, questionIndex) => {
       const definition = getQuestionTypeDefinition(question.questionType)
@@ -164,7 +163,6 @@ export function serializeQuestionnaireDraft(draft) {
       pageId: page.pageId ?? null,
       pageCode: page.pageCode,
       pageTitle: page.pageTitle,
-      pageDescription: page.pageDescription || null,
       sortOrder: page.sortOrder,
       questions: page.questions.map(question => {
         const definition = getQuestionTypeDefinition(question.questionType)

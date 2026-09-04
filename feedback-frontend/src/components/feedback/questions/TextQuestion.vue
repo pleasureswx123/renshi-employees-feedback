@@ -2,6 +2,7 @@
 const props = defineProps({
   question: { type: Object, required: true },
   mode: { type: String, default: 'preview' },
+  showHeading: { type: Boolean, default: true },
   modelValue: { type: Object, default: () => ({ text: '' }) }
 })
 
@@ -10,15 +11,15 @@ const emit = defineEmits(['update:modelValue'])
 
 <template>
   <section class="question-block">
-    <div class="question-heading">
+    <div v-if="showHeading" class="question-heading">
       <span v-if="question.isRequired" class="required-mark" aria-label="必答">*</span>
       <strong>{{ question.title }}</strong>
     </div>
-    <p v-if="question.description" class="question-description">{{ question.description }}</p>
+    <p v-if="showHeading && question.description" class="question-description">{{ question.description }}</p>
     <el-input
       :model-value="modelValue?.text || ''"
       type="textarea"
-      :rows="4"
+      :rows="mode === 'editor' ? 2 : 4"
       :maxlength="mode === 'answer' ? undefined : question.config.maxLength"
       :show-word-limit="mode !== 'answer'"
       :disabled="mode === 'editor'"

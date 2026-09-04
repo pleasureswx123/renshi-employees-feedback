@@ -42,6 +42,23 @@ describe('真实Element Plus答题表单', () => {
   })
   afterEach(() => { wrapper?.unmount(); ElMessage.closeAll(); document.body.innerHTML = '' })
 
+  it.each([false, true])('答题和历史页面忽略旧页面说明，保留统一问卷说明与分页（历史=%s）', async history => {
+    const detail = detailFixture()
+    detail.questionnaire.description = '统一问卷说明'
+    detail.questionnaire.pages.forEach(page => { page.pageDescription = '已停用的页面说明' })
+    api.getMyTask.mockResolvedValue({ data: detail })
+    api.getMyHistory.mockResolvedValue({ data: detail })
+    const { store } = await open(history)
+
+    expect(wrapper.text()).toContain('统一问卷说明')
+    expect(wrapper.text()).not.toContain('已停用的页面说明')
+    await button('下一页').trigger('click')
+    expect(store.pageIndex).toBe(1)
+    expect(wrapper.text()).toContain('质量与建议')
+    expect(wrapper.text()).toContain('统一问卷说明')
+    expect(wrapper.text()).not.toContain('已停用的页面说明')
+  })
+
   it('提交校验会从第二页定位第一道缺答题，不弹确认框或发送请求', async () => {
     const { store } = await open()
     await button('下一页').trigger('click')

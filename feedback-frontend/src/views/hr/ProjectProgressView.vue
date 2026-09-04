@@ -146,7 +146,7 @@ onBeforeUnmount(() => { drawerVisible.value = false })
 
 <template>
   <section class="progress-page">
-    <header class="page-header">
+    <header class="page-header workspace-page-header">
       <div class="heading-copy">
         <el-button
           v-if="permissionStore.hasPermission('feedback:project:list')"
@@ -225,10 +225,10 @@ onBeforeUnmount(() => { drawerVisible.value = false })
       <el-card shadow="never" class="detail-card">
         <el-form ref="filterFormRef" :model="filters" :rules="filterRules" label-position="top" class="filter-form">
           <el-form-item label="评价人姓名">
-            <el-input v-model="filters.evaluatorKeyword" maxlength="100" clearable placeholder="按冻结姓名筛选" @keyup.enter="search" />
+            <el-input v-model="filters.evaluatorKeyword" maxlength="100" clearable placeholder="输入评价人姓名" @keyup.enter="search" />
           </el-form-item>
           <el-form-item label="被评价人姓名">
-            <el-input v-model="filters.targetKeyword" maxlength="100" clearable placeholder="按冻结姓名筛选" @keyup.enter="search" />
+            <el-input v-model="filters.targetKeyword" maxlength="100" clearable placeholder="输入被评价人姓名" @keyup.enter="search" />
           </el-form-item>
           <el-form-item label="评价人用户ID" prop="evaluatorUserId">
             <el-input-number v-model="filters.evaluatorUserId" :min="1" :step="1" step-strictly :controls="false" placeholder="精确ID" />

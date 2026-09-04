@@ -1,752 +1,240 @@
 <template>
-  <div>
-    <AConfigProvider
-      :theme="{
-        algorithm: settingsStore.isDark
-          ? theme.darkAlgorithm
-          : theme.defaultAlgorithm,
-      }"
-    >
-      <div class="pageHeaderContent">
-        <div class="avatar">
-          <a-avatar size="large" :src="currentUser.avatar" />
+  <main class="management-home">
+    <el-card shadow="never" class="welcome-card">
+      <div class="welcome-content">
+        <el-avatar :size="56" :src="userStore.avatar" :icon="UserFilled" />
+        <div class="welcome-copy">
+          <span class="eyebrow">员工反馈与 360° 评价平台 · 系统管理</span>
+          <h1>你好，{{ userStore.nickName || userStore.name || '管理员' }}</h1>
+          <p>维护组织与账号，配置参评权限，为每一轮评价做好准备。</p>
         </div>
-        <div class="content">
-          <div class="contentTitle">
-            早安，
-            {{ currentUser.name }}
-            ，祝你开心每一天！
-          </div>
-          <div>{{ currentUser.title }} |{{ currentUser.group }}</div>
-        </div>
-        <div class="extraContent">
-          <div class="statItem">
-            <a-statistic title="项目数" :value="56" />
-          </div>
-          <div class="statItem">
-            <a-statistic title="团队内排名" :value="8" suffix="/ 24" />
-          </div>
-          <div class="statItem">
-            <a-statistic title="项目访问" :value="2223" />
-          </div>
+        <div v-if="canEnterFeedback" class="platform-action">
+          <el-button v-if="feedbackEntry" type="primary" size="large" tag="a"
+            :href="feedbackEntry" target="_blank" rel="noopener noreferrer" :icon="Right">
+            进入评价平台
+          </el-button>
+          <el-button v-else type="primary" size="large" disabled>进入评价平台</el-button>
+          <span>{{ feedbackEntry ? '发起评价、填写答卷、查看报告' : '评价平台入口暂未配置，请联系管理员' }}</span>
         </div>
       </div>
+    </el-card>
 
-      <div style="padding: 10px">
-        <a-row :gutter="24">
-          <a-col :xl="16" :lg="24" :md="24" :sm="24" :xs="24">
-            <a-card
-              class="projectList"
-              :style="{ marginBottom: '24px' }"
-              title="进行中的项目"
-              :bordered="false"
-              :loading="false"
-              :body-style="{ padding: 0 }"
-            >
-              <template #extra>
-                <a href="">
-                  <span style="color: var(--el-color-primary)">全部项目</span>
-                </a>
-              </template>
-              <a-card-grid
-                v-for="item in projectNotice"
-                :key="item.id"
-                class="projectGrid"
-              >
-                <a-card
-                  :body-style="{ padding: 0 }"
-                  style="box-shadow: none"
-                  :bordered="false"
-                >
-                  <a-card-meta :description="item.description" class="w-full">
-                    <template #title>
-                      <div class="cardTitle">
-                        <a-avatar size="small" :src="item.logo" />
-                        <a :href="item.href">
-                          {{ item.title }}
-                        </a>
-                      </div>
-                    </template>
-                  </a-card-meta>
-                  <div class="projectItemContent">
-                    <a :href="item.memberLink">
-                      {{ item.member || "" }}
-                    </a>
-                    <span class="datetime" ml-2 :title="item.updatedAt">
-                      {{ item.updatedAt }}
-                    </span>
-                  </div>
-                </a-card>
-              </a-card-grid>
-            </a-card>
-            <a-card
-              :body-style="{ padding: 0 }"
-              :bordered="false"
-              class="activeCard"
-              title="动态"
-              :loading="false"
-            >
-              <a-list :data-source="activities" class="activitiesList">
-                <template #renderItem="{ item }">
-                  <a-list-item :key="item.id">
-                    <a-list-item-meta>
-                      <template #title>
-                        <span>
-                          <a class="username">{{ item.user.name }}</a
-                          >&nbsp;
-                          <span class="event">
-                            <span>{{ item.template1 }}</span
-                            >&nbsp;
-                            <a href="" style="color: var(--el-color-primary)">
-                              {{ item?.group?.name }} </a
-                            >&nbsp; <span>{{ item.template2 }}</span
-                            >&nbsp;
-                            <a href="" style="color: var(--el-color-primary)">
-                              {{ item?.project?.name }}
-                            </a>
-                          </span>
-                        </span>
-                      </template>
-                      <template #avatar>
-                        <a-avatar :src="item.user.avatar" />
-                      </template>
-                      <template #description>
-                        <span class="datetime" :title="item.updatedAt">
-                          {{ item.updatedAt }}
-                        </span>
-                      </template>
-                    </a-list-item-meta>
-                  </a-list-item>
-                </template>
-              </a-list>
-            </a-card>
-          </a-col>
-          <a-col :xl="8" :lg="24" :md="24" :sm="24" :xs="24">
-            <a-card
-              :style="{ marginBottom: '24px' }"
-              title="快速开始 / 便捷导航"
-              :bordered="false"
-              :body-style="{ padding: 0 }"
-            >
-              <EditableLinkGroup />
-            </a-card>
-            <a-card
-              :style="{ marginBottom: '24px' }"
-              :bordered="false"
-              title="XX 指数"
-            >
-              <div class="chart">
-                <div ref="radarContainer" />
-              </div>
-            </a-card>
-            <a-card
-              :body-style="{ paddingTop: '12px', paddingBottom: '12px' }"
-              :bordered="false"
-              title="团队"
-            >
-              <div class="members">
-                <a-row :gutter="48">
-                  <a-col
-                    v-for="item in projectNotice"
-                    :key="`members-item-${item.id}`"
-                    :span="12"
-                  >
-                    <a :href="item.href">
-                      <a-avatar :src="item.logo" size="small" />
-                      <span class="member">{{ item.member }}</span>
-                    </a>
-                  </a-col>
-                </a-row>
-              </div>
-            </a-card>
-          </a-col>
-        </a-row>
+    <section aria-labelledby="overview-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="overview-title">组织与权限概览</h2>
+          <p>统计当前账号有权查看的数据。</p>
+        </div>
+        <div class="refresh-action">
+          <span v-if="updatedAt" class="updated-time">更新于 {{ updatedTime }}</span>
+          <el-button :icon="Refresh" :loading="loading" @click="refreshOverview">刷新概览</el-button>
+        </div>
       </div>
-    </AConfigProvider>
-  </div>
+      <div class="metrics-grid" :aria-busy="loading">
+        <el-card v-for="metric in metrics" :key="metric.key" shadow="never" class="metric-card">
+          <div class="metric-heading">
+            <h3>{{ metric.label }}</h3>
+            <el-icon :size="20" class="metric-icon"><component :is="metric.icon" /></el-icon>
+          </div>
+          <el-skeleton v-if="loading && checkPermi([metric.permission])" animated class="metric-loading">
+            <template #template><el-skeleton-item variant="h1" style="width: 90px; height: 38px" /></template>
+          </el-skeleton>
+          <el-statistic v-else-if="overview[metric.key].status === 'success'" :value="overview[metric.key].value" />
+          <div v-else class="metric-state" :class="{ 'is-error': overview[metric.key].status === 'error' }">
+            {{ overviewStateLabels[overview[metric.key].status] }}
+          </div>
+          <p>{{ metric.hint }}</p>
+        </el-card>
+      </div>
+    </section>
+
+    <div class="home-columns">
+      <el-card shadow="never" class="management-card">
+        <template #header>
+          <div class="card-heading"><h2>常用管理</h2><span>按当前账号权限显示</span></div>
+        </template>
+        <div class="entry-grid">
+          <el-button v-for="entry in availableEntries" :key="entry.path"
+            class="entry-button" :aria-label="entry.title" @click="openManagement(entry)">
+            <el-icon class="entry-icon" :size="22"><component :is="entry.icon" /></el-icon>
+            <span class="entry-copy"><strong>{{ entry.title }}</strong><small>{{ entry.description }}</small></span>
+            <el-icon class="entry-arrow"><ArrowRight /></el-icon>
+          </el-button>
+        </div>
+      </el-card>
+
+      <el-card shadow="never" class="guide-card">
+        <template #header><h2>开始一轮评价</h2></template>
+        <ol class="preparation-list">
+          <li><span class="step-number">1</span><div><h3>核对组织与人员</h3><p>确认部门归属、真实姓名和账号启用状态。</p></div></li>
+          <li><span class="step-number">2</span><div><h3>分配参评权限</h3><p>员工分配参评角色；需要参评的 HR 同时具有 HR 和员工角色。</p></div></li>
+          <li><span class="step-number">3</span><div><h3>进入评价平台</h3><p>由 HR 配置问卷与评价关系、发布项目，再由员工登录填写。</p></div></li>
+        </ol>
+        <div class="guide-note"><el-icon><InfoFilled /></el-icon><span>原始答案为独立权限，请按实际需要授权。</span></div>
+      </el-card>
+    </div>
+  </main>
 </template>
 
-<script>
-import {
-  Statistic,
-  Row,
-  Col,
-  Card,
-  CardGrid,
-  CardMeta,
-  List,
-  ListItem,
-  ListItemMeta,
-  Avatar,
-  ConfigProvider,
-  theme,
-} from "ant-design-vue";
-import "ant-design-vue/dist/reset.css";
-
-export default {
-  components: {
-    AStatistic: Statistic,
-    ARow: Row,
-    ACol: Col,
-    ACard: Card,
-    ACardGrid: CardGrid,
-    ACardMeta: CardMeta,
-    AList: List,
-    AListItem: ListItem,
-    AListItemMeta: ListItemMeta,
-    AAvatar: Avatar,
-    AConfigProvider: ConfigProvider,
-  },
-};
-</script>
-
 <script setup>
-import { Radar } from "@antv/g2plot";
-import EditableLinkGroup from "./editable-link-group.vue";
-import useSettingsStore from "@/store/modules/settings";
+import { computed, onActivated, onBeforeUnmount, onDeactivated, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { ArrowRight, Briefcase, Connection, Document, InfoFilled, Lock, Refresh, Right, User, UserFilled } from '@element-plus/icons-vue'
+import { listUser } from '@/api/system/user'
+import { listDept } from '@/api/system/dept'
+import { listRole } from '@/api/system/role'
+import useUserStore from '@/store/modules/user'
+import { checkPermi } from '@/utils/permission'
+import { emptyOverview, loadManagementOverview, overviewPermissions, resolveFeedbackEntry } from '@/utils/managementOverview'
 
-const settingsStore = useSettingsStore();
+defineOptions({ name: 'Index' })
 
-defineOptions({
-  name: "DashBoard",
-});
+const router = useRouter()
+const userStore = useUserStore()
+const loading = ref(false)
+const overview = reactive(emptyOverview())
+const updatedAt = ref(null)
+const feedbackEntry = resolveFeedbackEntry(import.meta.env.VITE_FEEDBACK_APP_URL)
+const canEnterFeedback = computed(() => checkPermi([
+  'feedback:project:list', 'feedback:progress:view', 'feedback:report:view',
+  'feedback:answer:view', 'feedback:task:view', 'feedback:history:view'
+]))
+const contextKey = computed(() => JSON.stringify([
+  userStore.id, [...userStore.permissions].sort(), [...userStore.roles].sort()
+]))
+const updatedTime = computed(() => updatedAt.value
+  ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(updatedAt.value)
+  : '')
+const overviewStateLabels = { idle: '待刷新', forbidden: '无查看权限', error: '读取失败，请刷新重试' }
+const metrics = [
+  { key: 'users', label: '账号总数', permission: overviewPermissions.users, icon: User, hint: '包含管理员及测试账号' },
+  { key: 'departments', label: '组织部门', permission: overviewPermissions.departments, icon: Connection, hint: '包含公司、部门与下级团队' },
+  { key: 'roles', label: '授权角色', permission: overviewPermissions.roles, icon: Lock, hint: '已建立的系统角色' }
+]
+const entries = [
+  { title: '用户管理', description: '维护姓名、部门与账号状态', path: '/system/user', permission: 'system:user:list', icon: User },
+  { title: '部门管理', description: '维护公司、部门与团队结构', path: '/system/dept', permission: 'system:dept:list', icon: Connection },
+  { title: '角色授权', description: '配置菜单权限与数据范围', path: '/system/role', permission: 'system:role:list', icon: Lock },
+  { title: '岗位管理', description: '维护组织岗位信息', path: '/system/post', permission: 'system:post:list', icon: Briefcase },
+  { title: '操作日志', description: '查看系统操作与审计记录', path: '/monitor/operlog', permission: 'monitor:operlog:list', icon: Document },
+  { title: '个人中心', description: '维护个人资料与登录密码', path: '/user/profile', icon: UserFilled }
+]
+const availableEntries = computed(() => entries.filter(entry => {
+  if (!entry.permission) return true
+  return checkPermi([entry.permission]) && router.getRoutes().some(route => route.path === entry.path)
+}))
 
-const currentUser = {
-  avatar: "https://gw.alipayobjects.com/zos/rmsportal/BiazfanxmamNRoxxVxka.png",
-  name: "吴彦祖",
-  userid: "00000001",
-  email: "antdesign@alipay.com",
-  signature: "海纳百川，有容乃大",
-  title: "交互专家",
-  group: "蚂蚁金服－某某某事业群－某某平台部－某某技术部－UED",
-};
+let requestSequence = 0
+let viewActive = true
 
-const projectNotice = [
-  {
-    id: "xxx1",
-    title: "Alipay",
-    logo: "https://gw.alipayobjects.com/zos/rmsportal/WdGqmHpayyMjiEhcKoVE.png",
-    description: "那是一种内在的东西，他们到达不了，也无法触及的",
-    updatedAt: "几秒前",
-    member: "科学搬砖组",
-    href: "",
-    memberLink: "",
-  },
-  {
-    id: "xxx2",
-    title: "Angular",
-    logo: "https://gw.alipayobjects.com/zos/rmsportal/zOsKZmFRdUtvpqCImOVY.png",
-    description: "希望是一个好东西，也许是最好的，好东西是不会消亡的",
-    updatedAt: "6 年前",
-    member: "全组都是吴彦祖",
-    href: "",
-    memberLink: "",
-  },
-  {
-    id: "xxx3",
-    title: "Ant Design",
-    logo: "https://gw.alipayobjects.com/zos/rmsportal/dURIMkkrRFpPgTuzkwnB.png",
-    description: "城镇中有那么多的酒馆，她却偏偏走进了我的酒馆",
-    updatedAt: "几秒前",
-    member: "中二少女团",
-    href: "",
-    memberLink: "",
-  },
-  {
-    id: "xxx4",
-    title: "Ant Design Pro",
-    logo: "https://gw.alipayobjects.com/zos/rmsportal/sfjbOqnsXXJgNCjCzDBL.png",
-    description: "那时候我只会想自己想要什么，从不想自己拥有什么",
-    updatedAt: "6 年前",
-    member: "程序员日常",
-    href: "",
-    memberLink: "",
-  },
-  {
-    id: "xxx5",
-    title: "Bootstrap",
-    logo: "https://gw.alipayobjects.com/zos/rmsportal/siCrBXXhmvTQGWPNLBow.png",
-    description: "凛冬将至",
-    updatedAt: "6 年前",
-    member: "高逼格设计天团",
-    href: "",
-    memberLink: "",
-  },
-  {
-    id: "xxx6",
-    title: "React",
-    logo: "https://gw.alipayobjects.com/zos/rmsportal/kZzEzemZyKLKFsojXItE.png",
-    description: "生命就像一盒巧克力，结果往往出人意料",
-    updatedAt: "6 年前",
-    member: "骗你来学计算机",
-    href: "",
-    memberLink: "",
-  },
-];
+async function refreshOverview() {
+  if (loading.value || !viewActive) return
+  loading.value = true
+  const requestId = ++requestSequence
+  const context = contextKey.value
+  const result = await loadManagementOverview(permission => checkPermi([permission]), {
+    users: listUser, departments: listDept, roles: listRole
+  })
+  // 离开页面、切换账号或变更权限后，旧请求不得回填当前概览。
+  if (requestId !== requestSequence || context !== contextKey.value || !viewActive) return
+  Object.assign(overview, result)
+  updatedAt.value = Object.values(result).some(item => item.status === 'success') ? new Date() : null
+  loading.value = false
+}
 
-const activities = [
-  {
-    id: "trend-1",
-    updatedAt: "几秒前",
-    user: {
-      name: "曲丽丽",
-      avatar:
-        "https://gw.alipayobjects.com/zos/rmsportal/BiazfanxmamNRoxxVxka.png",
-    },
-    group: {
-      name: "高逼格设计天团",
-      link: "http://github.com/",
-    },
-    project: {
-      name: "六月迭代",
-      link: "http://github.com/",
-    },
-    template1: "在",
-    template2: "新建项目",
-  },
-  {
-    id: "trend-2",
-    updatedAt: "几秒前",
-    user: {
-      name: "付小小",
-      avatar:
-        "https://gw.alipayobjects.com/zos/rmsportal/cnrhVkzwxjPwAaCfPbdc.png",
-    },
-    group: {
-      name: "高逼格设计天团",
-      link: "http://github.com/",
-    },
-    project: {
-      name: "六月迭代",
-      link: "http://github.com/",
-    },
-    template1: "在",
-    template2: "新建项目",
-  },
-  {
-    id: "trend-3",
-    updatedAt: "几秒前",
-    user: {
-      name: "林东东",
-      avatar:
-        "https://gw.alipayobjects.com/zos/rmsportal/gaOngJwsRYRaVAuXXcmB.png",
-    },
-    group: {
-      name: "中二少女团",
-      link: "http://github.com/",
-    },
-    project: {
-      name: "六月迭代",
-      link: "http://github.com/",
-    },
-    template1: "在",
-    template2: "新建项目",
-  },
-  {
-    id: "trend-4",
-    updatedAt: "几秒前",
-    user: {
-      name: "周星星",
-      avatar:
-        "https://gw.alipayobjects.com/zos/rmsportal/WhxKECPNujWoWEFNdnJE.png",
-    },
-    group: {
-      name: "5 月日常迭代",
-      link: "http://github.com/",
-    },
-    template1: "将",
-    template2: "更新至已发布状态",
-  },
-  {
-    id: "trend-5",
-    updatedAt: "几秒前",
-    user: {
-      name: "朱偏右",
-      avatar:
-        "https://gw.alipayobjects.com/zos/rmsportal/ubnKSIfAJTxIgXOKlciN.png",
-    },
-    group: {
-      name: "工程效能",
-      link: "http://github.com/",
-    },
-    project: {
-      name: "留言",
-      link: "http://github.com/",
-    },
-    template1: "在",
-    template2: "发布了",
-  },
-  {
-    id: "trend-6",
-    updatedAt: "几秒前",
-    user: {
-      name: "乐哥",
-      avatar:
-        "https://gw.alipayobjects.com/zos/rmsportal/jZUIxmJycoymBprLOUbT.png",
-    },
-    group: {
-      name: "程序员日常",
-      link: "http://github.com/",
-    },
-    project: {
-      name: "品牌迭代",
-      link: "http://github.com/",
-    },
-    template1: "在",
-    template2: "新建项目",
-  },
-];
+function openManagement(entry) {
+  if (entry.permission && !checkPermi([entry.permission])) return
+  router.push(entry.path)
+}
 
-const radarContainer = ref();
-const radarData = [
-  {
-    name: "个人",
-    label: "引用",
-    value: 10,
-  },
-  {
-    name: "个人",
-    label: "口碑",
-    value: 8,
-  },
-  {
-    name: "个人",
-    label: "产量",
-    value: 4,
-  },
-  {
-    name: "个人",
-    label: "贡献",
-    value: 5,
-  },
-  {
-    name: "个人",
-    label: "热度",
-    value: 7,
-  },
-  {
-    name: "团队",
-    label: "引用",
-    value: 3,
-  },
-  {
-    name: "团队",
-    label: "口碑",
-    value: 9,
-  },
-  {
-    name: "团队",
-    label: "产量",
-    value: 6,
-  },
-  {
-    name: "团队",
-    label: "贡献",
-    value: 3,
-  },
-  {
-    name: "团队",
-    label: "热度",
-    value: 1,
-  },
-  {
-    name: "部门",
-    label: "引用",
-    value: 4,
-  },
-  {
-    name: "部门",
-    label: "口碑",
-    value: 1,
-  },
-  {
-    name: "部门",
-    label: "产量",
-    value: 6,
-  },
-  {
-    name: "部门",
-    label: "贡献",
-    value: 5,
-  },
-  {
-    name: "部门",
-    label: "热度",
-    value: 7,
-  },
-];
-let radar;
-onMounted(() => {
-  radar = new Radar(radarContainer.value, {
-    data: radarData,
-    xField: "label",
-    yField: "value",
-    seriesField: "name",
-    point: {
-      size: 4,
-    },
-    legend: {
-      layout: "horizontal",
-      position: "bottom",
-    },
-  });
-  radar.render();
-});
+function invalidatePending() {
+  requestSequence += 1
+  loading.value = false
+}
 
+watch(contextKey, () => {
+  invalidatePending()
+  Object.assign(overview, emptyOverview())
+  updatedAt.value = null
+  void refreshOverview()
+}, { immediate: true })
+
+onActivated(() => {
+  viewActive = true
+  if (!loading.value) void refreshOverview()
+})
+onDeactivated(() => {
+  viewActive = false
+  invalidatePending()
+})
 onBeforeUnmount(() => {
-  radar?.destroy?.();
-});
+  viewActive = false
+  invalidatePending()
+})
 </script>
 
-<style scoped lang="less">
-.textOverflow() {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  word-break: break-all;
+<style scoped lang="scss">
+.management-home {
+  padding: 24px;
+  color: var(--el-text-color-primary);
+  background: var(--el-bg-color-page);
+  min-height: calc(100vh - 90px);
 }
-
-// mixins for clearfix
-// ------------------------
-.clearfix() {
-  zoom: 1;
-  &::before,
-  &::after {
-    display: table;
-    content: " ";
-  }
-  &::after {
-    clear: both;
-    height: 0;
-    font-size: 0;
-    visibility: hidden;
-  }
+.management-home h1, .management-home h2, .management-home h3, .management-home p { margin: 0; }
+.management-home h2 { font-size: 17px; font-weight: 600; }
+.management-home :deep(.el-card) { border-radius: 12px; }
+.welcome-card { background: linear-gradient(110deg, var(--el-bg-color), var(--el-color-primary-light-9)); }
+.welcome-content { display: flex; align-items: center; gap: 18px; padding: 8px; }
+.welcome-content > .el-avatar { flex-shrink: 0; }
+.welcome-copy { flex: 1; min-width: 0; }
+.eyebrow { font-size: 12px; color: var(--el-color-primary); }
+.welcome-copy h1 { margin: 8px 0; font-size: 25px; line-height: 1.4; overflow-wrap: anywhere; }
+.welcome-copy p, .platform-action > span { color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.7; }
+.platform-action { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.platform-action .el-button { text-decoration: none; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 26px 0 14px; }
+.section-heading p { margin-top: 6px; color: var(--el-text-color-secondary); font-size: 13px; }
+.refresh-action { display: flex; align-items: center; gap: 12px; }
+.updated-time { color: var(--el-text-color-secondary); font-size: 12px; white-space: nowrap; }
+.metrics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.metric-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.metric-heading h3 { font-size: 14px; font-weight: 500; color: var(--el-text-color-regular); }
+.metric-icon { color: var(--el-color-primary); }
+.metric-card :deep(.el-statistic__content) { font-size: 32px; font-weight: 600; line-height: 40px; }
+.metric-state, .metric-loading { min-height: 40px; display: flex; align-items: center; color: var(--el-text-color-secondary); font-size: 15px; }
+.metric-state.is-error { color: var(--el-color-danger); }
+.metric-card p { margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--el-text-color-secondary); }
+.home-columns { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(290px, 1fr); gap: 20px; margin-top: 22px; align-items: start; }
+.card-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.card-heading > span { font-size: 12px; color: var(--el-text-color-secondary); }
+.entry-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.entry-button { width: 100%; height: auto; min-height: 86px; margin: 0 !important; padding: 16px; text-align: left; border-radius: 9px; white-space: normal; }
+.entry-button :deep(> span) { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; }
+.entry-icon { flex-shrink: 0; color: var(--el-color-primary); }
+.entry-copy { display: flex; flex-direction: column; gap: 7px; flex: 1; min-width: 0; line-height: 1.5; }
+.entry-copy strong { font-size: 14px; font-weight: 600; }
+.entry-copy small { color: var(--el-text-color-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.entry-arrow { flex-shrink: 0; color: var(--el-text-color-placeholder); }
+.preparation-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; }
+.preparation-list li { display: flex; align-items: flex-start; gap: 12px; }
+.step-number { display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; color: var(--el-color-primary); background: var(--el-color-primary-light-9); font-size: 13px; font-weight: 600; }
+.preparation-list h3 { margin: 3px 0 6px; font-size: 14px; }
+.preparation-list p { color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.7; }
+.guide-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--el-border-color-lighter); font-size: 12px; line-height: 1.7; color: var(--el-text-color-secondary); }
+.guide-note .el-icon { margin-top: 3px; flex-shrink: 0; color: var(--el-color-primary); }
+@media (max-width: 1200px) {
+  .home-columns { grid-template-columns: 1fr; }
 }
-
-.activitiesList {
-  padding: 0 24px 8px 24px;
-  .username {
-    color: var(--el-text-color-regular);
-  }
-  .event {
-    font-weight: normal;
-  }
-}
-
-.pageHeaderContent {
-  display: flex;
-  padding: 12px;
-  margin-bottom: 24px;
-  box-shadow: var(--el-box-shadow-light);
-  .avatar {
-    flex: 0 1 72px;
-    & > span {
-      display: block;
-      width: 72px;
-      height: 72px;
-      border-radius: 72px;
-    }
-  }
-  .content {
-    position: relative;
-    top: 4px;
-    flex: 1 1 auto;
-    margin-left: 24px;
-    color: var(--el-text-color-secondary);
-    line-height: 22px;
-    .contentTitle {
-      margin-bottom: 12px;
-      color: var(--el-text-color-primary);
-      font-weight: 500;
-      font-size: 20px;
-      line-height: 28px;
-    }
-  }
-}
-
-.extraContent {
-  .clearfix();
-
-  float: right;
-  white-space: nowrap;
-  .statItem {
-    position: relative;
-    display: inline-block;
-    padding: 0 32px;
-    > p:first-child {
-      margin-bottom: 4px;
-      color: var(--el-text-color-secondary);
-      font-size: 14px;
-      line-height: 22px;
-    }
-    > p {
-      margin: 0;
-      color: var(--el-text-color-primary);
-      font-size: 30px;
-      line-height: 38px;
-      > span {
-        color: var(--el-text-color-secondary);
-        font-size: 20px;
-      }
-    }
-    &::after {
-      position: absolute;
-      top: 8px;
-      right: 0;
-      width: 1px;
-      height: 40px;
-      background-color: var(--el-border-color);
-      content: "";
-    }
-    &:last-child {
-      padding-right: 0;
-      &::after {
-        display: none;
-      }
-    }
-  }
-}
-
-.members {
-  a {
-    display: block;
-    height: 24px;
-    margin: 12px 0;
-    color: var(--el-text-color-regular);
-    transition: all 0.3s;
-    .textOverflow();
-    .member {
-      margin-left: 12px;
-      font-size: 14px;
-      line-height: 24px;
-      vertical-align: top;
-    }
-    &:hover {
-      color: var(--el-color-primary);
-    }
-  }
-}
-
-.projectList {
-  :deep(.ant-card-meta-description) {
-    height: 44px;
-    overflow: hidden;
-    color: var(--el-text-color-secondary);
-    line-height: 22px;
-  }
-  .cardTitle {
-    font-size: 0;
-    a {
-      display: inline-block;
-      height: 24px;
-      margin-left: 12px;
-      color: var(--el-text-color-primary);
-      font-size: 14px;
-      line-height: 24px;
-      vertical-align: top;
-      &:hover {
-        color: var(--el-color-primary);
-      }
-    }
-  }
-  .projectGrid {
-    width: 33.33%;
-  }
-  .projectItemContent {
-    display: flex;
-    flex-basis: 100%;
-    height: 20px;
-    margin-top: 8px;
-    overflow: hidden;
-    font-size: 12px;
-    line-height: 20px;
-    .textOverflow();
-    a {
-      display: inline-block;
-      flex: 1 1 0;
-      color: var(--el-text-color-secondary);
-      .textOverflow();
-      &:hover {
-        color: var(--el-color-primary);
-      }
-    }
-    .datetime {
-      flex: 0 0 auto;
-      float: right;
-      color: var(--el-text-color-placeholder);
-    }
-  }
-}
-
-.datetime {
-  color: var(--el-text-color-placeholder);
-}
-
-@media screen and (max-width: 1200px) and (min-width: 992px) {
-  .activeCard {
-    margin-bottom: 24px;
-  }
-  .members {
-    margin-bottom: 0;
-  }
-  .extraContent {
-    margin-left: -44px;
-    .statItem {
-      padding: 0 16px;
-    }
-  }
-}
-
-@media screen and (max-width: 992px) {
-  .activeCard {
-    margin-bottom: 24px;
-  }
-  .members {
-    margin-bottom: 0;
-  }
-  .extraContent {
-    float: none;
-    margin-right: 0;
-    .statItem {
-      padding: 0 16px;
-      text-align: left;
-      &::after {
-        display: none;
-      }
-    }
-  }
-}
-
-@media screen and (max-width: 768px) {
-  .extraContent {
-    margin-left: -16px;
-  }
-  .projectList {
-    .projectGrid {
-      width: 50%;
-    }
-  }
-}
-
-@media screen and (max-width: 576px) {
-  .pageHeaderContent {
-    display: block;
-    .content {
-      margin-left: 0;
-    }
-  }
-  .extraContent {
-    .statItem {
-      float: none;
-    }
-  }
-}
-
-@media screen and (max-width: 480px) {
-  .projectList {
-    .projectGrid {
-      width: 100%;
-    }
-  }
+@media (max-width: 768px) {
+  .management-home { padding: 16px; }
+  .welcome-content { flex-wrap: wrap; padding: 0; gap: 12px; }
+  .welcome-copy { flex-basis: calc(100% - 68px); }
+  .welcome-copy h1 { font-size: 21px; }
+  .platform-action { width: 100%; align-items: stretch; margin-top: 6px; }
+  .section-heading { align-items: flex-start; flex-wrap: wrap; }
+  .refresh-action { width: 100%; justify-content: space-between; }
+  .metrics-grid { grid-template-columns: 1fr; gap: 12px; }
+  .entry-grid { grid-template-columns: 1fr; }
+  .card-heading { align-items: flex-start; flex-direction: column; }
 }
 </style>

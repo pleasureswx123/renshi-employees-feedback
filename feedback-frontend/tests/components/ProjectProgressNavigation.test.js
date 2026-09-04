@@ -72,8 +72,38 @@ describe('项目列表进度入口与子路由菜单', () => {
     wrapper = mount(RouterView, { global: { plugins: [pinia, router, ElementPlus] } })
     await flushPromises()
     const menus = wrapper.findAllComponents({ name: 'ElMenu' })
-    expect(menus).toHaveLength(2)
+    expect(menus).toHaveLength(1)
     expect(menus.every(menu => menu.props('defaultActive') === '/hr/projects')).toBe(true)
+  })
+
+  it('收起侧栏保留权限菜单，移动抽屉选择后关闭并更新面包屑', async () => {
+    useAuthStore().permissions = ['feedback:project:list', 'feedback:report:view']
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{
+        path: '/hr', component: WorkspaceLayout, props: { workspace: 'hr', title: 'HR 工作台' },
+        children: [
+          { path: 'projects', component: { template: '<div>项目列表</div>' }, meta: { title: '评价项目' } },
+          { path: 'reports', component: { template: '<div>报告列表</div>' }, meta: { title: '评价报告' } }
+        ]
+      }]
+    })
+    await router.push('/hr/projects')
+    wrapper = mount(RouterView, { attachTo: document.body, global: { plugins: [pinia, router, ElementPlus] } })
+    await flushPromises()
+    await wrapper.get('[aria-label="收起侧栏"]').trigger('click')
+    expect(wrapper.findComponent({ name: 'ElMenu' }).props('collapse')).toBe(true)
+    expect(router.currentRoute.value.path).toBe('/hr/projects')
+    await wrapper.get('[aria-label="打开工作台导航"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'ElDrawer' }).props('modelValue')).toBe(true)
+    const navigation = wrapper.findAllComponents({ name: 'ElMenu' })[1]
+    expect(navigation.text()).not.toContain('原始答案')
+    await navigation.findAll('[role="menuitem"]')[1].trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/hr/reports')
+    expect(wrapper.findComponent({ name: 'ElDrawer' }).props('modelValue')).toBe(false)
+    expect(wrapper.get('.workspace-breadcrumb').text()).toContain('评价报告')
   })
 
   it('progress-only用户显示安全回收进度菜单并在明细页保持高亮', async () => {

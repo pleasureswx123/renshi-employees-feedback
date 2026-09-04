@@ -9,6 +9,7 @@ import { useAnswerSheetStore } from '@/stores/answerSheet'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissionStore } from '@/stores/permission'
 import { answerErrors, TASK_STATUS_LABELS } from '@/utils/answerSheet'
+import { formatDateTime } from '@/utils/displayFormat'
 
 const props = defineProps({ history: { type: Boolean, default: false } })
 const route = useRoute()
@@ -158,11 +159,13 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
       @click="router.push(`/employee/reviews/${route.params.assignmentId}`)"
     >查看已提交答案</el-button>
     <template v-if="store.detail">
-      <header class="answer-header">
+      <header class="answer-header workspace-page-header">
+        <div>
         <p>{{ store.detail.task.projectName }}</p>
-        <h1>{{ history ? '已提交的评价' : '评价' }}：{{ store.detail.task.targetName }}</h1>
+        <h1 class="page-heading">{{ history ? '已提交的评价' : '评价' }}：{{ store.detail.task.targetName }}</h1>
         <p>{{ store.detail.task.targetDeptName || '未配置部门' }} · {{ store.detail.task.relationName }}评价</p>
-        <el-tag>{{ TASK_STATUS_LABELS[store.detail.task.status] }}</el-tag>
+        </div>
+        <el-tag :type="store.detail.task.status === 'SUBMITTED' ? 'success' : 'warning'">{{ TASK_STATUS_LABELS[store.detail.task.status] }}</el-tag>
       </header>
       <el-alert
         v-if="store.detail.task.status === 'SUBMITTED'"
@@ -189,7 +192,6 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
         <el-form ref="form" :model="store" :disabled="disabled" label-position="top" @keydown.enter="handleEnter">
           <section v-for="(page, pageIndex) in pages" v-show="store.pageIndex === pageIndex" :key="page.pageId" class="answer-page">
             <h3>{{ page.pageTitle }}</h3>
-            <p v-if="page.pageDescription" class="description">{{ page.pageDescription }}</p>
             <el-form-item
               v-for="question in page.questions"
               :key="question.questionCode"
@@ -216,7 +218,7 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
       <footer class="answer-footer">
         <div class="save-state">
           <span v-if="store.dirty">有尚未暂存的修改</span>
-          <span v-else-if="store.detail.task.savedTime">最近保存：{{ store.detail.task.savedTime.replace('T', ' ') }}</span>
+          <span v-else-if="store.detail.task.savedTime">最近保存：{{ formatDateTime(store.detail.task.savedTime) }}</span>
           <span v-else>填写部分答案后也可以暂存</span>
         </div>
         <div v-if="canEdit" class="write-actions">
@@ -231,11 +233,15 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
 
 <style scoped>
 .answer-workspace { max-width: 900px; min-height: 240px; margin: auto; }
-.answer-header { margin: 24px 0; overflow-wrap: anywhere; }
+.answer-header { margin: 18px 0; overflow-wrap: anywhere; }
+.answer-header p { margin: 0; font-size: 13px; }
+.answer-top-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.answer-top-actions .el-button { margin-left: 0; }
 .answer-header h1 { font-size: 24px; margin: 8px 0; }
 .answer-header p, .description { color: #64748b; white-space: pre-wrap; line-height: 1.7; }
 .answer-notice { margin: 16px 0; }
 .answer-document h2, .answer-page h3 { overflow-wrap: anywhere; }
+.answer-document h2 { font-size: 20px; font-weight: 600; }
 .answer-progress { display: grid; gap: 8px; margin: 24px 0; }
 .answer-page { margin-top: 28px; }
 .answer-question { padding: 20px 0; border-bottom: 1px solid #e5e7eb; }
@@ -243,7 +249,7 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
 .answer-question :deep(.el-form-item__error) { position: static; padding-top: 8px; }
 .issue-link { height: auto; white-space: normal; text-align: left; line-height: 1.7; }
 .page-navigation { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
-.answer-footer { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; margin-top: 16px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; z-index: 5; }
+.answer-footer { position: sticky; bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; margin-top: 16px; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; box-shadow: 0 6px 24px rgb(30 50 80 / 8%); z-index: 5; }
 .save-state { color: #64748b; font-size: 13px; }
 .write-actions { display: flex; gap: 12px; flex-shrink: 0; }
 .write-actions .el-button + .el-button { margin-left: 0; }

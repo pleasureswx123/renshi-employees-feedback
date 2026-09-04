@@ -253,6 +253,36 @@ pnpm dev:mp-weixin
 
 #### 后端
 
+Windows PowerShell 开发环境统一使用后端目录下的独立虚拟环境，禁止复用 Hermes 或其他应用自身的虚拟环境。首次初始化时，先确认 `python` 是独立安装或由 `uv` 管理的 Python 3.11，而不是其他应用目录中的解释器：
+
+```powershell
+# 进入后端目录
+cd D:\work\renshi-employees-feedback\ruoyi-fastapi-backend
+
+# 创建前确认当前命令不是其他应用虚拟环境中的 Python
+Get-Command python
+python --version
+
+# 使用独立的 Python 3.11 创建项目虚拟环境
+python -m venv .venv
+
+# 激活后，后续 python、pip 和 ruoyi 都应来自当前后端 .venv
+.\.venv\Scripts\Activate.ps1
+Get-Command python
+
+# PostgreSQL 版本依赖；requirements-pg.txt 已包含项目自身安装项
+python -m pip install -r requirements-pg.txt
+Get-Command ruoyi
+
+# 启动前先检查数据库、Redis 和传输加密配置
+ruoyi app doctor --env=dev
+
+# 启动后端
+ruoyi app run --env=dev
+```
+
+如果 `Get-Command python` 在创建虚拟环境前指向 Hermes 或其他应用的 `venv`，应先改用独立 Python 3.11 的完整路径在后端目录创建 `.venv`，否则基础解释器仍可能随该应用更新而失效。
+
 ```bash
 # 进入后端目录
 cd ruoyi-fastapi-backend

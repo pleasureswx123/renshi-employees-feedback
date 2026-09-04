@@ -6,6 +6,7 @@ import { decimalToNumber } from '@/utils/fixedDecimal'
 const props = defineProps({
   question: { type: Object, required: true },
   mode: { type: String, default: 'preview' },
+  showHeading: { type: Boolean, default: true },
   modelValue: { type: Object, default: () => ({ value: null, touched: false }) }
 })
 
@@ -22,11 +23,11 @@ function changeValue(value) {
 
 <template>
   <section class="question-block">
-    <div class="question-heading">
+    <div v-if="showHeading" class="question-heading">
       <span v-if="question.isRequired" class="required-mark" aria-label="必答">*</span>
       <strong>{{ question.title }}</strong>
     </div>
-    <p v-if="question.description" class="question-description">{{ question.description }}</p>
+    <p v-if="showHeading && question.description" class="question-description">{{ question.description }}</p>
     <el-slider
       :model-value="decimalToNumber(displayValue)"
       :min="decimalToNumber(question.minScore)"

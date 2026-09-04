@@ -97,7 +97,7 @@ fb_score_result
 | `version_id` | `BIGINT` | 否 | FK `fb_questionnaire_version.version_id` | 问卷版本ID |
 | `page_code` | `VARCHAR(64)` | 否 | P4新增；版本内唯一 | 版本内稳定页面标识 |
 | `page_title` | `VARCHAR(200)` | 否 | 无 | 页面标题 |
-| `page_description` | `TEXT` | 是 | 无 | 页面说明 |
+| `page_description` | `TEXT` | 是 | 历史兼容列，业务停止读写 | 旧页面说明；不再属于页面接口或产品配置 |
 | `sort_order` | `INTEGER` | 否 | `> 0`；版本内唯一 | 页面顺序 |
 
 ### 4.4 `fb_question` 问卷题目表

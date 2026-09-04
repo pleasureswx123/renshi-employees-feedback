@@ -71,7 +71,7 @@ function search() {
     <div class="section-heading">
       <div>
         <h2>3. 分配评价人</h2>
-        <p>按被评价人与关系明确选择；每个目标的自评由后端自动添加。</p>
+        <p>为每位被评价人按关系分配评价人，自评任务自动添加。</p>
       </div>
     </div>
 

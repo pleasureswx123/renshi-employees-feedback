@@ -23,7 +23,7 @@ def questionnaire(version_id: int, lock_version: int) -> QuestionnaireDraftSaveM
             'config': {},
             'options': [
                 {'optionCode': 'O_GOOD', 'optionLabel': '很好', 'score': '3', 'requiresReason': True, 'sortOrder': 1},
-                {'optionCode': 'O_OTHER', 'optionLabel': '一般', 'score': '0', 'requiresReason': False, 'sortOrder': 2},
+                {'optionCode': 'O_OTHER', 'optionLabel': '一般', 'score': '1', 'requiresReason': False, 'sortOrder': 2},
             ],
         },
         {

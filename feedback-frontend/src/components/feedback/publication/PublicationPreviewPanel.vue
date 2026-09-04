@@ -11,7 +11,7 @@ defineProps({
     <div class="section-heading">
       <div>
         <h2>4. 发布检查与任务预览</h2>
-        <p>以下数量和问题均来自最近一次后端保存结果。</p>
+        <p>以下为最近一次保存后的检查结果，修改配置后请重新保存。</p>
       </div>
       <el-tag :type="ready ? 'success' : 'warning'">
         {{ ready ? '可以发布' : `待处理 ${issues.length} 项` }}

@@ -3,7 +3,7 @@ import { computed, nextTick, ref } from 'vue'
 
 import { decimalToNumber, normalizeDecimal } from '@/utils/fixedDecimal'
 
-const props = defineProps({ question: { type: Object, required: true } })
+const props = defineProps({ question: { type: Object, required: true }, disabled: { type: Boolean, default: false } })
 const emit = defineEmits(['change'])
 const formRef = ref()
 const isStar = computed(() => props.question.questionType === 'STAR_RATING')
@@ -38,7 +38,7 @@ defineExpose({ validate })
 </script>
 
 <template>
-  <el-form ref="formRef" :model="question" label-position="top">
+  <el-form ref="formRef" :model="question" :disabled="disabled" label-position="top" class="score-settings">
     <template v-if="isStar">
       <el-form-item label="星级数量">
         <el-input-number
@@ -46,10 +46,10 @@ defineExpose({ validate })
           :min="2"
           :max="10"
           :precision="0"
-          @change="changeStarCount"
+          @update:model-value="changeStarCount"
         />
       </el-form-item>
-      <el-alert title="未点击任何星级时保持未作答，不会把0误记为答案。" type="info" :closable="false" />
+      <p class="setting-hint">可设置 2–10 颗星，每颗星对应 1 分。</p>
     </template>
     <template v-else>
       <div class="range-row">
@@ -58,15 +58,15 @@ defineExpose({ validate })
             :model-value="decimalToNumber(question.minScore)"
             :min="0"
             :precision="question.decimalPlaces"
-            @change="changeQuestion({ minScore: decimalValue($event, 0) })"
+            @update:model-value="changeQuestion({ minScore: decimalValue($event, 0) })"
           />
         </el-form-item>
         <el-form-item label="最高分">
           <el-input-number
             :model-value="decimalToNumber(question.maxScore)"
-            :min="0.0001"
+            :min="10 ** -question.decimalPlaces"
             :precision="question.decimalPlaces"
-            @change="changeQuestion({ maxScore: decimalValue($event, 100) })"
+            @update:model-value="changeQuestion({ maxScore: decimalValue($event, 100) })"
           />
         </el-form-item>
       </div>
@@ -76,25 +76,25 @@ defineExpose({ validate })
           :min="0"
           :max="4"
           :precision="0"
-          @change="changeQuestion({ decimalPlaces: $event ?? 0 })"
+          @update:model-value="changeQuestion({ decimalPlaces: $event ?? 0 })"
         />
       </el-form-item>
       <el-form-item v-if="isSlider" label="滑动步长">
         <el-input-number
           :model-value="decimalToNumber(question.config.step)"
-          :min="0.0001"
+          :min="10 ** -question.decimalPlaces"
           :precision="question.decimalPlaces"
-          @change="changeConfig({ step: decimalValue($event, 1) })"
+          @update:model-value="changeConfig({ step: decimalValue($event, 1) })"
         />
       </el-form-item>
-      <el-form-item label="默认值（留空表示不预填答案）">
+      <el-form-item label="默认值（选填）">
         <el-input-number
           :model-value="question.config.defaultValue == null ? null : decimalToNumber(question.config.defaultValue)"
           :min="decimalToNumber(question.minScore)"
           :max="decimalToNumber(question.maxScore)"
           :precision="question.decimalPlaces"
           clearable
-          @change="changeConfig({ defaultValue: $event == null ? null : decimalValue($event, 0) })"
+          @update:model-value="changeConfig({ defaultValue: $event == null ? null : decimalValue($event, 0) })"
         />
       </el-form-item>
       <el-alert
@@ -108,6 +108,9 @@ defineExpose({ validate })
 </template>
 
 <style scoped>
-.range-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.score-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; max-width: 560px; }
+.range-row { display: contents; }
+.setting-hint { margin: 0; align-self: center; color: #909399; font-size: 12px; }
+.score-settings :deep(.el-alert) { grid-column: 1 / -1; }
 .range-row :deep(.el-input-number), :deep(.el-input-number) { width: 100%; }
 </style>

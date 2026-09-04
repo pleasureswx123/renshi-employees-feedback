@@ -32,7 +32,6 @@ function initialDraft() {
         pageId: 301,
         pageCode: 'P_INITIAL',
         pageTitle: '第1页',
-        pageDescription: '',
         sortOrder: 1,
         questions: []
       }
@@ -45,7 +44,7 @@ function initialDraft() {
   }
 }
 
-test('HR完成P4五题型、多页、指标、保存重载和手机预览', async ({ page }) => {
+test('HR完成P4五题型、多页、指标、保存重载和PC分页实时预览', async ({ page }) => {
   let persistedDraft = initialDraft()
   let saveCount = 0
   let draftReadCount = 0
@@ -149,16 +148,30 @@ test('HR完成P4五题型、多页、指标、保存重载和手机预览', asyn
 
   await expect(page).toHaveURL(/\/hr\/projects\/101\/editor$/)
   await expect(page.getByRole('heading', { name: '问卷与指标设计器' })).toBeVisible()
-  await page.locator('.tiptap').fill('请依据最近半年的实际协作表现作答')
+  await expect(page.getByRole('tab', { name: '题目属性', exact: true })).toHaveAttribute('aria-selected', 'true')
+  const propertiesWidth = (await page.locator('.right-panel').boundingBox()).width
+  await page.getByRole('tab', { name: '实时预览', exact: true }).click()
+  expect((await page.locator('.right-panel').boundingBox()).width).toBeGreaterThan(propertiesWidth)
+  await page.getByRole('tab', { name: '题目属性', exact: true }).click()
+  expect((await page.locator('.right-panel').boundingBox()).width).toBe(propertiesWidth)
+  await page.getByRole('tab', { name: '实时预览', exact: true }).click()
+  await page.locator('.canvas-panel .tiptap').fill('请依据最近半年的实际协作表现作答')
+  const livePreview = page.getByRole('tabpanel', { name: '实时预览', exact: true })
+  await expect(livePreview.getByText('请依据最近半年的实际协作表现作答')).toBeVisible()
 
   for (const label of ['单选题', '星级评分', '数字输入', '滑动评分']) {
     await page.getByRole('button', { name: new RegExp(`^${label}`) }).click()
+    await page.locator('.question-card.active').getByLabel('题目内容').fill(`请评价近期工作表现（${label}）`)
+    await expect(livePreview.getByText(`请评价近期工作表现（${label}）`, { exact: true })).toBeVisible()
+    if (['数字输入', '滑动评分'].includes(label)) {
+      await expect(page.getByRole('spinbutton', { name: '小数位数', exact: true })).toHaveValue('0')
+    }
   }
   await expect(page.locator('.question-card')).toHaveCount(4)
 
   await page.getByRole('button', { name: '增加页面' }).click()
   await page.getByRole('button', { name: /^问答题/ }).click()
-  await page.getByLabel('题目标题').fill('请给出一项最具体的改进建议')
+  await page.getByLabel('题目内容').fill('请给出一项最具体的改进建议')
   await expect(page.locator('.question-card')).toHaveCount(1)
 
   await page.getByRole('tab', { name: '评价指标' }).click()
@@ -178,23 +191,36 @@ test('HR完成P4五题型、多页、指标、保存重载和手机预览', asyn
     'TEXT'
   ])
   expect(persistedDraft.indicators[0].weight).toBe('100.0000')
+  expect(persistedDraft.pages[0].questions[0].options.every(option => Number.isInteger(Number(option.score)))).toBe(true)
 
   await page.reload()
   await expect(page.locator('.outline-page-group')).toHaveCount(2)
+  await expect(page.getByRole('tab', { name: '题目属性', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await page.getByRole('tab', { name: '实时预览', exact: true }).click()
   await expect(page.getByRole('button', { name: /请给出一项最具体的改进建议/ })).toBeVisible()
   expect(draftReadCount).toBeGreaterThanOrEqual(2)
 
-  await page.getByRole('button', { name: '电脑 / 手机预览' }).click()
-  const previewDialog = page.getByRole('dialog', { name: '问卷预览' })
-  await previewDialog.getByText('手机', { exact: true }).click()
-  await expect(previewDialog.getByText('1. 第1页')).toBeVisible()
-  await expect(previewDialog.getByText('2. 第2页')).toBeVisible()
-  const slider = previewDialog.getByRole('slider', { name: '滑动评分' })
+  await expect(page.getByRole('button', { name: '电脑 / 手机预览' })).toHaveCount(0)
+  await expect(livePreview.locator('.live-preview-toolbar')).toContainText('第 1 / 2 页')
+  const previewHeading = livePreview.locator('.preview-document-heading')
+  await expect(previewHeading.getByRole('heading', { level: 2 })).toBeVisible()
+  await expect(previewHeading).toContainText('请依据最近半年的实际协作表现作答')
+  await livePreview.locator('.live-preview-pagination').getByText('2', { exact: true }).click()
+  await expect(livePreview.locator('.live-preview-toolbar')).toContainText('第 2 / 2 页')
+  await expect(page.locator('.question-card')).toHaveCount(1)
+  await expect(previewHeading.getByRole('heading', { level: 2 })).toBeVisible()
+  await expect(previewHeading).toContainText('请依据最近半年的实际协作表现作答')
+  await expect(livePreview.getByText('请给出一项最具体的改进建议', { exact: true })).toBeVisible()
+  await livePreview.getByRole('textbox', { name: '问答内容' }).fill('分页试填保留')
+  await livePreview.locator('.live-preview-pagination').getByText('1', { exact: true }).click()
+  const slider = livePreview.getByRole('slider', { name: '滑动评分' })
   await slider.focus()
   await slider.press('ArrowRight')
-  await expect(previewDialog.getByText(/尚未作答/)).toHaveCount(0)
-  const hasHorizontalOverflow = await previewDialog
-    .locator('.preview-stage')
+  await expect(livePreview.getByText(/尚未作答/)).toHaveCount(0)
+  await livePreview.locator('.live-preview-pagination').getByText('2', { exact: true }).click()
+  await expect(livePreview.getByRole('textbox', { name: '问答内容' })).toHaveValue('分页试填保留')
+  const hasHorizontalOverflow = await livePreview
+    .locator('.preview-document')
     .evaluate(element => element.scrollWidth > element.clientWidth)
   expect(hasHorizontalOverflow).toBe(false)
   expect(saveCount).toBe(1)

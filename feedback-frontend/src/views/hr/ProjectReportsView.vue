@@ -41,7 +41,7 @@ onBeforeUnmount(() => { active = false; store.reset() })
 
 <template>
   <section class="reports-page">
-    <header class="report-header">
+    <header class="report-header workspace-page-header">
       <div><el-button link type="primary" @click="$router.push('/hr/reports')">返回报告列表</el-button><h1 class="page-heading">{{ store.team?.projectName || '评价报告' }}</h1><p class="page-description">综合分按发布时的指标与关系权重计算。自评仅作对照，发布时仅配置自评的人员除外。</p></div>
       <div class="actions">
         <el-button v-if="permissions.hasPermission('feedback:answer:view')" @click="$router.push(`/hr/projects/${route.params.projectId}/answers`)">原始答案</el-button>
@@ -59,7 +59,7 @@ onBeforeUnmount(() => { active = false; store.reset() })
       </el-card>
       <el-card v-else shadow="never">
         <h2>团队排名与明细</h2>
-        <el-form ref="form" :model="filters" inline>
+        <el-form ref="form" :model="filters" inline class="workspace-filter">
           <el-form-item label="被评价人" prop="keyword" :rules="[{ max: 200, message: '最多200字' }]">
             <el-input v-model="filters.keyword" maxlength="200" clearable @keyup.enter="search" />
           </el-form-item>

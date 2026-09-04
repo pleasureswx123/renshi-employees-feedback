@@ -5,6 +5,7 @@ import QuestionRenderer from '@/components/feedback/questions/QuestionRenderer.v
 import { usePermissionStore } from '@/stores/permission'
 import { useProjectReportsStore } from '@/stores/projectReports'
 import { restoreAnswers } from '@/utils/answerSheet'
+import { formatTableDate } from '@/utils/displayFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,13 +49,13 @@ onBeforeUnmount(() => { active = false; store.reset() })
 
 <template>
   <section class="submitted-answers">
-    <header>
+    <header class="workspace-page-header"><div>
       <el-button v-if="route.params.projectId && permissions.hasPermission('feedback:report:view')" link type="primary" @click="$router.push(`/hr/projects/${route.params.projectId}/reports`)">查看项目报告</el-button>
       <h1 class="page-heading">已提交原始答案</h1>
       <p class="page-description">仅显示当前数据范围内的已提交答卷，包含评价人身份。查看记录会留存审计。</p>
-    </header>
+    </div></header>
     <el-card shadow="never">
-      <el-form ref="form" :model="filters" :rules="rules" inline>
+      <el-form ref="form" :model="filters" :rules="rules" inline class="workspace-filter">
         <el-form-item label="项目ID" prop="projectId"><el-input-number v-model="filters.projectId" :min="1" :precision="0" :controls="false" @keyup.enter="search" /></el-form-item>
         <el-form-item label="被评价人" prop="keyword"><el-input v-model="filters.keyword" maxlength="200" clearable @keyup.enter="search" /></el-form-item>
         <el-form-item><el-button type="primary" :loading="opening || store.loading.answers" :disabled="opening || store.loading.answers" @click="search">查询</el-button></el-form-item>
@@ -65,7 +66,7 @@ onBeforeUnmount(() => { active = false; store.reset() })
         <el-table-column prop="targetDeptName" label="被评价人部门" min-width="140" />
         <el-table-column prop="evaluatorName" label="评价人" min-width="130" />
         <el-table-column prop="relationName" label="关系" width="100" />
-        <el-table-column prop="submittedTime" label="提交时间" min-width="180" />
+        <el-table-column prop="submittedTime" label="提交时间" min-width="180" :formatter="formatTableDate" />
         <el-table-column label="操作" width="110"><template #default="{ row }"><el-button link type="primary" @click="showAnswer(row)">查看答案</el-button></template></el-table-column>
       </el-table>
       <el-pagination layout="total, prev, pager, next" :total="store.answers?.total || 0" :current-page="filters.pageNum" :page-size="filters.pageSize" @current-change="pageChanged" />

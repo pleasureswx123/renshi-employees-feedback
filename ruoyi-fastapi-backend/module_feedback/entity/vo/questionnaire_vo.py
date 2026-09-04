@@ -22,7 +22,6 @@ class QuestionnairePageDraftModel(QuestionnaireVoModel):
     page_id: int | None = Field(default=None, description='页面ID')
     page_code: str = Field(min_length=1, max_length=64, pattern=r'^[A-Za-z0-9_-]+$')
     page_title: str = Field(min_length=1, max_length=200, description='页面标题')
-    page_description: str | None = Field(default=None, max_length=5000, description='页面说明')
     sort_order: int = Field(ge=1, description='页面顺序')
     questions: list[QuestionDraftModel] = Field(default_factory=list, max_length=200, description='页面题目')
 
@@ -33,14 +32,6 @@ class QuestionnairePageDraftModel(QuestionnaireVoModel):
         if not normalized:
             raise ValueError('页面标题不能为空')
         return normalized
-
-    @field_validator('page_description')
-    @classmethod
-    def normalize_page_description(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        normalized = value.strip()
-        return normalized or None
 
 
 class QuestionnaireDraftSaveModel(QuestionnaireVoModel):

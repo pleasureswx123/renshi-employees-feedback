@@ -159,9 +159,25 @@ def calculate_question_max_score(question: Any) -> Decimal:
     return question.max_score
 
 
+def get_option_score_validation_issues(draft: Any) -> list[dict[str, str]]:
+    """限制新保存、发布的单选题分值，不改写历史冻结数据。"""
+    return [
+        {
+            'code': 'OPTION_SCORE_POSITIVE_REQUIRED' if option.score < 1 else 'OPTION_SCORE_INTEGER_REQUIRED',
+            'path': f'pages.{page_index}.questions.{question_index}.options.{option_index}.score',
+            'message': f'单选题“{question.title}”的选项“{option.option_label}”分值必须是大于等于1的整数',
+        }
+        for page_index, page in enumerate(draft.pages)
+        for question_index, question in enumerate(page.questions)
+        if question.question_type == 'SINGLE_CHOICE'
+        for option_index, option in enumerate(question.options)
+        if option.score < 1 or option.score != option.score.to_integral_value()
+    ]
+
+
 def get_publish_validation_issues(draft: Any) -> list[dict[str, str]]:
     """返回P4问卷和指标达到发布条件前的稳定问题清单。"""
-    issues: list[dict[str, str]] = []
+    issues: list[dict[str, str]] = get_option_score_validation_issues(draft)
     question_entries = [
         (page_index, question_index, question)
         for page_index, page in enumerate(draft.pages)

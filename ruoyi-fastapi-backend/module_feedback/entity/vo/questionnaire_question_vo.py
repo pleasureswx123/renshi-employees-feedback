@@ -63,7 +63,7 @@ class QuestionOptionDraftModel(QuestionnaireVoModel):
     option_id: int | None = Field(default=None, description='选项ID')
     option_code: str = Field(min_length=1, max_length=64, pattern=r'^[A-Za-z0-9_-]+$')
     option_label: str = Field(min_length=1, max_length=500, description='选项文本')
-    score: Decimal = Field(default=Decimal('0'), ge=0, max_digits=12, decimal_places=4, description='选项分值')
+    score: Decimal = Field(default=Decimal('1'), ge=0, max_digits=12, decimal_places=4, description='选项分值，默认1分')
     requires_reason: bool = Field(default=False, description='选择后是否必须填写原因')
     sort_order: int = Field(ge=1, description='选项顺序')
 

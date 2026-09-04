@@ -1,6 +1,7 @@
 <script setup>
 import { usePermissionStore } from '@/stores/permission'
 import { TASK_STATUS_LABELS } from '@/utils/answerSheet'
+import { formatDateTime } from '@/utils/displayFormat'
 
 defineProps({ task: { type: Object, required: true }, showProject: Boolean })
 defineEmits(['open'])
@@ -14,8 +15,8 @@ const permission = usePermissionStore()
         <p v-if="showProject" class="task-project">{{ task.projectName }}</p>
         <h3>{{ task.targetName }}</h3>
         <p>{{ task.targetDeptName || '未配置部门' }} · {{ task.relationName }}评价</p>
-        <small v-if="task.submittedTime">提交时间：{{ task.submittedTime.replace('T', ' ') }}</small>
-        <small v-else-if="task.savedTime">最近暂存：{{ task.savedTime.replace('T', ' ') }}</small>
+        <small v-if="task.submittedTime">提交时间：{{ formatDateTime(task.submittedTime) }}</small>
+        <small v-else-if="task.savedTime">最近暂存：{{ formatDateTime(task.savedTime) }}</small>
       </div>
       <div class="task-card-actions">
         <el-tag :type="task.status === 'SUBMITTED' ? 'success' : task.status === 'CLOSED_INCOMPLETE' ? 'info' : 'warning'">
@@ -37,12 +38,12 @@ const permission = usePermissionStore()
 </template>
 
 <style scoped>
-.task-card-content { display: flex; justify-content: space-between; gap: 20px; align-items: center; }
+.task-card-content { display: grid; gap: 18px; }
 .task-identity { min-width: 0; overflow-wrap: anywhere; }
-.task-identity h3 { margin: 0 0 8px; }
+.task-identity h3 { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
 .task-identity p, .task-identity small { color: #64748b; line-height: 1.6; }
 .task-project { margin-top: 0; }
-.task-card-actions { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+.task-card-actions { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid #edf0f5; }
 @media (max-width: 600px) {
   .task-card-content { align-items: stretch; flex-direction: column; }
   .task-card-actions { justify-content: space-between; }

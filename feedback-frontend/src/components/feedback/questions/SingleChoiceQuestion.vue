@@ -4,6 +4,7 @@ import { computed } from 'vue'
 const props = defineProps({
   question: { type: Object, required: true },
   mode: { type: String, default: 'preview' },
+  showHeading: { type: Boolean, default: true },
   modelValue: { type: Object, default: () => ({ optionCode: '', reason: '' }) }
 })
 
@@ -23,12 +24,12 @@ function changeReason(reason) {
 </script>
 
 <template>
-  <section class="single-choice-question">
-    <div class="question-heading">
+  <section class="single-choice-question" :class="{ 'is-preview': mode === 'preview' }">
+    <div v-if="showHeading" class="question-heading">
       <span v-if="question.isRequired" class="required-mark" aria-label="必答">*</span>
       <strong>{{ question.title }}</strong>
     </div>
-    <p v-if="question.description" class="question-description">{{ question.description }}</p>
+    <p v-if="showHeading && question.description" class="question-description">{{ question.description }}</p>
     <el-radio-group
       :model-value="modelValue?.optionCode"
       :disabled="mode === 'editor' || mode === 'readonly'"
@@ -39,7 +40,7 @@ function changeReason(reason) {
         v-for="option in question.options"
         :key="option.optionCode"
         :value="option.optionCode"
-        border
+        :border="mode !== 'preview'"
       >
         <span>{{ option.optionLabel }}</span>
         <small v-if="mode === 'editor'" class="score-hint">{{ Number(option.score) }}分</small>
@@ -97,6 +98,10 @@ function changeReason(reason) {
 }
 
 .option-list :deep(.el-radio__label) { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+
+.is-preview .option-list { gap: 2px; }
+.is-preview .option-list :deep(.el-radio) { min-height: 32px; padding: 4px 0; box-sizing: border-box; }
+.is-preview .option-list :deep(.el-radio__label) { line-height: 1.6; }
 
 .score-hint {
   margin-left: 8px;

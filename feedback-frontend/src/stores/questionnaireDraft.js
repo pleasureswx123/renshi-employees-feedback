@@ -23,7 +23,7 @@ function duplicateQuestion(question) {
   const duplicated = definition.clone(question)
   duplicated.questionId = null
   duplicated.questionCode = createStableCode('Q')
-  duplicated.title = `${question.title.slice(0, 1996)}（副本）`
+  duplicated.title = question.title.trim() ? `${question.title.slice(0, 1996)}（副本）` : ''
   duplicated.options = duplicated.options.map(option => ({
     ...option,
     optionId: null,
@@ -98,7 +98,6 @@ export const useQuestionnaireDraftStore = defineStore('questionnaireDraft', {
         pageId: null,
         pageCode: createStableCode('P'),
         pageTitle: `第${this.draft.pages.length + 1}页`,
-        pageDescription: '',
         sortOrder: this.draft.pages.length + 1,
         questions: []
       }

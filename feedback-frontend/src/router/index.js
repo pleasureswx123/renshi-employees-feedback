@@ -47,7 +47,7 @@ const routes = [
         name: 'hr-progress-entry',
         component: () => import('@/views/hr/ProjectProgressEntryView.vue'),
         meta: {
-          title: '回收进度入口',
+          title: '回收进度',
           workspace: 'hr',
           permissions: ['feedback:progress:view']
         }
@@ -64,6 +64,7 @@ const routes = [
         component: () => import('@/views/hr/QuestionnaireEditorView.vue'),
         meta: {
           title: '问卷编辑器',
+          activeMenu: '/hr/projects',
           workspace: 'hr',
           permissions: ['feedback:questionnaire:edit']
         }
@@ -74,6 +75,7 @@ const routes = [
         component: () => import('@/views/hr/PublicationConfigView.vue'),
         meta: {
           title: '人员关系与发布',
+          activeMenu: '/hr/projects',
           workspace: 'hr',
           permissions: ['feedback:participant:manage', 'feedback:project:publish']
         }
@@ -112,20 +114,20 @@ const routes = [
         path: 'todos/:projectId',
         name: 'employee-project',
         component: () => import('@/views/employee/EmployeeProjectView.vue'),
-        meta: { title: '评价任务', workspace: 'employee', permissions: ['feedback:task:view'] }
+        meta: { title: '评价任务', workspace: 'employee', permissions: ['feedback:task:view'], activeMenu: '/employee/todos' }
       },
       {
         path: 'tasks/:assignmentId',
         name: 'employee-answer',
         component: () => import('@/views/employee/AnswerSheetView.vue'),
-        meta: { title: '填写评价', workspace: 'employee', permissions: ['feedback:task:view'] }
+        meta: { title: '填写评价', workspace: 'employee', permissions: ['feedback:task:view'], activeMenu: '/employee/todos' }
       },
       {
         path: 'reviews/:assignmentId',
         name: 'employee-answer-history',
         component: () => import('@/views/employee/AnswerSheetView.vue'),
         props: { history: true },
-        meta: { title: '已提交答案', workspace: 'employee', permissions: ['feedback:history:view'] }
+        meta: { title: '已提交答案', workspace: 'employee', permissions: ['feedback:history:view'], activeMenu: '/employee/reviews' }
       }
     ]
   },
