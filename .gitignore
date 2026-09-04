@@ -155,8 +155,10 @@ cython_debug/
 
 # P6本地验收产物与临时凭据，不进入版本库
 /.playwright-cli/
-/output/playwright/
 /ruoyi-fastapi-backend/.tmp/
+
+# 本地截图、验证日志及图片生成中间产物；正式资源保存在各前端工程内
+/output/
 
 # P9备份、执行计划与测试回执，仅保留脱敏后的文档证据
 /.tmp/
