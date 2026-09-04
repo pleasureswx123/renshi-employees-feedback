@@ -10,7 +10,7 @@ from common.vo import PageModel
 from exceptions.exception import ConflictException, ServiceException
 from module_admin.entity.do.dept_do import SysDept
 from module_admin.entity.do.user_do import SysUser
-from module_feedback.constants import FIXED_RELATION_CODES, SELF_RELATION_CODE
+from module_feedback.constants import BUILTIN_ADMIN_USER_ID, FIXED_RELATION_CODES, SELF_RELATION_CODE
 from module_feedback.dao import FeedbackProjectDao, FeedbackPublicationDao
 from module_feedback.entity.do import (
     FbAssignment,
@@ -51,10 +51,24 @@ class FeedbackPublicationService:
             return False
         user, dept = row
         return bool(
-            user.del_flag == '0'
+            user.user_id != BUILTIN_ADMIN_USER_ID
+            and user.del_flag == '0'
             and user.status == '0'
             and (user.dept_id is None or (dept is not None and dept.del_flag == '0' and dept.status == '0'))
         )
+
+    @staticmethod
+    def _system_account_issues(target_ids: set[int], evaluator_ids: set[int]) -> list[dict[str, str]]:
+        """只限制参评身份，保留内置账号作为项目管理者和历史审计操作人的能力。"""
+        if BUILTIN_ADMIN_USER_ID not in target_ids | evaluator_ids:
+            return []
+        return [
+            {
+                'code': 'SYSTEM_ACCOUNT_NOT_ALLOWED',
+                'path': 'targets' if BUILTIN_ADMIN_USER_ID in target_ids else 'evaluatorSelections',
+                'message': '系统维护账号不能参与评价，请移除后继续',
+            }
+        ]
 
     @classmethod
     def _participant_option(
@@ -187,7 +201,8 @@ class FeedbackPublicationService:
         configured_user_ids = {item.target_user_id for item in targets} | {
             item.evaluator_user_id for item in selections
         }
-        display_rows = await FeedbackPublicationDao.get_participant_display_rows(query_db, configured_user_ids)
+        display_user_ids = configured_user_ids | ({int(project.published_by)} if project.published_by else set())
+        display_rows = await FeedbackPublicationDao.get_participant_display_rows(query_db, display_user_ids)
         snapshot_by_user_id: dict[int, tuple[str, int | None, str | None]] = {
             int(target.target_user_id): (
                 target.target_user_name,
@@ -239,6 +254,12 @@ class FeedbackPublicationService:
 
         questionnaire = cls._questionnaire_model(version)
         issue_payloads = get_publication_validation_issues(questionnaire, targets, relations, selections)
+        if project.status == ProjectStatus.PREPARING.value:
+            issue_payloads.extend(
+                cls._system_account_issues(
+                    {item.target_user_id for item in targets}, {item.evaluator_user_id for item in selections}
+                )
+            )
         return PublicationConfigModel(
             projectId=project.project_id,
             projectName=project.project_name,
@@ -269,6 +290,21 @@ class FeedbackPublicationService:
             preview=cls._preview(targets, relations, selections),
             isPublishReady=not issue_payloads,
             validationIssues=[ValidationIssueModel.model_validate(item) for item in issue_payloads],
+            frozenDetails=(
+                {
+                    'publishedBy': project.published_by,
+                    'publishedByName': (
+                        display_rows[int(project.published_by)][0].user_name
+                        if int(project.published_by) in display_rows
+                        else f'用户{project.published_by}'
+                    ),
+                    'publishedTime': project.published_time,
+                    'versionNo': version.version_no,
+                    'questionnaire': questionnaire,
+                }
+                if project.status != ProjectStatus.PREPARING.value
+                else None
+            ),
         )
 
     @classmethod
@@ -357,6 +393,18 @@ class FeedbackPublicationService:
             participant_ids = {item.target_user_id for item in page_object.targets} | {
                 evaluator_user_id for _, _, evaluator_user_id in selection_specs
             }
+            system_account_issues = cls._system_account_issues(
+                {item.target_user_id for item in page_object.targets},
+                {evaluator_user_id for _, _, evaluator_user_id in selection_specs},
+            )
+            if system_account_issues:
+                raise ConflictException(
+                    message=system_account_issues[0]['message'],
+                    data={
+                        'unavailableUserIds': [BUILTIN_ADMIN_USER_ID],
+                        'validationIssues': system_account_issues,
+                    },
+                )
             participants = await FeedbackPublicationDao.get_available_participants(
                 query_db,
                 participant_ids,
@@ -538,6 +586,14 @@ class FeedbackPublicationService:
             raise ConflictException(message='准备阶段项目已经存在正式任务，拒绝继续发布')
 
         participant_ids = {item.target_user_id for item in targets} | {item.evaluator_user_id for item in selections}
+        system_account_issues = cls._system_account_issues(
+            {item.target_user_id for item in targets}, {item.evaluator_user_id for item in selections}
+        )
+        if system_account_issues:
+            raise ConflictException(
+                message=system_account_issues[0]['message'],
+                data={'validationIssues': system_account_issues},
+            )
         participants = await FeedbackPublicationDao.get_available_participants(
             query_db,
             participant_ids,

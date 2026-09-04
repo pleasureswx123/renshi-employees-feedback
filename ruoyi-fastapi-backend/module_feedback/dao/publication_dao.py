@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from module_admin.entity.do.dept_do import SysDept
 from module_admin.entity.do.user_do import SysUser
+from module_feedback.constants import BUILTIN_ADMIN_USER_ID
 from module_feedback.entity.do import (
     FbAssignment,
     FbEvaluatorSelection,
@@ -28,6 +29,7 @@ class FeedbackPublicationDao:
     @staticmethod
     def _active_participant_filters(user_scope_sql: ColumnElement | None = None) -> list[ColumnElement]:
         filters: list[ColumnElement] = [
+            SysUser.user_id != BUILTIN_ADMIN_USER_ID,
             SysUser.del_flag == '0',
             SysUser.status == '0',
             or_(
@@ -82,6 +84,7 @@ class FeedbackPublicationDao:
             select(SysUser)
             .where(
                 SysUser.user_id.in_(sorted(user_ids)),
+                SysUser.user_id != BUILTIN_ADMIN_USER_ID,
                 SysUser.del_flag == '0',
                 SysUser.status == '0',
                 user_scope_sql,

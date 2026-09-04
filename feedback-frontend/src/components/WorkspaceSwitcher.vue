@@ -28,6 +28,19 @@ const emit = defineEmits(['switch'])
   display: flex;
   flex-shrink: 0;
 }
-.workspace-switcher :deep(.el-button) { min-height: 28px; font-size: 12px; }
-.workspace-switcher :deep(.el-button.is-disabled) { color: #337ecc; background: #ecf5ff; border-color: #a0cfff; }
+.workspace-switcher :deep(.el-button) {
+  --el-button-text-color: #d6e1ef;
+  --el-button-bg-color: transparent;
+  --el-button-border-color: #536276;
+  --el-button-hover-text-color: #fff;
+  --el-button-hover-bg-color: #34455e;
+  --el-button-hover-border-color: #7790af;
+  --el-button-active-text-color: #fff;
+  --el-button-active-bg-color: #3c506b;
+  --el-button-active-border-color: #93c5fd;
+  min-height: 28px;
+  font-size: 12px;
+}
+.workspace-switcher :deep(.el-button.is-disabled) { color: #fff; background: #2563eb; border-color: #2563eb; }
+.workspace-switcher :deep(.el-button:focus-visible) { outline: 2px solid #93c5fd; outline-offset: 2px; }
 </style>

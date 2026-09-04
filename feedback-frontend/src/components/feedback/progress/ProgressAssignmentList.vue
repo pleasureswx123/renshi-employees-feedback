@@ -73,13 +73,13 @@ function displayTime(row) {
 <style scoped>
 .desktop-table strong,
 .desktop-table small { display: block; }
-.desktop-table small { margin-top: 4px; color: #64748b; }
+.desktop-table small { margin-top: 4px; color: var(--fb-text-muted, #64748b); }
 .mobile-cards { display: none; }
-.assignment-card { min-width: 0; padding: 16px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
+.assignment-card { min-width: 0; padding: 16px; border: 1px solid var(--fb-border, #e2e8f0); border-radius: 10px; background: var(--fb-surface, #fff); }
 .assignment-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 dl { display: grid; gap: 8px; margin: 14px 0 0; }
 dl div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; }
-dt { color: #64748b; }
+dt { color: var(--fb-text-muted, #64748b); }
 dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 @media (max-width: 760px) {
   .desktop-table { display: none; }

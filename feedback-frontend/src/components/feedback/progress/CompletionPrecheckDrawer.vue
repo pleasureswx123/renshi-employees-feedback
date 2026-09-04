@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -10,6 +10,8 @@ const emit = defineEmits(['update:modelValue', 'submit'])
 
 const formRef = ref()
 const form = reactive({ completionReason: '', confirmed: false })
+const remainingCount = computed(() => (props.precheck?.summary?.pendingCount || 0) + (props.precheck?.summary?.draftCount || 0))
+const earlyCompletion = computed(() => props.precheck?.projectStatus === 'ACTIVE' && remainingCount.value > 0)
 
 function validateReason(_rule, value, callback) {
   const normalized = String(value || '').trim()
@@ -51,7 +53,7 @@ async function submit() {
 <template>
   <el-drawer
     :model-value="modelValue"
-    title="完成项目实时预检"
+    :title="earlyCompletion ? '提前结束项目确认' : '完成项目实时预检'"
     direction="rtl"
     size="75%"
     class="completion-drawer"
@@ -76,6 +78,15 @@ async function submit() {
         type="success"
         :closable="false"
         show-icon
+      />
+      <el-alert
+        v-else-if="earlyCompletion"
+        :title="`还有 ${remainingCount} 份评价未提交`"
+        :description="`确认后，剩余 ${remainingCount} 份任务将关闭，员工不能继续填写；报告仅使用 ${precheck.summary.submittedCount} 份已提交答卷。项目结束后不能重新打开。`"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="early-completion-warning"
       />
       <dl v-if="precheck.projectStatus === 'COMPLETED'" class="completion-audit">
         <div>
@@ -136,14 +147,15 @@ async function submit() {
             v-model="form.completionReason"
             type="textarea"
             :rows="4"
-            placeholder="填写本次结束项目的真实业务原因"
+            :placeholder="earlyCompletion ? '说明评价尚未全部提交时，提前结束本轮项目的原因' : '填写本次结束项目的真实业务原因'"
             :disabled="completing"
           />
         </el-form-item>
         <p class="unicode-count">{{ Array.from(form.completionReason.trim()).length }}/500 个字符</p>
         <el-form-item>
           <el-checkbox v-model="form.confirmed" :disabled="completing">
-            我已阅读最新预检，确认完成不可撤销，未提交任务将关闭且不能继续作答
+            <template v-if="earlyCompletion">我已知晓提前结束不可撤销，剩余 {{ remainingCount }} 份未提交任务将关闭且不能继续作答</template>
+            <template v-else>我已阅读最新预检，确认完成不可撤销，项目不能重新打开</template>
           </el-checkbox>
         </el-form-item>
       </el-form>
@@ -158,7 +170,7 @@ async function submit() {
         :disabled="completing || !form.confirmed"
         @click="submit"
       >
-        确认完成项目
+        {{ earlyCompletion ? '确认提前结束' : '确认完成项目' }}
       </el-button>
     </template>
   </el-drawer>
@@ -166,32 +178,33 @@ async function submit() {
 
 <style scoped>
 .precheck-section { min-width: 0; max-width: 100%; margin-bottom: 24px; }
-.precheck-section h3 { margin: 0 0 12px; color: #0f172a; }
+.early-completion-warning { margin-bottom: 20px; }
+.precheck-section h3 { margin: 0 0 12px; color: var(--fb-text-primary, #0f172a); }
 .snapshot-time,
-.unicode-count { margin: 0 0 12px; color: #64748b; font-size: 13px; }
+.unicode-count { margin: 0 0 12px; color: var(--fb-text-muted, #64748b); font-size: 13px; }
 .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .summary-grid span,
-.missing-list article { padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
-.summary-grid strong { display: block; margin-top: 5px; color: #0f172a; font-size: 20px; }
+.missing-list article { padding: 12px; border: 1px solid var(--fb-border, #e2e8f0); border-radius: 8px; background: var(--fb-surface-muted, #f8fafc); }
+.summary-grid strong { display: block; margin-top: 5px; color: var(--fb-text-primary, #0f172a); font-size: 20px; }
 .missing-list { display: grid; gap: 8px; }
 .missing-list article { display: flex; justify-content: space-between; gap: 12px; }
-.missing-list span { color: #64748b; }
-.impact-list { max-width: 100%; margin: 0; padding-left: 20px; color: #475569; line-height: 1.8; overflow-wrap: anywhere; }
+.missing-list span { color: var(--fb-text-muted, #64748b); }
+.impact-list { max-width: 100%; margin: 0; padding-left: 20px; color: var(--fb-text-regular, #475569); line-height: 1.8; overflow-wrap: anywhere; }
 .completion-audit { display: grid; gap: 10px; margin: 16px 0 24px; }
 .completion-audit div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; }
-.completion-audit dt { color: #64748b; }
-.completion-audit dd { min-width: 0; margin: 0; color: #0f172a; overflow-wrap: anywhere; }
-.completion-form { min-width: 0; max-width: 100%; padding-top: 20px; border-top: 1px solid #e2e8f0; }
-.completion-form :deep(.el-form-item__content) { min-width: 0; max-width: 100%; }
-.completion-form :deep(.el-checkbox) {
+.completion-audit dt { color: var(--fb-text-muted, #64748b); }
+.completion-audit dd { min-width: 0; margin: 0; color: var(--fb-text-primary, #0f172a); overflow-wrap: anywhere; }
+.completion-form { min-width: 0; max-width: 100%; padding-top: 20px; border-top: 1px solid var(--fb-border, #e2e8f0); }
+.completion-form:deep(.el-form-item__content) { min-width: 0; max-width: 100%; }
+.completion-form:deep(.el-checkbox) {
   align-items: flex-start;
   width: 100%;
   max-width: 100%;
   height: auto;
   white-space: normal;
 }
-.completion-form :deep(.el-checkbox__input) { margin-top: 3px; }
-.completion-form :deep(.el-checkbox__label) {
+.completion-form:deep(.el-checkbox__input) { margin-top: 3px; }
+.completion-form:deep(.el-checkbox__label) {
   min-width: 0;
   max-width: calc(100% - 22px);
   line-height: 1.55;

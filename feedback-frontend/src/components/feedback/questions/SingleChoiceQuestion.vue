@@ -24,7 +24,7 @@ function changeReason(reason) {
 </script>
 
 <template>
-  <section class="single-choice-question" :class="{ 'is-preview': mode === 'preview' }">
+  <section class="single-choice-question" :class="{ 'is-preview': mode !== 'editor' }">
     <div v-if="showHeading" class="question-heading">
       <span v-if="question.isRequired" class="required-mark" aria-label="必答">*</span>
       <strong>{{ question.title }}</strong>
@@ -40,7 +40,7 @@ function changeReason(reason) {
         v-for="option in question.options"
         :key="option.optionCode"
         :value="option.optionCode"
-        :border="mode !== 'preview'"
+        :border="mode === 'editor'"
       >
         <span>{{ option.optionLabel }}</span>
         <small v-if="mode === 'editor'" class="score-hint">{{ Number(option.score) }}分</small>
@@ -69,7 +69,7 @@ function changeReason(reason) {
 }
 
 .question-heading {
-  color: #111827;
+  color: var(--fb-text-primary, #111827);
   line-height: 1.6;
 }
 
@@ -80,7 +80,7 @@ function changeReason(reason) {
 
 .question-description {
   margin: 0;
-  color: #64748b;
+  color: var(--fb-text-muted, #64748b);
   line-height: 1.6;
 }
 
@@ -89,7 +89,7 @@ function changeReason(reason) {
   gap: 10px;
 }
 
-.option-list :deep(.el-radio) {
+.option-list:deep(.el-radio) {
   width: 100%;
   height: auto;
   min-height: 42px;
@@ -97,14 +97,14 @@ function changeReason(reason) {
   white-space: normal;
 }
 
-.option-list :deep(.el-radio__label) { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+.option-list:deep(.el-radio__label) { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 
 .is-preview .option-list { gap: 2px; }
-.is-preview .option-list :deep(.el-radio) { min-height: 32px; padding: 4px 0; box-sizing: border-box; }
-.is-preview .option-list :deep(.el-radio__label) { line-height: 1.6; }
+.is-preview .option-list:deep(.el-radio) { min-height: 32px; padding: 4px 0; box-sizing: border-box; }
+.is-preview .option-list:deep(.el-radio__label) { line-height: 1.6; }
 
 .score-hint {
   margin-left: 8px;
-  color: #909399;
+  color: var(--fb-text-muted, #909399);
 }
 </style>

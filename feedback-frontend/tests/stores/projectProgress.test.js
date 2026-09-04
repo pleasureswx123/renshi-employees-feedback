@@ -72,7 +72,7 @@ function deferred() {
   return { promise, resolve, reject }
 }
 
-describe('项目回收进度Store', () => {
+describe('项目评价进度Store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     Object.values(api).forEach(fn => fn.mockReset())

@@ -3,11 +3,11 @@
     <transition name="sidebarLogoFade">
       <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/" :title="title" :aria-label="title">
         <img v-if="logo" :src="logo" alt="" class="sidebar-logo" />
-        <h1 v-else class="sidebar-title">{{ title }}</h1>
+        <h1 v-else class="sidebar-title">{{ brand.name }}</h1>
       </router-link>
       <router-link v-else key="expand" class="sidebar-logo-link" to="/" :title="title" :aria-label="title">
         <img v-if="logo" :src="logo" alt="" class="sidebar-logo" />
-        <h1 class="sidebar-title">{{ title }}</h1>
+        <div class="sidebar-brand-copy"><h1 class="sidebar-title">{{ brand.name }}</h1><small>{{ brand.edition }}</small></div>
       </router-link>
     </transition>
   </div>
@@ -16,6 +16,7 @@
 <script setup>
 import useSettingsStore from '@/store/modules/settings'
 import variables from '@/assets/styles/variables.module.scss'
+import { brand } from '@/config/brand'
 
 defineProps({
   collapse: {
@@ -24,8 +25,8 @@ defineProps({
   }
 })
 
-const title = import.meta.env.VITE_APP_TITLE;
-const logo = `${import.meta.env.BASE_URL}favicon.svg`;
+const title = brand.title;
+const logo = brand.logo;
 const settingsStore = useSettingsStore();
 const sideTheme = computed(() => settingsStore.sideTheme);
 
@@ -75,10 +76,10 @@ const getLogoTextColor = computed(() => {
     width: 100%;
 
     & .sidebar-logo {
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       vertical-align: middle;
-      margin-right: 12px;
+      margin-right: 10px;
     }
 
     & .sidebar-title {
@@ -87,11 +88,15 @@ const getLogoTextColor = computed(() => {
       color: v-bind(getLogoTextColor);
       font-weight: 600;
       line-height: 50px;
-      font-size: 14px;
+      font-size: 20px;
+      letter-spacing: 2px;
       font-family: Avenir, Helvetica Neue, Arial, Helvetica, sans-serif;
       vertical-align: middle;
     }
   }
+
+  .sidebar-brand-copy { display: inline-flex; align-items: baseline; gap: 10px; vertical-align: middle; }
+  .sidebar-brand-copy small { color: v-bind(getLogoTextColor); opacity: .65; font-size: 11px; font-weight: 400; }
 
   &.collapse {
     .sidebar-logo {

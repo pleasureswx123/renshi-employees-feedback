@@ -142,23 +142,23 @@ onBeforeUnmount(() => editor.value?.destroy())
 </template>
 
 <style scoped>
-.rich-text { width: 100%; min-width: 0; overflow: hidden; border: 1px solid #dcdfe6; border-radius: 6px; background: #fff; }
+.rich-text { width: 100%; min-width: 0; overflow: hidden; border: 1px solid var(--fb-border-strong, #dcdfe6); border-radius: 6px; background: var(--fb-surface, #fff); }
 .rich-text.is-readonly { border: 0; background: transparent; }
-.rich-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid #e5e7eb; background: #f8fafc; }
+.rich-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--fb-border, #e5e7eb); background: var(--fb-surface-muted, #f8fafc); }
 .rich-tool-group { display: flex; flex-shrink: 0; align-items: center; gap: 2px; }
-.rich-tool-group + .rich-tool-group { padding-left: 6px; border-left: 1px solid #dfe5ee; }
+.rich-tool-group + .rich-tool-group { padding-left: 6px; border-left: 1px solid var(--fb-border, #dfe5ee); }
 .rich-toolbar .rich-tool-button { width: 32px; height: 32px; margin: 0; padding: 0; border-radius: 4px; }
-.rich-tool-button[aria-pressed="true"] { color: #409eff; background: #ecf5ff; }
+.rich-tool-button[aria-pressed="true"] { color: #409eff; background: var(--fb-primary-bg, #ecf5ff); }
 .rich-tool-button:focus-visible { outline: 2px solid #409eff; outline-offset: 1px; }
 /* 中文字体通常没有独立斜体字形，富文本需允许浏览器合成，覆盖全局禁用设置。 */
-.rich-text :deep(.tiptap) { min-height: 120px; padding: 14px; outline: none; line-height: 1.7; font-synthesis: weight style; }
-.rich-text.is-readonly :deep(.tiptap) { min-height: 0; padding: 0; }
-.rich-text :deep(.tiptap em) { font-style: italic; }
-.rich-text :deep(.tiptap blockquote) { margin: 12px 0; padding: 10px 14px; border-left: 3px solid #a4c7fb; border-radius: 0 4px 4px 0; color: #596579; background: #f5f8fd; }
-.rich-text :deep(.tiptap blockquote:first-child) { margin-top: 0; }
-.rich-text :deep(.tiptap blockquote:last-child) { margin-bottom: 0; }
-.rich-text :deep(.tiptap p:first-child),
+.rich-text:deep(.tiptap) { min-height: 120px; padding: 14px; outline: none; line-height: 1.7; font-synthesis: weight style; }
+.rich-text.is-readonly:deep(.tiptap) { min-height: 0; padding: 0; }
+.rich-text:deep(.tiptap em) { font-style: italic; }
+.rich-text:deep(.tiptap blockquote) { margin: 12px 0; padding: 10px 14px; border-left: 3px solid var(--fb-primary-border, #a4c7fb); border-radius: 0 4px 4px 0; color: var(--fb-text-regular, #596579); background: var(--fb-primary-bg, #f5f8fd); }
+.rich-text:deep(.tiptap blockquote:first-child) { margin-top: 0; }
+.rich-text:deep(.tiptap blockquote:last-child) { margin-bottom: 0; }
+.rich-text:deep(.tiptap p:first-child),
 .rich-text :deep(.tiptap h2:first-child),
 .rich-text :deep(.tiptap h3:first-child) { margin-top: 0; }
-.rich-text :deep(.tiptap p:last-child) { margin-bottom: 0; }
+.rich-text:deep(.tiptap p:last-child) { margin-bottom: 0; }
 </style>

@@ -7,12 +7,10 @@ const props = defineProps({
   question: { type: Object, required: true },
   pages: { type: Array, required: true },
   currentPageCode: { type: String, required: true },
-  indicators: { type: Array, default: () => [] },
   disabled: { type: Boolean, default: false }
 })
-const emit = defineEmits(['change', 'move-to-page', 'set-indicator'])
+const emit = defineEmits(['change', 'move-to-page'])
 const definition = computed(() => getQuestionTypeDefinition(props.question.questionType))
-const indicatorCode = computed(() => props.indicators.find(item => item.questionCodes.includes(props.question.questionCode))?.indicatorCode || '')
 
 function changeQuestion(patch) {
   if (!props.disabled) emit('change', { ...props.question, ...patch })
@@ -26,12 +24,12 @@ function changeQuestion(patch) {
       <strong :title="question.title">{{ question.title.trim() || '待填写题目内容' }}</strong>
     </div>
 
-    <el-form :model="question" :disabled="disabled" label-position="top">
+    <el-form :model="question" :disabled="disabled" label-position="top" size="small">
       <div class="switch-row">
-        <el-form-item label="必答">
+        <el-form-item label="必答" label-position="left">
           <el-switch :model-value="question.isRequired" @change="changeQuestion({ isRequired: $event })" />
         </el-form-item>
-        <el-form-item label="参与计分">
+        <el-form-item label="参与计分" label-position="left">
           <el-switch
             :model-value="question.isScored"
             :disabled="question.questionType === 'TEXT'"
@@ -39,18 +37,6 @@ function changeQuestion(patch) {
           />
         </el-form-item>
       </div>
-      <el-form-item v-if="question.isScored && question.questionType !== 'TEXT'" label="评价指标">
-        <el-select
-          :model-value="indicatorCode"
-          clearable
-          placeholder="选择所属指标"
-          aria-label="题目评价指标"
-          @change="emit('set-indicator', question.questionCode, $event || '')"
-        >
-          <el-option v-for="indicator in indicators" :key="indicator.indicatorCode" :label="indicator.indicatorName" :value="indicator.indicatorCode" />
-        </el-select>
-        <small v-if="!indicators.length" class="field-hint">先在“评价指标”中添加指标。</small>
-      </el-form-item>
       <el-form-item label="所在页面">
         <el-select
           :model-value="currentPageCode"
@@ -67,18 +53,19 @@ function changeQuestion(patch) {
       </el-form-item>
     </el-form>
 
-    <p class="editing-hint">在画布中直接修改题目内容和题型参数。</p>
   </div>
 </template>
 
 <style scoped>
-.properties-panel { display: grid; gap: 16px; }
-.panel-heading, .switch-row { display: flex; align-items: center; gap: 10px; }
-.switch-row { justify-content: space-between; }
-.panel-heading strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-.panel-heading :deep(.el-tag) { flex: none; }
-.editing-hint { margin: 0; color: #909399; font-size: 12px; line-height: 1.6; }
-.field-hint { color: #909399; line-height: 1.6; margin-top: 5px; }
-.switch-row :deep(.el-form-item) { margin-bottom: 16px; }
+.properties-panel { display: grid; gap: 14px; }
+.panel-heading { display: flex; align-items: flex-start; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--fb-border, #ebeef5); }
+.switch-row { display: grid; gap: 2px; padding: 4px 10px; margin-bottom: 14px; background: var(--fb-surface-muted, #f6f8fa); border-radius: 6px; }
+.panel-heading strong { min-width: 0; overflow-wrap: anywhere; font-size: 14px; line-height: 1.6; }
+.panel-heading:deep(.el-tag) { flex: none; }
+.properties-panel:deep(.el-form-item) { margin-bottom: 14px; }
+.properties-panel:deep(.el-form-item:last-child) { margin-bottom: 0; }
+.switch-row:deep(.el-form-item) { align-items: center; margin-bottom: 0; }
+.switch-row:deep(.el-form-item__label) { height: auto; margin: 0; padding: 0; line-height: 32px; }
+.switch-row:deep(.el-form-item__content) { justify-content: flex-end; }
 :deep(.el-select) { width: 100%; }
 </style>

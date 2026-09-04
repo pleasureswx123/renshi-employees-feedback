@@ -67,6 +67,27 @@ describe('P5发布配置Store', () => {
     savePublicationConfig.mockReset()
   })
 
+  it('冻结读取不查询候选，迟到的当前资料也不能覆盖历史姓名和部门', async () => {
+    const original = { userId: 11, nickName: '发布时李四', deptName: '发布时部门' }
+    getPublicationConfig.mockResolvedValueOnce({ data: configFixture() }).mockResolvedValueOnce({
+      data: configFixture({ editable: false, projectStatus: 'ACTIVE', configuredParticipants: [original] })
+    })
+    let resolveCandidates
+    listParticipantOptions.mockReturnValue(new Promise(resolve => { resolveCandidates = resolve }))
+    const store = usePublicationConfigStore()
+    await store.load(7)
+    const pending = store.loadCandidates()
+    await store.load(7)
+    resolveCandidates({ rows: [{ ...original, nickName: '当前李四', deptName: '当前部门' }], total: 1 })
+    await pending
+    await store.loadCandidates()
+    expect(listParticipantOptions).toHaveBeenCalledTimes(1)
+    expect(store.candidateRows).toEqual([])
+    expect(store.participantDirectory.get(11)).toEqual(original)
+    expect(store.config.configuredParticipants).toEqual([original])
+    expect(store.dirty).toBe(false)
+  })
+
   it('分页加载候选、选择目标和评价人，并过滤自评提交', async () => {
     getPublicationConfig.mockResolvedValue({ data: configFixture() })
     listParticipantOptions.mockResolvedValue({

@@ -1,4 +1,14 @@
 <script setup>
+import ArrowLeftIcon from '@iconify-vue/lucide/arrow-left'
+import ArrowRightIcon from '@iconify-vue/lucide/arrow-right'
+import CircleCheckIcon from '@iconify-vue/lucide/circle-check'
+import InfoIcon from '@iconify-vue/lucide/info'
+import ListChecksIcon from '@iconify-vue/lucide/list-checks'
+import PencilLineIcon from '@iconify-vue/lucide/pencil-line'
+import RefreshCwIcon from '@iconify-vue/lucide/refresh-cw'
+import SaveIcon from '@iconify-vue/lucide/save'
+import SendIcon from '@iconify-vue/lucide/send'
+import UserRoundIcon from '@iconify-vue/lucide/user-round'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -150,8 +160,8 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
 <template>
   <section v-loading="store.loading" class="answer-workspace">
     <div class="answer-top-actions">
-      <el-button @click="back">{{ history ? '返回我评价的' : '返回任务列表' }}</el-button>
-      <el-button :disabled="store.busy || confirming" @click="reload">重新加载</el-button>
+      <el-button :icon="ArrowLeftIcon" @click="back">{{ history ? '返回我评价的' : '返回任务列表' }}</el-button>
+      <el-button :icon="RefreshCwIcon" :disabled="store.busy || confirming" @click="reload">重新加载</el-button>
     </div>
     <el-alert v-if="store.error" :title="store.error" type="error" :closable="false" class="answer-notice" />
     <el-button
@@ -162,7 +172,7 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
       <header class="answer-header workspace-page-header">
         <div>
         <p>{{ store.detail.task.projectName }}</p>
-        <h1 class="page-heading">{{ history ? '已提交的评价' : '评价' }}：{{ store.detail.task.targetName }}</h1>
+        <h1 class="page-heading answer-heading"><UserRoundIcon width="22" height="22" class="heading-icon" aria-hidden="true" /><span>{{ history ? '已提交的评价' : '评价' }}：{{ store.detail.task.targetName }}</span></h1>
         <p>{{ store.detail.task.targetDeptName || '未配置部门' }} · {{ store.detail.task.relationName }}评价</p>
         </div>
         <el-tag :type="store.detail.task.status === 'SUBMITTED' ? 'success' : 'warning'">{{ TASK_STATUS_LABELS[store.detail.task.status] }}</el-tag>
@@ -173,17 +183,14 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
       />
       <el-alert v-else-if="!store.editable" title="项目或任务已关闭，不能继续答题。" type="info" :closable="false" class="answer-notice" />
       <el-alert v-else-if="!canEdit" title="当前账号仅有查看权限，不能填写或提交答案。" type="info" :closable="false" class="answer-notice" />
+      <section class="answer-progress" aria-label="答题进度">
+          <span class="progress-label"><ListChecksIcon width="16" height="16" aria-hidden="true" />已作答 {{ store.answeredCount }}/{{ store.questions.length }} 题</span>
+          <el-progress :percentage="store.questions.length ? Math.round(store.answeredCount / store.questions.length * 100) : 0" />
+      </section>
       <el-card shadow="never" class="answer-document">
         <h2>{{ store.detail.questionnaire.title }}</h2>
         <RichTextEditor v-if="store.detail.questionnaire.descriptionDoc" :model-value="store.detail.questionnaire.descriptionDoc" readonly />
         <p v-else-if="store.detail.questionnaire.description" class="description">{{ store.detail.questionnaire.description }}</p>
-        <div class="answer-progress">
-          <span>已作答 {{ store.answeredCount }}/{{ store.questions.length }} 题</span>
-          <el-progress :percentage="store.questions.length ? Math.round(store.answeredCount / store.questions.length * 100) : 0" />
-        </div>
-        <el-select :model-value="store.pageIndex" aria-label="问卷页面" :disabled="store.busy || confirming" @change="store.setPage">
-          <el-option v-for="(page, index) in pages" :key="page.pageId" :value="index" :label="`${index + 1}. ${page.pageTitle}`" />
-        </el-select>
         <el-alert v-if="store.issues.length" title="请检查以下题目" type="warning" :closable="false" class="answer-notice">
           <div v-for="(issue, index) in store.issues" :key="index">
             <el-button link type="primary" class="issue-link" @click="focusIssue(issue)">{{ issueLabel(issue) }}</el-button>
@@ -191,17 +198,22 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
         </el-alert>
         <el-form ref="form" :model="store" :disabled="disabled" label-position="top" @keydown.enter="handleEnter">
           <section v-for="(page, pageIndex) in pages" v-show="store.pageIndex === pageIndex" :key="page.pageId" class="answer-page">
-            <h3>{{ page.pageTitle }}</h3>
             <el-form-item
-              v-for="question in page.questions"
+              v-for="(question, questionIndex) in page.questions"
               :key="question.questionCode"
               :prop="['answers', question.questionCode]"
               :rules="rulesFor(question)"
               :data-question-id="question.questionId"
               class="answer-question"
             >
+              <div class="answer-question-heading">
+                <span v-if="question.isRequired" class="required-mark" aria-label="必答">*</span>
+                <strong>第 {{ pages.slice(0, pageIndex).reduce((count, item) => count + item.questions.length, 0) + questionIndex + 1 }} 题：{{ question.title }}</strong>
+              </div>
+              <p v-if="question.description" class="question-description">{{ question.description }}</p>
               <QuestionRenderer
                 :question="question"
+                :show-heading="false"
                 :mode="canEdit ? 'answer' : 'readonly'"
                 :model-value="store.answers[question.questionCode]"
                 @update:model-value="updateAnswer(question, $event)"
@@ -210,22 +222,25 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
           </section>
         </el-form>
         <div class="page-navigation">
-          <el-button :disabled="store.pageIndex === 0 || store.busy || confirming" @click="store.setPage(store.pageIndex - 1)">上一页</el-button>
+          <el-button :icon="ArrowLeftIcon" :disabled="store.pageIndex === 0 || store.busy || confirming" @click="store.setPage(store.pageIndex - 1)">上一页</el-button>
           <span>{{ store.pageIndex + 1 }}/{{ pages.length }}</span>
-          <el-button :disabled="store.pageIndex === pages.length - 1 || store.busy || confirming" @click="store.setPage(store.pageIndex + 1)">下一页</el-button>
+          <el-button :disabled="store.pageIndex === pages.length - 1 || store.busy || confirming" @click="store.setPage(store.pageIndex + 1)">下一页<ArrowRightIcon width="14" height="14" class="next-page-icon" aria-hidden="true" /></el-button>
         </div>
       </el-card>
       <footer class="answer-footer">
-        <div class="save-state">
-          <span v-if="store.dirty">有尚未暂存的修改</span>
+        <div class="save-state" :class="{ 'is-unsaved': store.dirty, 'is-saved': !store.dirty && !!store.detail.task.savedTime }" role="status">
+          <PencilLineIcon v-if="store.dirty" width="16" height="16" class="state-icon" aria-hidden="true" />
+          <CircleCheckIcon v-else-if="store.detail.task.savedTime" width="16" height="16" class="state-icon" aria-hidden="true" />
+          <InfoIcon v-else width="16" height="16" class="state-icon" aria-hidden="true" />
+          <span v-if="store.dirty">修改未暂存</span>
           <span v-else-if="store.detail.task.savedTime">最近保存：{{ formatDateTime(store.detail.task.savedTime) }}</span>
           <span v-else>填写部分答案后也可以暂存</span>
         </div>
         <div v-if="canEdit" class="write-actions">
-          <el-button v-if="permission.hasPermission('feedback:task:answer')" :loading="store.saving" :disabled="disabled" @click="save">暂存答卷</el-button>
-          <el-button v-if="permission.hasPermission('feedback:task:submit')" type="primary" :loading="store.submitting" :disabled="disabled" @click="submit">提交本份评价</el-button>
+          <el-button v-if="permission.hasPermission('feedback:task:answer')" :icon="SaveIcon" :loading="store.saving" :disabled="disabled" @click="save">暂存答卷</el-button>
+          <el-button v-if="permission.hasPermission('feedback:task:submit')" :icon="SendIcon" type="primary" :loading="store.submitting" :disabled="disabled" @click="submit">提交本份评价</el-button>
         </div>
-        <el-button v-else-if="!history && permission.hasPermission('feedback:task:view')" type="primary" @click="back">继续处理其他任务</el-button>
+        <el-button v-else-if="!history && permission.hasPermission('feedback:task:view')" :icon="ArrowRightIcon" type="primary" @click="back">继续处理其他任务</el-button>
       </footer>
     </template>
   </section>
@@ -238,26 +253,37 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
 .answer-top-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 .answer-top-actions .el-button { margin-left: 0; }
 .answer-header h1 { font-size: 24px; margin: 8px 0; }
-.answer-header p, .description { color: #64748b; white-space: pre-wrap; line-height: 1.7; }
+.answer-heading { display: flex; align-items: center; gap: 8px; }
+.heading-icon { flex-shrink: 0; color: var(--el-color-primary); }
+.answer-header p, .description { color: var(--fb-text-muted, #64748b); white-space: pre-wrap; line-height: 1.7; }
 .answer-notice { margin: 16px 0; }
-.answer-document h2, .answer-page h3 { overflow-wrap: anywhere; }
-.answer-document h2 { font-size: 20px; font-weight: 600; }
-.answer-progress { display: grid; gap: 8px; margin: 24px 0; }
-.answer-page { margin-top: 28px; }
-.answer-question { padding: 20px 0; border-bottom: 1px solid #e5e7eb; }
-.answer-question :deep(.el-form-item__content) { display: block; min-width: 0; overflow-wrap: anywhere; }
-.answer-question :deep(.el-form-item__error) { position: static; padding-top: 8px; }
+.answer-document h2 { overflow-wrap: anywhere; }
+.answer-document h2 { font-size: 20px; font-weight: 600; text-align: center; }
+.answer-progress { display: grid; gap: 8px; margin: 0 0 18px; padding: 14px 20px; border: 1px solid var(--fb-primary-border, #d9e8f8); border-radius: 6px; background: var(--fb-primary-bg, #f0f7ff); color: var(--fb-text-regular, #475569); font-size: 13px; }
+.progress-label { display: flex; align-items: center; gap: 6px; }
+.answer-page { margin-top: 8px; }
+.answer-question { padding: 20px 0; border-bottom: 1px solid var(--fb-border, #e5e7eb); }
+.answer-question-heading { margin-bottom: 12px; color: var(--fb-text-primary, #111827); line-height: 1.7; }
+.required-mark { margin-right: 4px; color: #f56c6c; }
+.question-description { margin: 0 0 12px; color: var(--fb-text-muted, #64748b); white-space: pre-wrap; line-height: 1.7; }
+.answer-question:deep(.el-form-item__content) { display: block; min-width: 0; overflow-wrap: anywhere; }
+.answer-question:deep(.el-form-item__error) { position: static; padding-top: 8px; }
 .issue-link { height: auto; white-space: normal; text-align: left; line-height: 1.7; }
 .page-navigation { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
-.answer-footer { position: sticky; bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; margin-top: 16px; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; box-shadow: 0 6px 24px rgb(30 50 80 / 8%); z-index: 5; }
-.save-state { color: #64748b; font-size: 13px; }
-.write-actions { display: flex; gap: 12px; flex-shrink: 0; }
+.next-page-icon { margin-left: 6px; }
+.answer-footer { position: sticky; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; margin: 20px 12px 0; background: var(--fb-surface, #fff); border: 1px solid var(--fb-border, #e2e8f0); border-radius: 12px; box-shadow: 0 4px 20px rgb(15 23 42 / 8%), 0 1px 3px rgb(15 23 42 / 4%); z-index: 5; }
+.save-state { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--fb-text-muted, #64748b); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.state-icon { flex-shrink: 0; }
+.save-state.is-unsaved { color: var(--fb-warning-text, #925b12); }
+.save-state.is-saved .state-icon { color: #67c23a; }
+.write-actions { display: flex; gap: 10px; flex-shrink: 0; }
+.answer-footer .el-button { height: 36px; padding: 0 18px; border-radius: 8px; font-weight: 500; }
 .write-actions .el-button + .el-button { margin-left: 0; }
 @media (max-width: 600px) {
-  .answer-footer { flex-direction: column; align-items: stretch; padding: 12px; }
-  .write-actions .el-button { flex: 1; }
+  .answer-footer { bottom: calc(10px + env(safe-area-inset-bottom)); flex-direction: column; align-items: stretch; gap: 10px; margin: 16px 0 0; padding: 12px; }
+  .write-actions .el-button { flex: 1; min-width: 0; padding: 0 10px; }
   .answer-header h1 { font-size: 21px; }
-  .answer-question :deep(.el-slider__runway.show-input) { margin-right: 0; width: 100%; }
-  .answer-question :deep(.el-slider) { flex-wrap: wrap; height: auto; gap: 16px; padding: 10px; }
+  .answer-question:deep(.el-slider__runway.show-input) { margin-right: 0; width: 100%; }
+  .answer-question:deep(.el-slider) { flex-wrap: wrap; height: auto; gap: 16px; padding: 10px; }
 }
 </style>

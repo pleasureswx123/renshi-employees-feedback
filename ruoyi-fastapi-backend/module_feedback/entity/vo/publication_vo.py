@@ -5,7 +5,7 @@ from pydantic import Field, field_serializer, field_validator, model_validator
 
 from module_feedback.constants import DEFAULT_RELATION_DEFINITIONS, FIXED_RELATION_CODES, SELF_RELATION_CODE
 from module_feedback.entity.vo.questionnaire_question_vo import QuestionnaireVoModel
-from module_feedback.entity.vo.questionnaire_vo import ValidationIssueModel
+from module_feedback.entity.vo.questionnaire_vo import QuestionnaireDraftSaveModel, ValidationIssueModel
 from module_feedback.enums import ProjectStatus, QuestionnaireVersionStatus, RelationType
 
 
@@ -210,6 +210,16 @@ class PublicationConfigSaveModel(QuestionnaireVoModel):
         return self
 
 
+class FrozenPublicationDetailsModel(QuestionnaireVoModel):
+    """发布后按原冻结版本读取的详情，不接受客户端写入。"""
+
+    published_by: int = Field(description='发布人用户ID')
+    published_by_name: str = Field(description='发布人当前账号，仅用于识别操作人')
+    published_time: datetime = Field(description='发布时间')
+    version_no: int = Field(description='发布时问卷版本号')
+    questionnaire: QuestionnaireDraftSaveModel = Field(description='原冻结问卷、题目及指标')
+
+
 class PublicationConfigModel(QuestionnaireVoModel):
     """准备期可编辑或发布后只读的聚合配置。"""
 
@@ -228,6 +238,7 @@ class PublicationConfigModel(QuestionnaireVoModel):
     preview: PublicationPreviewModel
     is_publish_ready: bool = Field(description='是否满足发布条件')
     validation_issues: list[ValidationIssueModel] = Field(default_factory=list)
+    frozen_details: FrozenPublicationDetailsModel | None = Field(default=None, description='仅已发布项目返回冻结详情')
 
 
 class PublishRequestModel(QuestionnaireVoModel):

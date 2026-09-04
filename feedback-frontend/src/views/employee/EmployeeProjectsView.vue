@@ -78,12 +78,12 @@ onBeforeUnmount(() => { requestId++ })
 <style scoped>
 .employee-page { display: grid; gap: 18px; max-width: 1200px; margin: auto; }
 .employee-filter-card .employee-filter { margin: 0; padding: 0; border: 0; }
-.employee-filter-card :deep(.el-form-item) { margin-bottom: 0; }
+.employee-filter-card:deep(.el-form-item) { margin-bottom: 0; }
 .employee-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-height: 120px; }
 .empty-projects { grid-column: 1 / -1; }
 .project-card h2 { margin: 0; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
-.project-card p, .project-footer span { color: #64748b; line-height: 1.6; }
+.project-card p, .project-footer span { color: var(--fb-text-muted, #64748b); line-height: 1.6; }
 .project-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-top: 18px; }
 @media (max-width: 1000px) { .employee-list { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 760px) { .employee-filter-card :deep(.el-form-item:first-child) { margin-bottom: 14px; } }
+@media (max-width: 760px) { .employee-filter-card:deep(.el-form-item:first-child) { margin-bottom: 14px; } }
 </style>

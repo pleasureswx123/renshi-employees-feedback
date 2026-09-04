@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import WorkspaceLayout from '@/layouts/WorkspaceLayout.vue'
 import ProjectListView from '@/views/hr/ProjectListView.vue'
+import appRouter from '@/router'
 import { useAuthStore } from '@/stores/auth'
+import { useWorkspaceUiStore } from '@/stores/workspaceUi'
 
 const api = vi.hoisted(() => ({
   createProject: vi.fn(),
@@ -35,7 +37,7 @@ describe('项目列表进度入口与子路由菜单', () => {
   })
   afterEach(() => { wrapper?.unmount(); document.body.innerHTML = '' })
 
-  it('仅ACTIVE和COMPLETED项目显示回收进度入口并进入固定路由', async () => {
+  it('仅ACTIVE和COMPLETED项目显示评价进度入口并进入固定路由', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
@@ -47,7 +49,7 @@ describe('项目列表进度入口与子路由菜单', () => {
     wrapper = mount(RouterView, { global: { plugins: [pinia, router, ElementPlus] } })
     await flushPromises()
 
-    const progressButtons = wrapper.findAll('button').filter(item => item.text() === '回收进度')
+    const progressButtons = wrapper.findAll('button').filter(item => item.text() === '评价进度')
     expect(progressButtons).toHaveLength(2)
     await progressButtons[0].trigger('click')
     await flushPromises()
@@ -106,7 +108,50 @@ describe('项目列表进度入口与子路由菜单', () => {
     expect(wrapper.get('.workspace-breadcrumb').text()).toContain('评价报告')
   })
 
-  it('progress-only用户显示安全回收进度菜单并在明细页保持高亮', async () => {
+  it.each([false, true])('编辑页默认折叠、允许手动展开，离开后恢复原偏好（原折叠状态：%s）', async initialCollapsed => {
+    const ui = useWorkspaceUiStore()
+    ui.collapsed = initialCollapsed
+    const editorRoute = appRouter.getRoutes().find(item => item.name === 'hr-questionnaire-editor')
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{
+        path: '/hr', component: WorkspaceLayout, props: { workspace: 'hr', title: 'HR 工作台' },
+        children: [
+          { path: 'projects', component: { template: '<div>项目列表</div>' } },
+          { path: 'projects/:projectId/editor', component: { template: '<div>编辑器</div>' }, meta: editorRoute.meta }
+        ]
+      }]
+    })
+    await router.push('/hr/projects/1/editor')
+    wrapper = mount(RouterView, { global: { plugins: [pinia, router, ElementPlus] } })
+    await flushPromises()
+    const menu = () => wrapper.findComponent({ name: 'ElMenu' })
+
+    expect(menu().props('collapse')).toBe(true)
+    expect(wrapper.get('.workspace-layout').classes()).toContain('is-collapsed')
+    expect(wrapper.get('[aria-label="展开侧栏"]').attributes('aria-expanded')).toBe('false')
+    await wrapper.get('[aria-label="展开侧栏"]').trigger('click')
+    expect(menu().props('collapse')).toBe(false)
+    expect(wrapper.get('[aria-label="收起侧栏"]').attributes('aria-expanded')).toBe('true')
+    expect(ui.collapsed).toBe(initialCollapsed)
+
+    await router.push('/hr/projects/1/editor?tab=preview')
+    await flushPromises()
+    expect(menu().props('collapse')).toBe(false)
+
+    await router.push('/hr/projects')
+    await flushPromises()
+    expect(menu().props('collapse')).toBe(initialCollapsed)
+    await router.push('/hr/projects/1/editor')
+    await flushPromises()
+    expect(menu().props('collapse')).toBe(true)
+    await wrapper.get('[aria-label="展开侧栏"]').trigger('click')
+    await wrapper.get('[aria-label="收起侧栏"]').trigger('click')
+    expect(menu().props('collapse')).toBe(true)
+    expect(ui.collapsed).toBe(initialCollapsed)
+  })
+
+  it('progress-only用户显示安全评价进度菜单并在明细页保持高亮', async () => {
     useAuthStore().permissions = ['feedback:progress:view']
     const router = createRouter({
       history: createMemoryHistory(),
@@ -128,7 +173,7 @@ describe('项目列表进度入口与子路由菜单', () => {
     wrapper = mount(RouterView, { global: { plugins: [pinia, router, ElementPlus] } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('回收进度')
+    expect(wrapper.text()).toContain('评价进度')
     const menus = wrapper.findAllComponents({ name: 'ElMenu' })
     expect(menus.every(menu => menu.props('defaultActive') === '/hr/progress')).toBe(true)
   })

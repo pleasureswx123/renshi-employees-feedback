@@ -15,6 +15,7 @@ vi.mock('@/api/feedback/projects', () => api)
 let wrapper
 let store
 let persisted
+let router
 const activeCard = () => wrapper.get('.question-card.active')
 const button = name => {
   const scope = ['复制题目', '上移题目', '下移题目', '删除题目'].includes(name) ? activeCard() : wrapper
@@ -69,8 +70,9 @@ describe('问卷画布直接编辑', () => {
     })
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm')
     Element.prototype.scrollIntoView = vi.fn()
-    const router = createRouter({ history: createMemoryHistory(), routes: [
-      { path: '/hr/projects/:projectId/editor', component: QuestionnaireEditorView }
+    router = createRouter({ history: createMemoryHistory(), routes: [
+      { path: '/hr/projects/:projectId/editor', component: QuestionnaireEditorView },
+      { path: '/hr/projects/:projectId/publication', component: { template: '<div>人员配置</div>' } }
     ] })
     await router.push('/hr/projects/7/editor')
     wrapper = mount(RouterView, { attachTo: document.body, global: { plugins: [pinia, router, ElementPlus] } })
@@ -79,6 +81,182 @@ describe('问卷画布直接编辑', () => {
   })
 
   afterEach(() => { wrapper?.unmount(); ElMessage.closeAll(); document.body.innerHTML = '' })
+
+  it('顺序进入指标步骤，未绑定题目时留在当前页且不发送保存', async () => {
+    useAuthStore().permissions.push('feedback:participant:manage')
+    expect(wrapper.get('.editor-workflow').text()).toContain('1 编辑问卷')
+    expect(wrapper.get('.editor-workflow').text()).toContain('3 人员与发布')
+    expect(wrapper.find('.properties-panel').text()).not.toContain('先在“评价指标”中添加指标')
+    await button('下一步：配置指标').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('#tab-indicator').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('.indicator-step-notice').text()).toContain('还有3道计分题未绑定指标')
+    await button('下一步：配置人员').trigger('click')
+    await flushPromises()
+    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.path).toBe('/hr/projects/7/editor')
+  })
+
+  it('问卷未完成时下一步定位空题，完成后才进入指标', async () => {
+    store.draft.pages[1].questions[2].title = ''
+    await flushPromises()
+    await button('完善问卷').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('#tab-question').attributes('aria-selected')).toBe('true')
+    expect(store.selectedQuestionCode).toBe('Q5')
+    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+    await activeCard().get('.title-field textarea').setValue('改进建议')
+    await button('下一步：配置指标').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('#tab-indicator').attributes('aria-selected')).toBe('true')
+  })
+
+  it('配置指标后新增题目，按钮和步骤回到问卷，补完后保留指标并提示绑定新题', async () => {
+    useAuthStore().permissions.push('feedback:participant:manage')
+    store.setIndicatorBindings('I1', ['Q1', 'Q2', 'Q3', 'Q4'])
+    await button('下一步：配置指标').trigger('click')
+    expect(button('下一步：配置人员')).toBeDefined()
+    await wrapper.findAll('.question-type-button').find(item => item.text() === '单选题').trigger('click')
+    await flushPromises()
+    const addedCode = store.selectedQuestionCode
+    expect(wrapper.get('#tab-question').attributes('aria-selected')).toBe('true')
+    expect(button('完善问卷')).toBeDefined()
+    expect(button('下一步：配置人员')).toBeUndefined()
+    expect(wrapper.findComponent({ name: 'ElSteps' }).props('active')).toBe(0)
+    await switchRightTab('评价指标')
+    expect(button('完善问卷')).toBeDefined()
+    expect(button('下一步：配置人员')).toBeUndefined()
+    expect(wrapper.findComponent({ name: 'ElSteps' }).props('active')).toBe(0)
+    expect(wrapper.get('.indicator-step-notice').text()).toContain('已有指标配置会保留')
+    await button('完善问卷').trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(activeCard().get('.title-field textarea').element)
+    expect(store.selectedQuestionCode).toBe(addedCode)
+    await activeCard().get('.title-field textarea').setValue('新增协作题')
+    await button('下一步：配置指标').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.indicator-step-notice').text()).toContain('还有1道计分题未绑定指标')
+    expect(store.draft.indicators[0]).toMatchObject({ indicatorName: '协作', weight: '100.0000', questionCodes: ['Q1', 'Q2', 'Q3', 'Q4'] })
+    expect(wrapper.findComponent({ name: 'ElSteps' }).props('active')).toBe(1)
+    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+  })
+
+  it('指标页签内清空题目时也能返回完善问卷，不受人员配置权限限制', async () => {
+    await button('下一步：配置指标').trigger('click')
+    expect(button('下一步：配置人员')).toBeUndefined()
+    await activeCard().get('.title-field textarea').setValue('')
+    expect(button('完善问卷')).toBeDefined()
+    expect(wrapper.findComponent({ name: 'ElSteps' }).props('active')).toBe(0)
+    await button('完善问卷').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('#tab-question').attributes('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(activeCard().get('.title-field textarea').element)
+    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+  })
+
+  it('保存草稿允许指标未完成；下一步服从后端完整性检查并展示问题', async () => {
+    useAuthStore().permissions.push('feedback:participant:manage')
+    await button('保存草稿').trigger('click')
+    await flushPromises()
+    expect(api.saveQuestionnaireDraft).toHaveBeenCalledOnce()
+    store.setIndicatorBindings('I1', ['Q1', 'Q2', 'Q3', 'Q4'])
+    persisted.validationIssues = [{ code: 'CHECK_FAILED', path: 'indicators', message: '请核对指标配置' }]
+    await button('下一步：配置指标').trigger('click')
+    await button('下一步：配置人员').trigger('click')
+    await flushPromises()
+    expect(api.saveQuestionnaireDraft).toHaveBeenCalledTimes(2)
+    expect(router.currentRoute.value.path).toBe('/hr/projects/7/editor')
+    expect(wrapper.get('.indicator-step-notice').text()).toContain('请核对指标配置')
+  })
+
+  it('下一步保存失败保留本页草稿，重试成功后进入人员配置', async () => {
+    useAuthStore().permissions.push('feedback:participant:manage')
+    store.setIndicatorBindings('I1', ['Q1', 'Q2', 'Q3', 'Q4'])
+    api.saveQuestionnaireDraft.mockRejectedValueOnce(new Error('保存失败，请重试'))
+    await button('下一步：配置指标').trigger('click')
+    await button('下一步：配置人员').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/hr/projects/7/editor')
+    expect(store.dirty).toBe(true)
+    expect(store.draft.indicators[0].questionCodes).toEqual(['Q1', 'Q2', 'Q3', 'Q4'])
+    persisted.isPublishReady = true
+    await button('下一步：配置人员').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/hr/projects/7/publication')
+    expect(ElMessageBox.confirm).not.toHaveBeenCalled()
+  })
+
+  it('下一步等待保存时禁止重复提交和编辑；无人员权限不显示人员入口', async () => {
+    store.setIndicatorBindings('I1', ['Q1', 'Q2', 'Q3', 'Q4'])
+    await button('下一步：配置指标').trigger('click')
+    expect(button('下一步：配置人员')).toBeUndefined()
+    useAuthStore().permissions.push('feedback:participant:manage')
+    await flushPromises()
+    let finishSave
+    api.saveQuestionnaireDraft.mockImplementation(() => new Promise(resolve => { finishSave = resolve }))
+    await button('下一步：配置人员').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.editor-grid').attributes('inert')).toBeDefined()
+    await button('下一步：配置人员').trigger('click')
+    expect(api.saveQuestionnaireDraft).toHaveBeenCalledOnce()
+    finishSave({ data: { ...persisted, isPublishReady: true } })
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/hr/projects/7/publication')
+  })
+
+  it('待绑定清单展示连续题号与页码，可定位、直接绑定并在保存重载后保留', async () => {
+    await switchRightTab('评价指标')
+    const items = () => wrapper.findAll('.unbound-item')
+    expect(items()).toHaveLength(3)
+    expect(items()[0].text()).toContain('第 2 题')
+    expect(items()[0].text()).toContain('第 1 页')
+    expect(items()[1].text()).toContain('第 3 题')
+    expect(items()[1].text()).toContain('第 2 页')
+    expect(wrapper.get('.unbound-panel').text()).not.toContain('工作表现评价 5')
+    await items()[1].get('button').trigger('click')
+    await flushPromises()
+    expect(store.selectedQuestionCode).toBe('Q3')
+    expect(wrapper.get('#tab-indicator').attributes('aria-selected')).toBe('true')
+    for (const item of items()) {
+      item.findComponent({ name: 'ElSelect' }).vm.$emit('change', 'I1')
+    }
+    await flushPromises()
+    expect(wrapper.find('.unbound-panel').exists()).toBe(false)
+    expect(wrapper.get('.binding-complete').text()).toBe('计分题已全部绑定')
+    expect(store.draft.indicators[0].questionCodes).toEqual(['Q1', 'Q2', 'Q3', 'Q4'])
+    expect(store.dirty).toBe(true)
+    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+    await button('保存草稿').trigger('click')
+    await flushPromises()
+    await store.load(7)
+    await flushPromises()
+    expect(wrapper.find('.unbound-panel').exists()).toBe(false)
+    expect(store.draft.indicators[0].questionCodes).toEqual(['Q1', 'Q2', 'Q3', 'Q4'])
+    store.setIndicatorBindings('I1', ['Q1', 'Q2', 'Q4'])
+    await flushPromises()
+    expect(items()).toHaveLength(1)
+    expect(items()[0].text()).toContain('工作表现评价 3')
+    store.removeIndicator('I1')
+    await flushPromises()
+    expect(items()).toHaveLength(4)
+    expect(wrapper.get('.unbound-hint').text()).toContain('先增加指标')
+    expect(items()[0].findComponent({ name: 'ElSelect' }).props('disabled')).toBe(true)
+  })
+
+  it('待绑定清单随页面重排和计分开关更新，不把问答题或不计分题列入', async () => {
+    store.draft.pages[0].questions[1].isScored = false
+    await switchRightTab('评价指标')
+    expect(wrapper.findAll('.unbound-item')).toHaveLength(2)
+    store.movePage('P2', -1)
+    await flushPromises()
+    const items = wrapper.findAll('.unbound-item')
+    expect(items[0].text()).toContain('第 1 题')
+    expect(items[0].text()).toContain('第 1 页')
+    expect(items[0].text()).toContain('工作表现评价 3')
+    expect(items[1].text()).toContain('第 2 题')
+    expect(wrapper.get('.unbound-panel').text()).not.toContain('工作表现评价 2')
+    expect(wrapper.get('.unbound-panel').text()).not.toContain('工作表现评价 5')
+  })
 
   it('默认显示题目属性，往返切换页签保留当前题目与预览试填', async () => {
     const tab = name => wrapper.findAll('[role="tab"]').find(item => item.text() === name)
@@ -122,7 +300,8 @@ describe('问卷画布直接编辑', () => {
       if (typeLabel === '单选题') {
         await wrapper.findAll('[role="tab"]').find(item => item.text() === '评价指标').trigger('click')
         await flushPromises()
-        expect(wrapper.findAllComponents({ name: 'ElOption' }).some(option => option.props('label') === '单选题 · 待填写')).toBe(true)
+        expect(wrapper.get('.indicator-step-notice').text()).toContain('请先完成问卷，再配置指标')
+        expect(wrapper.find('.indicator-panel').exists()).toBe(false)
         await wrapper.findAll('[role="tab"]').find(item => item.text() === '题目属性').trigger('click')
       }
       await field.setValue(title)
@@ -246,6 +425,47 @@ describe('问卷画布直接编辑', () => {
     expectHeader()
   })
 
+  it('大纲、画布与预览跨页连续编号，重排、跨页移动、增删和空白页不留断号', async () => {
+    await switchRightTab('实时预览')
+    await selectQuestion('Q3')
+    const expectVisibleNumbers = numbers => {
+      expect(wrapper.findAll('.question-index > span:first-child').map(item => item.text())).toEqual(numbers.map(number => `第 ${number} 题`))
+      expect(wrapper.findAll('.preview-question-number').map(item => item.text())).toEqual(numbers.map(number => `${number}、`))
+    }
+    expectVisibleNumbers([3, 4, 5])
+    expect(wrapper.get('.outline-question.active').text()).toBe('3. 工作表现评价 3')
+    expect(store.dirty).toBe(false)
+
+    store.movePage('P2', -1)
+    await flushPromises()
+    expectVisibleNumbers([1, 2, 3])
+    expect(wrapper.findAll('.outline-question').map(item => item.text())).toEqual([
+      '1. 工作表现评价 3', '2. 工作表现评价 4', '3. 工作表现评价 5', '4. 工作表现评价 1', '5. 工作表现评价 2'
+    ])
+    store.movePage('P2', 1)
+    await selectQuestion('Q1')
+    store.moveSelectedQuestionToPage('P2')
+    await flushPromises()
+    expectVisibleNumbers([2, 3, 4, 5])
+    expect(wrapper.get('.outline-question.active').text()).toBe('5. 工作表现评价 1')
+
+    store.removeSelectedQuestion()
+    await flushPromises()
+    expectVisibleNumbers([2, 3, 4])
+    store.addPage()
+    store.movePage(store.selectedPageCode, -1)
+    await selectQuestion('Q3')
+    expectVisibleNumbers([2, 3, 4])
+    store.duplicateSelectedQuestion()
+    await flushPromises()
+    expectVisibleNumbers([2, 3, 4, 5])
+    expect(wrapper.get('.outline-question.active').text()).toBe('3. 工作表现评价 3（副本）')
+    expect(wrapper.findAll('.outline-question').map(item => Number(item.text().split('.')[0]))).toEqual([1, 2, 3, 4, 5])
+    // 连续题号只用于展示，存储中的题目顺序仍属于各自页面。
+    expect(store.draft.pages.map(page => page.questions.map(question => question.sortOrder))).toEqual([[1], [], [1, 2, 3, 4]])
+    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+  })
+
   it.each(['0.0000', '4.5000'])('打开历史%s分选项时提示重新设置，不隐式改写草稿', async score => {
     store.selectedQuestion.options[0].score = score
     await flushPromises()
@@ -336,10 +556,12 @@ describe('问卷画布直接编辑', () => {
     await panel.findAllComponents({ name: 'ElSwitch' })[0].trigger('click')
     expect(store.selectedQuestion.isRequired).toBe(true)
     expect(activeCard().text()).toContain('必答')
-    const indicatorField = panel.findAllComponents({ name: 'ElFormItem' }).find(item => item.props('label') === '评价指标')
-    indicatorField.findComponent({ name: 'ElSelect' }).vm.$emit('change', 'I1')
+    expect(panel.findAllComponents({ name: 'ElFormItem' }).some(item => item.props('label') === '评价指标')).toBe(false)
+    await switchRightTab('评价指标')
+    wrapper.findComponent({ name: 'IndicatorPanel' }).vm.$emit('set-bindings', 'I1', ['Q1', 'Q2'])
     await flushPromises()
     expect(store.draft.indicators[0].questionCodes).toEqual(['Q1', 'Q2'])
+    await switchRightTab('题目属性')
     const pageField = panel.findAllComponents({ name: 'ElFormItem' }).find(item => item.props('label') === '所在页面')
     pageField.findComponent({ name: 'ElSelect' }).vm.$emit('change', 'P2')
     await flushPromises()

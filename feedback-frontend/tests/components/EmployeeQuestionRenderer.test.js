@@ -1,6 +1,6 @@
 import ElementPlus from 'element-plus'
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
 
 import QuestionRenderer from '@/components/feedback/questions/QuestionRenderer.vue'
 import { completeAnswers, detailFixture } from '../fixtures/answerSheet'
@@ -48,16 +48,34 @@ describe('员工五题型与只读语义', () => {
     wrapper.unmount()
   })
 
-  it('数值参考默认值不算作答，滑块须主动确认才发出值', async () => {
+  it('数值参考默认值不算作答', () => {
     const number = render(questions[2], 'answer', { value: null })
     expect(number.get('input').element.value).toBe('')
     expect(number.emitted('update:modelValue')).toBeUndefined()
-    const slider = render(questions[3], 'answer', { value: null, touched: false })
-    expect(slider.text()).toContain('尚未作答')
-    expect(slider.emitted('update:modelValue')).toBeUndefined()
-    await slider.findAll('button').find(button => button.text().includes('确认')).trigger('click')
-    expect(slider.emitted('update:modelValue').at(-1)[0]).toEqual({ value: 5, touched: true })
     number.unmount()
+  })
+
+  it.each([0, 5])('滑块显示%s分不算作答，点击原位置可直接记录，无需确认按钮', async value => {
+    const question = { ...questions[3], config: { ...questions[3].config, defaultValue: value } }
+    const slider = render(question, 'answer', { value: null, touched: false })
+    expect(slider.text()).not.toContain('尚未作答')
+    expect(slider.text()).not.toContain('确认使用当前分值')
+    expect(slider.emitted('update:modelValue')).toBeUndefined()
+    await slider.get('.el-slider__button-wrapper').trigger('mousedown', { clientX: 100, clientY: 20 })
+    window.dispatchEvent(new MouseEvent('mouseup', { clientX: 100, clientY: 20 }))
+    await vi.waitFor(() => expect(slider.emitted('update:modelValue')?.at(-1)[0]).toEqual({ value, touched: true }))
+    slider.unmount()
+  })
+
+  it('滑块在最低零分位置按Home也能记录零分，单纯聚焦不记录', async () => {
+    const question = { ...questions[3], config: { ...questions[3].config, defaultValue: 0 } }
+    const slider = render(question, 'answer', { value: null, touched: false })
+    const thumb = slider.get('.el-slider__button-wrapper')
+    await thumb.trigger('focus')
+    expect(slider.emitted('update:modelValue')).toBeUndefined()
+    await thumb.trigger('keydown', { key: 'Home', code: 'Home' })
+    await flushPromises()
+    expect(slider.emitted('update:modelValue').at(-1)[0]).toEqual({ value: 0, touched: true })
     slider.unmount()
   })
 

@@ -44,19 +44,33 @@ describe('真实Element Plus答题表单', () => {
 
   it.each([false, true])('答题和历史页面忽略旧页面说明，保留统一问卷说明与分页（历史=%s）', async history => {
     const detail = detailFixture()
+    detail.lastPageId = history ? 22 : 21
     detail.questionnaire.description = '统一问卷说明'
     detail.questionnaire.pages.forEach(page => { page.pageDescription = '已停用的页面说明' })
     api.getMyTask.mockResolvedValue({ data: detail })
     api.getMyHistory.mockResolvedValue({ data: detail })
     const { store } = await open(history)
 
+    expect(store.pageIndex).toBe(0)
+    expect(wrapper.findAll('.answer-page')[0].isVisible()).toBe(true)
     expect(wrapper.text()).toContain('统一问卷说明')
     expect(wrapper.text()).not.toContain('已停用的页面说明')
+    expect(wrapper.find('.answer-document .answer-progress').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="问卷页面"]').exists()).toBe(false)
+    expect(wrapper.find('.answer-page h3').exists()).toBe(false)
+    expect(wrapper.find('.answer-question-heading').text()).toContain('第 1 题：协作评价')
     await button('下一页').trigger('click')
     expect(store.pageIndex).toBe(1)
-    expect(wrapper.text()).toContain('质量与建议')
+    expect(wrapper.findAll('.answer-page')[1].text()).toContain('第 3 题：质量评分')
     expect(wrapper.text()).toContain('统一问卷说明')
     expect(wrapper.text()).not.toContain('已停用的页面说明')
+    if (history) {
+      await button('重新加载').trigger('click')
+      await flushPromises()
+      expect(store.pageIndex).toBe(0)
+      expect(wrapper.findAll('.answer-page')[0].isVisible()).toBe(true)
+      expect(button('上一页').element.disabled).toBe(true)
+    }
   })
 
   it('提交校验会从第二页定位第一道缺答题，不弹确认框或发送请求', async () => {
@@ -76,6 +90,7 @@ describe('真实Element Plus答题表单', () => {
   it('不完整答案可以暂存，发送正确任务和页面版本并显示保存状态', async () => {
     const { store } = await open()
     await wrapper.findAll('input[type="radio"]')[0].setValue(true)
+    expect(wrapper.find('.el-radio.is-bordered').exists()).toBe(false)
     await button('下一页').trigger('click')
     api.saveMyDraft.mockResolvedValue({ data: detailFixture(1, {
       lockVersion: 1, lastPageId: 22, answers: [{ questionId: 1, optionId: 11 }],

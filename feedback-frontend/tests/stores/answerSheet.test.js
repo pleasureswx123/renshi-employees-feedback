@@ -51,6 +51,28 @@ describe('逐任务答卷Store', () => {
     expect(store.editable).toBe(false)
   })
 
+  it('查看历史答案从第一页开始，翻页后重新打开仍回到第一页且不改写保存位置', async () => {
+    const detail = detailFixture(1, {
+      editable: false,
+      lastPageId: 22,
+      answers: [{ questionId: 1, optionId: 11, reason: '已提交说明' }],
+      task: { ...detailFixture().task, status: 'SUBMITTED' }
+    })
+    api.getMyHistory.mockResolvedValue({ data: detail })
+    const store = useAnswerSheetStore()
+    await store.load(1, { history: true })
+    expect(store.pageIndex).toBe(0)
+    expect(store.answers.Q1).toMatchObject({ optionCode: 'O1', reason: '已提交说明' })
+    store.setPage(1)
+    expect(store.pageIndex).toBe(1)
+    expect(store.dirty).toBe(false)
+    await store.load(1, { history: true })
+    expect(store.pageIndex).toBe(0)
+    expect(detail.lastPageId).toBe(22)
+    expect(api.saveMyDraft).not.toHaveBeenCalled()
+    expect(api.submitMyAnswer).not.toHaveBeenCalled()
+  })
+
   it('请求进行时阻止重复写入和修改，冲突保留本地输入并要求重新加载', async () => {
     api.getMyTask.mockResolvedValue({ data: detailFixture() })
     const store = useAnswerSheetStore()

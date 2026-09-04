@@ -14,6 +14,7 @@ import { getQuestionTypeDefinition } from '@/components/feedback/questions/quest
 import { useQuestionnaireDraftStore } from '@/stores/questionnaireDraft'
 import { usePermissionStore } from '@/stores/permission'
 import { calculateRawMaxScore } from '@/utils/questionnaireDraft'
+import { getQuestionnaireWorkflow } from '@/utils/questionnaireWorkflow'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,6 +23,7 @@ const permissionStore = usePermissionStore()
 const questionnaireFormRef = ref()
 const questionCards = new Map()
 const savePending = ref(false)
+const advancing = ref(false)
 const actionMessage = ref('')
 const isSaving = computed(() => savePending.value || draftStore.saving)
 const activeRightTab = ref('question')
@@ -34,6 +36,13 @@ const rawMaxScore = computed(() => calculateRawMaxScore(draft.value))
 const selectedPageIndex = computed(() =>
   draft.value?.pages.findIndex(page => page.pageCode === draftStore.selectedPageCode) ?? -1
 )
+const workflow = computed(() => getQuestionnaireWorkflow(draft.value))
+const workflowHint = computed(() => {
+  if (!workflow.value.questionReady) return workflow.value.questionIssues[0]
+  if (activeRightTab.value !== 'indicator') return '问卷已完成，下一步设置指标权重与题目绑定'
+  if (!workflow.value.indicatorReady) return workflow.value.indicatorIssues[0]
+  return '指标已完成，下一步保存并配置参评人员'
+})
 
 function changeDraftField(field, value) {
   draft.value[field] = value
@@ -153,6 +162,7 @@ async function saveDraft() {
     } else {
       ElMessage.success('问卷草稿已保存，已满足发布前完整性检查')
     }
+    return saved
   } catch (error) {
     if (error?.message && !String(error.message).includes('validation')) {
       ElMessage.warning(error.message)
@@ -160,6 +170,47 @@ async function saveDraft() {
   } finally {
     savePending.value = false
     if (invalidQuestionCode) await focusQuestion(invalidQuestionCode, true)
+  }
+}
+
+async function nextStep() {
+  if (!draft.value || isSaving.value || advancing.value) return
+  if (!workflow.value.questionReady) {
+    activeRightTab.value = 'question'
+    ElMessage.warning(workflow.value.questionIssues[0])
+    try {
+      await questionnaireFormRef.value?.validate()
+      const code = workflow.value.invalidQuestionCode
+      if (code) {
+        draftStore.selectQuestion(code)
+        await focusQuestion(code, true)
+        await questionCards.get(code)?.validate()
+      }
+    } catch {
+      // 保留原有表单校验反馈，完成题目后再进入指标步骤。
+    }
+    return
+  }
+  if (activeRightTab.value !== 'indicator') {
+    activeRightTab.value = 'indicator'
+    return
+  }
+  if (!workflow.value.indicatorReady) {
+    ElMessage.warning(workflow.value.indicatorIssues[0])
+    return
+  }
+  if (!permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish'])) return
+  advancing.value = true
+  try {
+    const saved = await saveDraft()
+    if (!saved) return
+    if (!saved.isPublishReady || saved.validationIssues.length) {
+      ElMessage.warning(saved.validationIssues[0]?.message || '请完成问卷与指标的发布前检查')
+      return
+    }
+    await router.push(`/hr/projects/${projectId}/publication`)
+  } finally {
+    advancing.value = false
   }
 }
 
@@ -185,7 +236,7 @@ onBeforeUnmount(() => draftStore.reset())
   <section v-loading="draftStore.loading" class="editor-page">
     <header class="editor-header workspace-page-header workspace-detail-header">
       <div class="workspace-detail-heading">
-        <el-button class="workspace-detail-back" text aria-label="返回项目列表" title="返回项目列表" @click="router.push('/hr/projects')">
+        <el-button class="workspace-detail-back" text size="small" aria-label="返回项目列表" title="返回项目列表" @click="router.push('/hr/projects')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m10 6-6 6 6 6M4 12h16" />
           </svg>
@@ -199,32 +250,42 @@ onBeforeUnmount(() => draftStore.reset())
             <span class="workspace-detail-project-name" :title="draft?.projectName || '评价项目'">{{ draft?.projectName || '评价项目' }}</span>
           </p>
         </div>
+        <el-tooltip content="先完成问卷，再设置指标；两步检查通过后，保存并进入人员配置。" :trigger="['hover', 'focus']" :trigger-keys="[]">
+          <el-button class="editor-help" text circle size="small" aria-label="编辑流程说明">?</el-button>
+        </el-tooltip>
       </div>
       <div class="editor-actions">
         <span v-if="draftStore.dirty" class="dirty-state">有未保存修改</span>
         <span v-else-if="draftStore.lastSavedAt" class="saved-state">草稿已保存</span>
         <el-button
-          v-if="permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish'])"
-          :disabled="!draft || draftStore.dirty"
-          @click="router.push(`/hr/projects/${projectId}/publication`)"
+          :disabled="!draft || isSaving || advancing"
+          @click="saveDraft"
         >
-          配置人员与发布
-        </el-button>
-        <el-button type="primary" :loading="isSaving" :disabled="!draft" @click="saveDraft">
           保存草稿
+        </el-button>
+        <el-button
+          v-if="!workflow.questionReady || activeRightTab !== 'indicator' || permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish'])"
+          type="primary"
+          :loading="advancing"
+          :disabled="!draft || isSaving"
+          @click="nextStep"
+        >
+          {{ !workflow.questionReady ? '完善问卷' : activeRightTab === 'indicator' ? '下一步：配置人员' : '下一步：配置指标' }}
         </el-button>
       </div>
     </header>
 
-    <el-alert
-      title="编辑过程中可随时保存草稿；完成问卷与指标配置后，再配置参评人员并发布。"
-      type="info"
-      :closable="false"
-      show-icon
-    />
+    <div class="editor-workflow" aria-label="评价准备流程">
+      <el-steps :active="workflow.questionReady && activeRightTab === 'indicator' ? 1 : 0" simple finish-status="success">
+        <el-step title="1 编辑问卷" :status="workflow.questionReady ? 'success' : 'process'" />
+        <el-step title="2 配置指标" :status="!workflow.questionReady ? 'wait' : workflow.indicatorReady ? 'success' : activeRightTab === 'indicator' ? 'process' : 'wait'" />
+        <el-step title="3 人员与发布" />
+      </el-steps>
+      <p class="workflow-hint" role="status" aria-live="polite" :title="workflowHint">{{ workflowHint }}</p>
+    </div>
 
     <p class="sr-only" role="status" aria-live="polite">{{ actionMessage }}</p>
-    <div v-if="draft" class="editor-grid" :class="{ 'preview-expanded': activeRightTab === 'preview' }" :inert="isSaving ? true : null">
+    <div v-if="draft" :key="projectId" class="editor-grid" :class="{ 'preview-expanded': activeRightTab === 'preview' }" :inert="isSaving ? true : null">
       <aside class="left-panel editor-panel">
         <QuestionnaireOutline
           :draft="draft"
@@ -278,7 +339,7 @@ onBeforeUnmount(() => draftStore.reset())
           :key="question.questionCode"
           :ref="element => element ? questionCards.set(question.questionCode, element) : questionCards.delete(question.questionCode)"
           :question="question"
-          :index="index"
+          :index="draft.pages.slice(0, selectedPageIndex).reduce((count, page) => count + page.questions.length, 0) + index"
           :active="question.questionCode === draftStore.selectedQuestionCode"
           :can-move-up="index > 0"
           :can-move-down="index < selectedPage.questions.length - 1"
@@ -296,9 +357,7 @@ onBeforeUnmount(() => draftStore.reset())
           <el-tab-pane label="实时预览" name="preview">
             <div class="live-preview-controls">
               <div class="live-preview-toolbar">
-                <span>第 {{ selectedPageIndex + 1 }} / {{ draft.pages.length }} 页</span>
-                <el-button link type="primary" @click="livePreviewRef?.resetAnswers()">重新试填</el-button>
-              </div>
+                <span class="preview-page-status">第 {{ selectedPageIndex + 1 }} / {{ draft.pages.length }} 页</span>
               <el-pagination
                 v-if="draft.pages.length > 1"
                 class="live-preview-pagination"
@@ -311,7 +370,8 @@ onBeforeUnmount(() => draftStore.reset())
                 size="small"
                 @update:current-page="draftStore.selectPage(draft.pages[$event - 1]?.pageCode)"
               />
-              <p class="live-preview-hint">修改即时同步，试填内容不会保存。</p>
+                <el-button link size="small" type="primary" @click="livePreviewRef?.resetAnswers()">重新试填</el-button>
+              </div>
             </div>
             <QuestionnairePreviewContent
               ref="livePreviewRef"
@@ -329,27 +389,37 @@ onBeforeUnmount(() => draftStore.reset())
               :question="selectedQuestion"
               :pages="draft.pages"
               :current-page-code="selectedPage.pageCode"
-              :indicators="draft.indicators"
               :disabled="isSaving"
               @change="draftStore.updateQuestion"
               @move-to-page="moveQuestionToPage"
-              @set-indicator="draftStore.setQuestionIndicator"
             />
             <el-empty v-else description="选择一道题后配置属性" :image-size="84" />
-            <div v-if="draft.validationIssues.length" class="validation-issues">
-              <strong>最近保存时的发布检查</strong>
-              <ul><li v-for="issue in draft.validationIssues" :key="`${issue.code}-${issue.path}`">{{ issue.message }}</li></ul>
-            </div>
           </el-tab-pane>
           <el-tab-pane label="评价指标" name="indicator">
+            <div v-if="!workflow.questionReady" class="indicator-step-notice">
+              <span>请先完成问卷，再配置指标。已有指标配置会保留。</span>
+              <el-button link type="primary" size="small" @click="nextStep">返回完善问卷</el-button>
+            </div>
+            <div v-else-if="workflow.indicatorIssues.length" class="indicator-step-notice">
+              <strong>完成以下配置即可进入人员配置</strong>
+              <ul><li v-for="issue in workflow.indicatorIssues" :key="issue">{{ issue }}</li></ul>
+            </div>
+            <div v-else-if="!draftStore.dirty && draft.validationIssues.length" class="indicator-step-notice">
+              <strong>保存检查发现以下问题</strong>
+              <ul><li v-for="issue in draft.validationIssues" :key="`${issue.code}-${issue.path}`">{{ issue.message }}</li></ul>
+            </div>
             <IndicatorPanel
+              v-if="workflow.questionReady"
               :indicators="draft.indicators"
               :questions="draftStore.scoredQuestions"
+              :pages="draft.pages"
               @add="draftStore.addIndicator"
               @change="draftStore.updateIndicator"
               @delete="draftStore.removeIndicator"
               @move="draftStore.moveIndicator"
               @set-bindings="draftStore.setIndicatorBindings"
+              @set-question-indicator="draftStore.setQuestionIndicator"
+              @locate-question="draftStore.selectQuestion($event); focusQuestion($event)"
             />
           </el-tab-pane>
         </el-tabs>
@@ -360,33 +430,55 @@ onBeforeUnmount(() => draftStore.reset())
 </template>
 
 <style scoped>
-.editor-page { display: grid; gap: 16px; min-height: calc(100vh - 120px); }
+.editor-page { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); gap: 10px; height: 100%; min-height: 0; }
+.editor-workflow { display: flex; align-items: center; gap: 16px; min-width: 0; padding: 8px 14px; border: 1px solid var(--fb-border, #e5e7eb); border-radius: 8px; background: var(--fb-surface, #fff); }
+.editor-workflow:deep(.el-steps) { flex: 1; min-width: 0; padding: 0; background: transparent; }
+.editor-workflow:deep(.el-step__title) { font-size: 13px; white-space: nowrap; }
+.editor-workflow:deep(.el-step__arrow) { flex: 1; min-width: 22px; }
+.workflow-hint { flex: 0 1 330px; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fb-text-muted, #73767a); font-size: 12px; }
+.indicator-step-notice { margin-bottom: 12px; padding: 10px; border-radius: 6px; background: var(--fb-primary-bg, #f4f8ff); color: var(--fb-text-regular, #606266); font-size: 12px; line-height: 1.7; }
+.indicator-step-notice ul { margin: 6px 0 0; padding-left: 16px; }
+.editor-header { flex-wrap: nowrap; gap: 12px; padding: 10px 14px; }
+.editor-header .workspace-detail-heading { flex: 1; }
+.editor-header .workspace-detail-back { height: 30px; padding: 4px 6px; }
+.editor-header .workspace-detail-divider { height: 26px; margin-inline: 10px; }
+.editor-header .workspace-detail-title { display: flex; flex: 0 1 auto; align-items: center; gap: 14px; }
+.editor-header h1 { flex: none; font-size: 17px; }
+.editor-header .workspace-detail-project { min-width: 0; margin: 0; }
+.editor-help { flex: none; margin-left: 8px; color: var(--fb-text-muted, #909399); }
 .editor-actions, .canvas-summary, .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .editor-actions { flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
-.editor-actions :deep(.el-button + .el-button) { margin-left: 0; }
+.editor-actions:deep(.el-button + .el-button) { margin-left: 0; }
 .dirty-state { color: #e6a23c; font-size: 13px; }
 .saved-state { color: #67c23a; font-size: 13px; }
-.editor-grid { display: grid; grid-template-columns: 210px minmax(360px, 1fr) 390px; gap: 14px; align-items: start; }
+.editor-grid { display: grid; grid-template-columns: 210px minmax(360px, 1fr) 390px; gap: 14px; min-height: 0; align-items: stretch; }
 .editor-grid.preview-expanded { grid-template-columns: 210px minmax(360px, 1fr) clamp(390px, 40%, 760px); }
-.editor-panel { min-width: 0; padding: 18px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
-.left-panel, .right-panel { position: sticky; top: var(--workspace-panel-top, 78px); max-height: calc(100vh - var(--workspace-panel-top, 78px) - 22px); overflow-y: auto; }
-.left-panel { display: grid; gap: 24px; }
+.editor-panel { min-width: 0; padding: 18px; border: 1px solid var(--fb-border, #e5e7eb); border-radius: 10px; background: var(--fb-surface, #fff); }
+.left-panel, .right-panel, .canvas-panel { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.left-panel { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
 .left-panel > * { min-width: 0; }
-.right-panel { height: calc(100vh - var(--workspace-panel-top, 78px) - 22px); display: flex; padding: 0; overflow: hidden; }
-.right-panel :deep(.el-tabs) { display: flex; flex-direction: column; min-width: 0; width: 100%; }
-.right-panel :deep(.el-tabs__header) { flex: none; margin: 0; padding: 10px 14px 0; }
-.right-panel :deep(.el-tabs__content) { flex: 1; overflow-y: auto; min-height: 0; padding: 14px; }
-.editor-grid.preview-expanded .right-panel :deep(.el-tabs__content) { --preview-gutter: clamp(14px, 1vw, 22px); padding: var(--preview-gutter); background: #e7ecef; }
-.live-preview-controls { margin: calc(-1 * var(--preview-gutter, 14px)) calc(-1 * var(--preview-gutter, 14px)) 20px; padding: 12px var(--preview-gutter, 14px); border-bottom: 1px solid #dce1e6; background: #fff; }
-.live-preview-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: #606266; }
-.live-preview-pagination { justify-content: center; margin-top: 8px; }
-.live-preview-hint { margin: 6px 0 0; color: #909399; font-size: 12px; }
-.questionnaire-form { padding-bottom: 4px; border-bottom: 1px solid #e5e7eb; }
-.page-heading { margin-bottom: 14px; color: #64748b; font-size: 13px; }
-.canvas-summary { margin: 10px 0; color: #64748b; font-size: 13px; }
+.left-panel > .questionnaire-outline { flex: 1; }
+.right-panel { display: flex; padding: 0; overflow: hidden; }
+.right-panel:deep(.el-tabs) { display: flex; flex-direction: column; min-width: 0; width: 100%; }
+.right-panel:deep(.el-tabs__header) { flex: none; margin: 0; padding: 4px 14px 0; }
+.right-panel:deep(.el-tabs__content) { flex: 1; overflow-y: auto; min-height: 0; padding: 14px; }
+.editor-grid.preview-expanded .right-panel:deep(.el-tabs__content) { --preview-gutter: clamp(14px, 1vw, 22px); padding: var(--preview-gutter); background: var(--fb-surface-muted, #e7ecef); }
+.live-preview-controls { position: sticky; top: calc(-1 * var(--preview-gutter, 14px)); z-index: 2; margin: calc(-1 * var(--preview-gutter, 14px)) calc(-1 * var(--preview-gutter, 14px)) 16px; padding: 10px var(--preview-gutter, 14px); border-bottom: 1px solid var(--fb-border, #dce1e6); background: var(--fb-surface, #fff); }
+.live-preview-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; color: var(--fb-text-regular, #606266); }
+.preview-page-status, .live-preview-toolbar > .el-button { flex: none; white-space: nowrap; }
+.live-preview-pagination { flex: 1; min-width: 0; margin: 0; }
+.live-preview-toolbar:deep(.el-pagination) { justify-content: center; }
+.live-preview-pagination:deep(.number), .live-preview-pagination :deep(.btn-prev), .live-preview-pagination :deep(.btn-next), .live-preview-pagination :deep(.more) { min-width: 22px; margin-inline: 0; }
+.questionnaire-form { padding-bottom: 4px; border-bottom: 1px solid var(--fb-border, #e5e7eb); }
+.page-heading { margin-bottom: 14px; color: var(--fb-text-muted, #64748b); font-size: 13px; }
+.canvas-summary { flex-wrap: wrap; gap: 8px 12px; margin: 10px 0; color: var(--fb-text-muted, #64748b); font-size: 13px; }
+.canvas-summary > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.canvas-summary > span:last-child { flex: none; margin-left: auto; padding: 5px 10px; border: 1px solid var(--el-color-primary-light-7); border-radius: 6px; color: var(--el-color-primary-dark-2); background: var(--el-color-primary-light-9); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 22px; white-space: nowrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); }
-.validation-issues { margin-top: 16px; padding: 12px; border-radius: 8px; color: #b45309; background: #fff7ed; font-size: 13px; }
-.validation-issues ul { margin: 8px 0 0; padding-left: 20px; }
+.validation-issues { margin-top: 16px; padding: 10px 12px; border: 1px solid var(--fb-warning-border, #fae4c5); border-radius: 6px; color: var(--fb-warning-text, #a65c16); background: var(--fb-warning-bg, #fffbf5); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.validation-issues strong { font-weight: 600; }
+.validation-issues ul { margin: 6px 0 0; padding-left: 16px; }
+.validation-issues li + li { margin-top: 4px; }
 @media (max-width: 1500px) {
   .editor-grid { grid-template-columns: 190px minmax(340px, 1fr) 330px; gap: 12px; }
   .editor-grid.preview-expanded { grid-template-columns: 190px minmax(340px, 1fr) clamp(330px, 40%, calc(100% - 554px)); }
@@ -394,15 +486,24 @@ onBeforeUnmount(() => draftStore.reset())
   .right-panel { padding: 0; }
 }
 @media (max-width: 1100px) {
-  .editor-grid { grid-template-columns: minmax(340px, 1fr) 320px; }
-  .editor-grid.preview-expanded { grid-template-columns: minmax(340px, 1fr) clamp(320px, 44%, calc(100% - 352px)); }
-  .left-panel { grid-column: 1 / -1; position: static; max-height: none; grid-template-columns: 1fr 1fr; }
+  .editor-workflow { flex-wrap: wrap; gap: 4px; }
+  .editor-workflow:deep(.el-steps) { flex-basis: 100%; }
+  .workflow-hint { flex-basis: 100%; }
+  .editor-grid, .editor-grid.preview-expanded { grid-template-columns: 160px minmax(260px, 1fr) 300px; gap: 10px; overflow-x: auto; }
+  .editor-header .workspace-detail-title { display: block; }
+  .editor-header .workspace-detail-project { margin-top: 2px; }
+  .editor-actions { gap: 6px; }
 }
 @media (max-width: 760px) {
+  .editor-page { height: auto; grid-template-rows: auto auto auto; }
+  .editor-workflow { padding: 8px; }
+  .editor-workflow:deep(.el-step__title) { font-size: 11px; }
+  .editor-workflow:deep(.el-step__head) { display: none; }
   .editor-header, .editor-actions { align-items: flex-start; flex-wrap: wrap; }
   .editor-grid, .editor-grid.preview-expanded { grid-template-columns: 1fr; }
   .left-panel, .right-panel { position: static; max-height: none; }
-  .left-panel { grid-template-columns: 1fr; }
+  .left-panel { max-height: 560px; }
+  .left-panel > .questionnaire-outline { flex-basis: 280px; }
   .right-panel { height: auto; min-height: 380px; }
 }
 @media (max-width: 760px) {

@@ -28,7 +28,7 @@ async function openProgress() {
 <template>
   <section class="progress-entry-page">
     <header class="workspace-page-header">
-      <div><h1 class="page-heading">回收进度</h1>
+      <div><h1 class="page-heading">评价进度</h1>
       <p class="page-description">输入项目编号，查看你有权限访问的评价进度。</p></div>
     </header>
     <el-card shadow="never" class="entry-card">
@@ -44,7 +44,7 @@ async function openProgress() {
             @keyup.enter="openProgress"
           />
         </el-form-item>
-        <el-button type="primary" @click="openProgress">查看回收进度</el-button>
+        <el-button type="primary" @click="openProgress">查看评价进度</el-button>
       </el-form>
     </el-card>
   </section>
@@ -52,7 +52,7 @@ async function openProgress() {
 
 <style scoped>
 .progress-entry-page { display: grid; max-width: 720px; gap: 20px; }
-.progress-entry-page h1 { margin: 0 0 8px; color: #0f172a; }
-.progress-entry-page p { margin: 0; color: #64748b; line-height: 1.7; }
-.entry-card :deep(.el-input-number) { width: 100%; }
+.progress-entry-page h1 { margin: 0 0 8px; color: var(--fb-text-primary, #0f172a); }
+.progress-entry-page p { margin: 0; color: var(--fb-text-muted, #64748b); line-height: 1.7; }
+.entry-card:deep(.el-input-number) { width: 100%; }
 </style>

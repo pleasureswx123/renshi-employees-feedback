@@ -38,7 +38,7 @@ export const useAnswerSheetStore = defineStore('answerSheet', {
     hydrate(detail) {
       this.detail = detail
       this.answers = restoreAnswers(detail)
-      this.pageIndex = Math.max(0, detail.questionnaire.pages.findIndex(page => page.pageId === detail.lastPageId))
+      this.pageIndex = this.history ? 0 : Math.max(0, detail.questionnaire.pages.findIndex(page => page.pageId === detail.lastPageId))
       this.dirty = false
       this.issues = []
       this.error = ''

@@ -41,8 +41,8 @@ function changeValue(value) {
 
 <style scoped>
 .question-block { display: grid; gap: 12px; }
-.question-heading { color: #111827; line-height: 1.6; }
+.question-heading { color: var(--fb-text-primary, #111827); line-height: 1.6; }
 .required-mark { margin-right: 4px; color: #f56c6c; }
-.question-description { margin: 0; color: #64748b; line-height: 1.6; }
-.range-hint { color: #909399; }
+.question-description { margin: 0; color: var(--fb-text-muted, #64748b); line-height: 1.6; }
+.range-hint { color: var(--fb-text-muted, #909399); }
 </style>

@@ -16,7 +16,7 @@ const cards = [
 </script>
 
 <template>
-  <div class="kpi-grid" aria-label="回收统计">
+  <div class="kpi-grid" aria-label="评价进度统计">
     <button
       v-for="card in cards"
       :key="card.key"
@@ -43,10 +43,10 @@ const cards = [
   gap: 8px;
   min-width: 0;
   padding: 18px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--fb-border, #e2e8f0);
   border-radius: 10px;
-  background: #fff;
-  color: #64748b;
+  background: var(--fb-surface, #fff);
+  color: var(--fb-text-muted, #64748b);
   text-align: left;
   cursor: pointer;
   transition: border-color .2s, box-shadow .2s;
@@ -58,7 +58,7 @@ const cards = [
   box-shadow: 0 0 0 2px rgb(64 158 255 / 12%);
   outline: none;
 }
-.kpi-card strong { color: #0f172a; font-size: 26px; overflow-wrap: anywhere; }
+.kpi-card strong { color: var(--fb-text-primary, #0f172a); font-size: 26px; overflow-wrap: anywhere; }
 @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

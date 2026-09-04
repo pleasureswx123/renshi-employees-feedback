@@ -91,6 +91,6 @@ onBeforeUnmount(() => { active = false; store.reset() })
 <style scoped>
 .submitted-answers { display: grid; gap: 20px; min-width: 0; }
 .el-pagination { margin-top: 20px; }
-.answer-question { padding: 18px 0; border-bottom: 1px solid #ebeef5; overflow-wrap: anywhere; }
+.answer-question { padding: 18px 0; border-bottom: 1px solid var(--fb-border, #ebeef5); overflow-wrap: anywhere; }
 h2, h3, p { overflow-wrap: anywhere; }
 </style>

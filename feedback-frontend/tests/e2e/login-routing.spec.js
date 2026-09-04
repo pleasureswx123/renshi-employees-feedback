@@ -76,7 +76,8 @@ test('登录、刷新恢复、双工作台切换和退出形成完整路由链',
   await expect(page).toHaveURL(/\/employee\/todos$/)
   await expect(page.getByRole('heading', { name: '我的待办' })).toBeVisible()
 
-  await page.getByRole('button', { name: '退出登录' }).click()
+  await page.getByRole('button', { name: '用户菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
   await expect(page).toHaveURL(/\/login$/)
 })
 

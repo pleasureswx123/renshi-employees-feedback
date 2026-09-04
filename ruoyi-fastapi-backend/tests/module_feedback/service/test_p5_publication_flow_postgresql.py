@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from config.database import create_async_db_engine, create_async_session_factory
 from config.env import DataSourceSettings
-from exceptions.exception import ConflictException
+from exceptions.exception import ConflictException, ServiceException
 from module_admin.entity.do.dept_do import SysDept
 from module_admin.entity.do.user_do import SysUser
 from module_feedback.dao import FeedbackAssignmentDao, FeedbackPublicationDao
@@ -233,6 +233,7 @@ async def test_p5_configuration_publish_snapshot_idempotency_and_read_only() -> 
         config = state['config']
         target_user_id, evaluator_user_id, publisher_user_id = state['user_ids']
         assert config.is_publish_ready is True
+        assert config.frozen_details is None
         assert config.preview.assignment_count == EXPECTED_ASSIGNMENT_COUNT
         assert [item.relation_code for item in config.evaluator_selections] == ['REL_PEER', 'REL_SELF']
 
@@ -318,17 +319,34 @@ async def test_p5_configuration_publish_snapshot_idempotency_and_read_only() -> 
                 update(SysUser).where(SysUser.user_id == target_user_id).values(nick_name='发布后被评价人')
             )
             await db.execute(
-                update(SysUser).where(SysUser.user_id == evaluator_user_id).values(nick_name='发布后评价人')
+                update(SysUser)
+                .where(SysUser.user_id == evaluator_user_id)
+                .values(nick_name='发布后评价人', dept_id=None)
             )
             await db.commit()
 
             frozen = await FeedbackPublicationService.get_config(db, state['project_id'], true())
             assert frozen.editable is False
             assert frozen.project_status.value == 'ACTIVE'
+            assert frozen.frozen_details.published_by == publisher_user_id
+            assert frozen.frozen_details.published_time == project.published_time
+            assert frozen.frozen_details.version_no == version.version_no
+            assert frozen.frozen_details.questionnaire.version_id == state['version_id']
+            assert frozen.frozen_details.questionnaire.title == 'P5发布问卷'
+            assert frozen.frozen_details.questionnaire.pages[0].questions[0].title == '协作表现'
+            assert frozen.frozen_details.questionnaire.indicators[0].question_codes == ['Q_SCORE']
+            assert str(frozen.frozen_details.questionnaire.indicators[0].weight) == '100.0000'
+            assert frozen.frozen_details.published_by_name == (await db.get(SysUser, publisher_user_id)).user_name
+            with pytest.raises(ServiceException):
+                await FeedbackPublicationService.get_config(db, state['project_id'], false())
             assert frozen.targets[0].nick_name == '发布时被评价人'
             participant_names = {item.user_id: item.nick_name for item in frozen.configured_participants}
             assert participant_names[target_user_id] == '发布时被评价人'
             assert participant_names[evaluator_user_id] == '发布时评价人'
+            frozen_evaluator = next(
+                item for item in frozen.configured_participants if item.user_id == evaluator_user_id
+            )
+            assert frozen_evaluator.dept_id == peer_task.evaluator_dept_id
             with pytest.raises(ConflictException) as exc_info:
                 await FeedbackPublicationService.save_config(
                     db,

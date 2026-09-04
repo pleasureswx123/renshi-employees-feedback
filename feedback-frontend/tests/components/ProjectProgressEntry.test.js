@@ -21,7 +21,7 @@ async function mountEntry() {
   return router
 }
 
-describe('回收进度安全入口', () => {
+describe('评价进度安全入口', () => {
   afterEach(() => wrapper?.unmount())
 
   it('使用ElForm正整数规则并通过明确按钮进入项目进度页', async () => {

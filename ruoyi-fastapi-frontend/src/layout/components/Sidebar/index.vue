@@ -1,7 +1,7 @@
 <template>
   <div :class="['sidebar-theme-wrapper', {'has-logo':showLogo}, sideTheme]" class="sidebar-container">
     <logo v-if="showLogo" :collapse="isCollapse" />
-    <el-scrollbar wrap-class="scrollbar-wrapper">
+    <el-scrollbar class="sidebar-menu-scroll" wrap-class="scrollbar-wrapper">
       <el-menu
         :default-active="activeMenu"
         :collapse="isCollapse"
@@ -21,6 +21,9 @@
         />
       </el-menu>
     </el-scrollbar>
+    <footer v-if="!isCollapse" class="sidebar-company" aria-label="公司标识">
+      <img :src="brand.companyLogo" :alt="brand.companyName" width="1231" height="267" />
+    </footer>
   </div>
 </template>
 
@@ -31,6 +34,7 @@ import variables from '@/assets/styles/variables.module.scss'
 import useAppStore from '@/store/modules/app'
 import useSettingsStore from '@/store/modules/settings'
 import usePermissionStore from '@/store/modules/permission'
+import { brand } from '@/config/brand'
 
 const route = useRoute();
 const appStore = useAppStore()
@@ -70,7 +74,14 @@ const activeMenu = computed(() => {
 
 <style lang="scss" scoped>
 .sidebar-container {
+  display: flex;
+  flex-direction: column;
   background-color: v-bind(getMenuBackground);
+
+  :deep(.sidebar-logo-container) { flex-shrink: 0; }
+  .sidebar-menu-scroll { flex: 1 1 0%; min-height: 0; }
+  .sidebar-company { flex-shrink: 0; margin: 12px 12px 16px; padding: 10px 6px; border: 1px solid #34455e; border-radius: 8px; background: #243247; }
+  .sidebar-company img { display: block; width: 100%; height: auto; }
   
   .scrollbar-wrapper {
     background-color: v-bind(getMenuBackground);

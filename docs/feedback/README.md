@@ -20,6 +20,7 @@
 16. [P9安全、性能、迁移与首期验收](./16-p9-release-acceptance.md)
 17. [启动、迁移、权限与运维手册](./17-operations-runbook.md)
 18. [P0–P9复核与内置浏览器完整流程验收](./18-p0-p9-browser-acceptance.md)
+19. [同见：名称与标识](./19-brand-identity.md)
 
 ## 文档维护规则
 

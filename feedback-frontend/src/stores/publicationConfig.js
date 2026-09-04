@@ -43,7 +43,7 @@ export const usePublicationConfigStore = defineStore('publicationConfig', {
     participantDirectory(state) {
       const directory = new Map()
       for (const item of state.config?.configuredParticipants || []) directory.set(item.userId, item)
-      for (const item of state.candidateRows) directory.set(item.userId, item)
+      if (state.config?.editable) for (const item of state.candidateRows) directory.set(item.userId, item)
       for (const item of state.config?.targets || []) directory.set(item.userId, item)
       return directory
     },
@@ -59,6 +59,7 @@ export const usePublicationConfigStore = defineStore('publicationConfig', {
         const response = await getPublicationConfig(projectId)
         this.projectId = Number(projectId)
         this.config = normalizePublicationConfig(response.data)
+        if (!this.config.editable) this.candidateRows = []
         this.dirty = false
         this.lastSavedAt = null
       } finally {
@@ -66,7 +67,7 @@ export const usePublicationConfigStore = defineStore('publicationConfig', {
       }
     },
     async loadCandidates({ pageNum = 1, keyword = this.candidateKeyword } = {}) {
-      if (this.candidatesLoading || !this.projectId) return
+      if (this.candidatesLoading || !this.projectId || !this.editable) return
       this.candidatesLoading = true
       this.candidatePageNum = pageNum
       this.candidateKeyword = keyword
@@ -76,6 +77,8 @@ export const usePublicationConfigStore = defineStore('publicationConfig', {
           pageSize: this.candidatePageSize,
           keyword: keyword || undefined
         })
+        // 发布响应可能先于候选查询返回；迟到的当前资料不能覆盖冻结快照。
+        if (!this.editable) return
         this.candidateRows = response.rows || []
         this.candidateTotal = Number(response.total || 0)
         for (const item of this.candidateRows) upsertParticipant(this.config.configuredParticipants, item)

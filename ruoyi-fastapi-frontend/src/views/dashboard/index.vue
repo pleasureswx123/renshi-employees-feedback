@@ -4,7 +4,7 @@
       <div class="welcome-content">
         <el-avatar :size="56" :src="userStore.avatar" :icon="UserFilled" />
         <div class="welcome-copy">
-          <span class="eyebrow">员工反馈与 360° 评价平台 · 系统管理</span>
+          <span class="eyebrow">{{ brand.title }} · {{ brand.description }}</span>
           <h1>你好，{{ userStore.nickName || userStore.name || '管理员' }}</h1>
           <p>维护组织与账号，配置参评权限，为每一轮评价做好准备。</p>
         </div>
@@ -84,6 +84,7 @@ import { listUser } from '@/api/system/user'
 import { listDept } from '@/api/system/dept'
 import { listRole } from '@/api/system/role'
 import useUserStore from '@/store/modules/user'
+import { brand } from '@/config/brand'
 import { checkPermi } from '@/utils/permission'
 import { emptyOverview, loadManagementOverview, overviewPermissions, resolveFeedbackEntry } from '@/utils/managementOverview'
 

@@ -14,6 +14,7 @@ const props = defineProps({
 })
 const pages = computed(() => props.pageCode ? props.draft.pages.filter(page => page.pageCode === props.pageCode) : props.draft.pages)
 const questions = computed(() => props.draft.pages.flatMap(page => page.questions))
+const questionNumbers = computed(() => new Map(questions.value.map((question, index) => [question.questionCode, index + 1])))
 const answers = reactive({})
 const questionElements = new Map()
 const previewDocumentRef = ref()
@@ -71,7 +72,7 @@ defineExpose({ resetAnswers })
     <section v-for="page in pages" :key="page.pageCode" class="preview-page">
       <el-empty v-if="!page.questions.length" description="添加题目后，即可在这里试填" :image-size="64" />
       <div
-        v-for="(question, index) in page.questions"
+        v-for="question in page.questions"
         :key="question.questionCode"
         :ref="element => element ? questionElements.set(question.questionCode, element) : questionElements.delete(question.questionCode)"
         :class="['preview-question', { 'is-selected': compact && question.questionCode === selectedQuestionCode }]"
@@ -79,7 +80,7 @@ defineExpose({ resetAnswers })
       >
         <header class="preview-question-heading">
           <h3 class="preview-question-title">
-            <span class="preview-question-number">{{ index + 1 }}、</span><strong>{{ question.title.trim() || `${getQuestionTypeDefinition(question.questionType)?.label} · 待填写题目内容` }}</strong><span v-if="question.isRequired" class="required-mark" aria-label="必答">*</span>
+            <span class="preview-question-number">{{ questionNumbers.get(question.questionCode) }}、</span><strong>{{ question.title.trim() || `${getQuestionTypeDefinition(question.questionType)?.label} · 待填写题目内容` }}</strong><span v-if="question.isRequired" class="required-mark" aria-label="必答">*</span>
           </h3>
           <span v-if="compact && question.questionCode === selectedQuestionCode" class="editing-indicator">正在编辑</span>
         </header>
@@ -98,21 +99,21 @@ defineExpose({ resetAnswers })
 </template>
 
 <style scoped>
-.preview-document { container-type: inline-size; width: min(760px, 100%); margin: 0 auto; padding: 28px; border-radius: 10px; background: #fff; box-sizing: border-box; }
-.preview-document-heading h2 { margin: 0 0 18px; color: #1f2937; font-size: 22px; line-height: 1.5; text-align: center; overflow-wrap: anywhere; }
+.preview-document { container-type: inline-size; width: min(760px, 100%); margin: 0 auto; padding: 28px; border-radius: 10px; background: var(--fb-surface, #fff); box-sizing: border-box; }
+.preview-document-heading h2 { margin: 0 0 18px; color: var(--fb-text-primary, #1f2937); font-size: 22px; line-height: 1.5; text-align: center; overflow-wrap: anywhere; }
 .plain-description { white-space: pre-wrap; overflow-wrap: anywhere; }
 .preview-page { margin-top: 20px; }
 .preview-question { margin-top: 24px; overflow-wrap: anywhere; }
 .preview-question-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-.preview-question-title { min-width: 0; margin: 0; color: #111827; font-size: 14px; font-weight: 600; line-height: 1.6; white-space: pre-wrap; }
+.preview-question-title { min-width: 0; margin: 0; color: var(--fb-text-primary, #111827); font-size: 14px; font-weight: 600; line-height: 1.6; white-space: pre-wrap; }
 .required-mark { margin-left: 4px; color: #f56c6c; }
 .editing-indicator { flex-shrink: 0; color: #409eff; font-size: 12px; }
-.preview-question-description { margin: 0 0 12px; color: #64748b; line-height: 1.6; white-space: pre-wrap; }
-.compact { min-height: 640px; padding: 28px clamp(18px, 5%, 36px) 40px; border: 1px solid #c8ced4; border-radius: 0; box-shadow: 0 2px 8px rgb(15 23 42 / 12%); }
+.preview-question-description { margin: 0 0 12px; color: var(--fb-text-muted, #64748b); line-height: 1.6; white-space: pre-wrap; }
+.compact { min-height: 640px; padding: 28px clamp(18px, 5%, 36px) 40px; border: 1px solid var(--fb-border-strong, #c8ced4); border-radius: 0; box-shadow: 0 2px 8px rgb(15 23 42 / 12%); }
 .compact .preview-document-heading h2 { font-size: 18px; }
 .compact .preview-question { margin-top: 20px; }
 .compact .preview-question.is-selected .preview-question-number { color: #409eff; }
-.preview-question :deep(.el-input-number) { max-width: 100%; }
-.preview-question :deep(.el-slider) { flex-wrap: nowrap; gap: 16px; }
-.preview-question :deep(.el-slider__runway.show-input) { min-width: 0; margin-right: 0; }
+.preview-question:deep(.el-input-number) { max-width: 100%; }
+.preview-question:deep(.el-slider) { flex-wrap: nowrap; gap: 16px; }
+.preview-question:deep(.el-slider__runway.show-input) { min-width: 0; margin-right: 0; }
 </style>

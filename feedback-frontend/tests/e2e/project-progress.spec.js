@@ -72,7 +72,7 @@ async function login(page) {
   await expect(page).toHaveURL(/\/hr\/projects$/)
 }
 
-test('HR实时预检、二次确认完成并刷新为只读状态', async ({ page }) => {
+test('有未提交任务时禁用完成，HR通过提前结束预检确认并刷新为只读状态', async ({ page }) => {
   await mockBase(page)
   let completed = false
   let completeCount = 0
@@ -96,18 +96,24 @@ test('HR实时预检、二次确认完成并刷新为只读状态', async ({ pag
   await page.route('**/dev-api/feedback/projects/**', handle)
   await login(page)
 
-  await page.getByRole('button', { name: '回收进度' }).click()
+  await page.getByRole('button', { name: '评价进度' }).click()
   await expect(page).toHaveURL(/\/hr\/projects\/12\/progress$/)
-  await expect(page.getByRole('heading', { name: 'P7回收项目' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '评价进度', exact: true })).toBeVisible()
   await expect(page.getByText('33.33%')).toBeVisible()
   await expect(page.getByText('张三').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: '完成项目', exact: true })).toBeDisabled()
+  await expect(page.getByText('还有 2 份未提交', { exact: true })).toBeVisible()
+  expect(completeCount).toBe(0)
 
-  await page.getByRole('button', { name: '完成项目' }).click()
-  const drawer = page.getByRole('dialog', { name: '完成项目实时预检' })
+  await page.getByRole('button', { name: '提前结束', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: '提前结束项目确认' })
+  await expect(drawer.getByText('还有 2 份评价未提交', { exact: true })).toBeVisible()
+  await expect(drawer.getByText('确认后，剩余 2 份任务将关闭，员工不能继续填写；报告仅使用 1 份已提交答卷。项目结束后不能重新打开。')).toBeVisible()
+  await expect(drawer.getByRole('button', { name: '确认提前结束', exact: true })).toBeDisabled()
   await expect(drawer.getByText('完成后1项已暂存任务和1项未开始任务将关闭且不可继续作答。')).toBeVisible()
   await drawer.getByLabel('完成原因').fill('  本轮评价截止  ')
   await drawer.locator('.el-checkbox').click()
-  await drawer.getByRole('button', { name: '确认完成项目' }).click()
+  await drawer.getByRole('button', { name: '确认提前结束', exact: true }).click()
 
   await expect(page.getByText('已完成').first()).toBeVisible()
   await expect(page.getByRole('button', { name: '完成项目' })).toHaveCount(0)
@@ -115,6 +121,39 @@ test('HR实时预检、二次确认完成并刷新为只读状态', async ({ pag
   expect(completePayload).toEqual({ projectLockVersion: 3, completionReason: '本轮评价截止', expectedSummary: { totalCount: 3, submittedCount: 1, draftCount: 1, pendingCount: 1, closedIncompleteCount: 0 } })
   await expect(page.getByText('查看答案')).toHaveCount(0)
   await expect(page.getByText('导出')).toHaveCount(0)
+})
+
+test('全部提交后仅提供正常完成入口，点击先预检且不直接发送完成请求', async ({ page }) => {
+  await mockBase(page)
+  const full = summary({ submittedCount: 3, draftCount: 0, pendingCount: 0, incompleteCount: 0, completionRate: '100.00' })
+  let precheckCount = 0
+  let completeCount = 0
+  const handle = route => {
+    const path = new URL(route.request().url()).pathname.replace('/dev-api', '')
+    if (path === '/feedback/projects') return route.fulfill({ json: { code: 200, rows: [{ projectId: 12, projectName: 'P7回收项目', status: 'ACTIVE', lockVersion: 3 }], total: 1 } })
+    if (path === '/feedback/projects/12/progress') return route.fulfill({ json: { code: 200, data: progress({ summary: full, rows: progress().rows.map(row => ({ ...row, status: 'SUBMITTED' })) }) } })
+    if (path === '/feedback/projects/12/completion-precheck') {
+      precheckCount += 1
+      return route.fulfill({ json: { code: 200, data: completionPrecheck({ summary: full }) } })
+    }
+    if (path === '/feedback/projects/12/complete') completeCount += 1
+    return route.fulfill({ status: 404, json: { code: 404, msg: '未匹配P7测试接口' } })
+  }
+  await page.route('**/dev-api/feedback/projects*', handle)
+  await page.route('**/dev-api/feedback/projects/**', handle)
+  await login(page)
+  await page.getByRole('button', { name: '评价进度', exact: true }).click()
+  await expect(page.getByText('全部评价已提交', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '提前结束', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '完成项目', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: '完成项目', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: '完成项目实时预检' })
+  await expect(drawer).toBeVisible()
+  await expect(drawer.getByRole('button', { name: '确认完成项目', exact: true })).toBeDisabled()
+  await expect(drawer.getByRole('button', { name: '确认提前结束', exact: true })).toHaveCount(0)
+  await drawer.getByRole('button', { name: '关闭', exact: true }).click()
+  expect(precheckCount).toBe(1)
+  expect(completeCount).toBe(0)
 })
 
 test('409统计变化关闭旧确认且不会自动重发完成请求', async ({ page }) => {
@@ -133,12 +172,12 @@ test('409统计变化关闭旧确认且不会自动重发完成请求', async ({
   await page.route('**/dev-api/feedback/projects*', handle)
   await page.route('**/dev-api/feedback/projects/**', handle)
   await login(page)
-  await page.getByRole('button', { name: '回收进度' }).click()
-  await page.getByRole('button', { name: '完成项目' }).click()
-  const drawer = page.getByRole('dialog', { name: '完成项目实时预检' })
+  await page.getByRole('button', { name: '评价进度' }).click()
+  await page.getByRole('button', { name: '提前结束', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: '提前结束项目确认' })
   await drawer.getByLabel('完成原因').fill('本轮截止')
   await drawer.locator('.el-checkbox').click()
-  await drawer.getByRole('button', { name: '确认完成项目' }).click()
+  await drawer.getByRole('button', { name: '确认提前结束', exact: true }).click()
   await expect(drawer).toHaveCount(0)
   await expect(page.getByText('回收数据已变化，请重新阅读最新预检并再次确认。')).toBeVisible()
   await expect(page.getByText('2').first()).toBeVisible()
@@ -159,9 +198,9 @@ test('390px完成抽屉正文和确认复选框不产生横向溢出', async ({ 
   await page.route('**/dev-api/feedback/projects*', handle)
   await page.route('**/dev-api/feedback/projects/**', handle)
   await login(page)
-  await page.getByRole('button', { name: '回收进度' }).click()
-  await page.getByRole('button', { name: '完成项目' }).click()
-  const drawer = page.getByRole('dialog', { name: '完成项目实时预检' })
+  await page.getByRole('button', { name: '评价进度' }).click()
+  await page.getByRole('button', { name: '提前结束', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: '提前结束项目确认' })
   await expect(drawer).toBeVisible()
 
   const bodySize = await drawer.locator('.el-drawer__body').evaluate(element => ({
@@ -189,13 +228,13 @@ test('progress-only用户从安全入口进入进度页且不会请求项目详�
   await page.getByRole('button', { name: '登录', exact: true }).click()
 
   await expect(page).toHaveURL(/\/hr\/progress$/)
-  await expect(page.getByRole('heading', { name: '回收进度' })).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: '回收进度' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '评价进度' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: '评价进度' })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: '项目管理' })).toHaveCount(0)
   await page.getByRole('spinbutton', { name: '项目ID' }).fill('12')
-  await page.getByRole('button', { name: '查看回收进度' }).click()
+  await page.getByRole('button', { name: '查看评价进度' }).click()
   await expect(page).toHaveURL(/\/hr\/projects\/12\/progress$/)
-  await expect(page.getByRole('button', { name: '返回回收进度入口' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '返回评价进度入口' })).toBeVisible()
   expect(detailRequestCount).toBe(0)
 })
 
@@ -234,8 +273,8 @@ test('预检发现并发已完成后刷新终态并打开只读审计抽屉', as
   await page.route('**/dev-api/feedback/projects*', handle)
   await page.route('**/dev-api/feedback/projects/**', handle)
   await login(page)
-  await page.getByRole('button', { name: '回收进度' }).click()
-  await page.getByRole('button', { name: '完成项目' }).click()
+  await page.getByRole('button', { name: '评价进度' }).click()
+  await page.getByRole('button', { name: '提前结束', exact: true }).click()
 
   const drawer = page.getByRole('dialog', { name: '完成项目实时预检' })
   await expect(drawer.getByText('完成操作人ID：7')).toBeVisible()
@@ -265,13 +304,13 @@ test('完成范围被收窄时立即清空旧明细且刷新失败也不回显',
   await page.route('**/dev-api/feedback/projects*', handle)
   await page.route('**/dev-api/feedback/projects/**', handle)
   await login(page)
-  await page.getByRole('button', { name: '回收进度' }).click()
+  await page.getByRole('button', { name: '评价进度' }).click()
   await expect(page.getByText('张三').first()).toBeVisible()
-  await page.getByRole('button', { name: '完成项目' }).click()
-  const drawer = page.getByRole('dialog', { name: '完成项目实时预检' })
+  await page.getByRole('button', { name: '提前结束', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: '提前结束项目确认' })
   await drawer.getByLabel('完成原因').fill('本轮截止')
   await drawer.locator('.el-checkbox').click()
-  await drawer.getByRole('button', { name: '确认完成项目' }).click()
+  await drawer.getByRole('button', { name: '确认提前结束', exact: true }).click()
 
   await expect(page.getByText('当前数据范围不能覆盖全部被评价人，禁止完成整个项目。')).toBeVisible()
   await expect(page.getByText('张三')).toHaveCount(0)
@@ -296,22 +335,23 @@ test('完成请求5xx后锁定且重新核对ACTIVE不自动重发', async ({ pa
   await page.route('**/dev-api/feedback/projects*', handle)
   await page.route('**/dev-api/feedback/projects/**', handle)
   await login(page)
-  await page.getByRole('button', { name: '回收进度' }).click()
-  await page.getByRole('button', { name: '完成项目' }).click()
-  const drawer = page.getByRole('dialog', { name: '完成项目实时预检' })
+  await page.getByRole('button', { name: '评价进度' }).click()
+  await page.getByRole('button', { name: '提前结束', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: '提前结束项目确认' })
   await drawer.getByLabel('完成原因').fill('本轮截止')
   await drawer.locator('.el-checkbox').click()
-  await drawer.getByRole('button', { name: '确认完成项目' }).click()
+  await drawer.getByRole('button', { name: '确认提前结束', exact: true }).click()
 
   await expect(page.getByText('完成请求可能已经到达服务端，当前结果未知。请先重新核对，系统不会自动重发完成请求。')).toBeVisible()
   await expect(page.getByRole('button', { name: '完成项目' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '提前结束', exact: true })).toBeDisabled()
   expect(completeCount).toBe(1)
   await page.getByRole('button', { name: '重新核对' }).click()
   await expect(page.getByText('服务端仍显示项目进行中；如需再次完成，请重新执行实时预检。')).toBeVisible()
   expect(completeCount).toBe(1)
   expect(precheckCount).toBe(1)
-  await page.getByRole('button', { name: '完成项目' }).click()
-  await expect(page.getByRole('dialog', { name: '完成项目实时预检' })).toBeVisible()
+  await page.getByRole('button', { name: '提前结束', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '提前结束项目确认' })).toBeVisible()
   expect(precheckCount).toBe(2)
   expect(completeCount).toBe(1)
 })

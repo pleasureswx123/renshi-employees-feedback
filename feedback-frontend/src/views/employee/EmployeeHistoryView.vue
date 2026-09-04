@@ -69,9 +69,9 @@ onBeforeUnmount(() => { requestId++ })
 <style scoped>
 .employee-history { display: grid; gap: 18px; max-width: 1200px; margin: auto; }
 .history-filter-card .history-filter { margin: 0; padding: 0; border: 0; }
-.history-filter-card :deep(.el-form-item) { margin-bottom: 0; }
+.history-filter-card:deep(.el-form-item) { margin-bottom: 0; }
 .history-list { min-height: 120px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .empty-history { grid-column: 1 / -1; }
 @media (max-width: 1000px) { .history-list { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 760px) { .history-filter-card :deep(.el-form-item:first-child) { margin-bottom: 14px; } }
+@media (max-width: 760px) { .history-filter-card:deep(.el-form-item:first-child) { margin-bottom: 14px; } }
 </style>

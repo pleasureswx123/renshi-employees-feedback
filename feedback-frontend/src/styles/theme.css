@@ -1,0 +1,43 @@
+/* Element Plus组件与业务区域共用主题变量；浅色沿用各区域已有颜色。 */
+html.dark {
+  --el-bg-color: #182334;
+  --el-bg-color-page: #101827;
+  --el-bg-color-overlay: #1c293b;
+  --el-text-color-primary: #edf2f9;
+  --el-text-color-regular: #c5d0e0;
+  --el-text-color-secondary: #a4b3c8;
+  --el-text-color-placeholder: #889ab1;
+  --el-text-color-disabled: #72839a;
+  --el-border-color: #3a4b62;
+  --el-border-color-light: #304158;
+  --el-border-color-lighter: #293950;
+  --el-border-color-extra-light: #243247;
+  --el-fill-color: #293a51;
+  --el-fill-color-light: #223147;
+  --el-fill-color-lighter: #1e2d41;
+  --el-fill-color-extra-light: #1b283b;
+  --el-fill-color-blank: #182334;
+  --fb-page: var(--el-bg-color-page);
+  --fb-surface: var(--el-bg-color);
+  --fb-surface-muted: var(--el-fill-color-light);
+  --fb-surface-hover: var(--el-fill-color);
+  --fb-text-primary: var(--el-text-color-primary);
+  --fb-text-regular: var(--el-text-color-regular);
+  --fb-text-muted: var(--el-text-color-secondary);
+  --fb-text-disabled: var(--el-text-color-placeholder);
+  --fb-border: var(--el-border-color-light);
+  --fb-border-strong: var(--el-border-color);
+  --fb-primary-text: #86bbff;
+  --fb-primary-bg: #1b3556;
+  --fb-primary-border: #365b85;
+  --fb-warning-text: #eebe77;
+  --fb-warning-bg: #362d21;
+  --fb-warning-border: #665138;
+  --fb-success-bg: #24382b;
+  --fb-surface-floating: rgb(24 35 52 / 96%);
+  /* 这些深色文字变量在浅色背景上使用，切换后改为可辨识的强调色。 */
+  --el-color-primary-dark-2: #79bbff;
+  --el-color-success-dark-2: #95d475;
+  --el-color-warning-dark-2: #eebe77;
+  --el-color-danger-dark-2: #f89898;
+}

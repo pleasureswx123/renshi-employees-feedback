@@ -1,14 +1,17 @@
 <script setup>
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import EvaluatorSelectionPanel from '@/components/feedback/publication/EvaluatorSelectionPanel.vue'
 import PublicationPreviewPanel from '@/components/feedback/publication/PublicationPreviewPanel.vue'
+import PublicationDetails from '@/components/feedback/publication/PublicationDetails.vue'
 import RelationConfigPanel from '@/components/feedback/publication/RelationConfigPanel.vue'
 import TargetSelectorPanel from '@/components/feedback/publication/TargetSelectorPanel.vue'
 import { usePermissionStore } from '@/stores/permission'
 import { usePublicationConfigStore } from '@/stores/publicationConfig'
+import { SELF_RELATION_CODE } from '@/utils/publicationConfig'
+import { analyzePublicationWorkflow, PUBLICATION_STEPS, publicationIssueDestination } from '@/utils/publicationWorkflow'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +19,22 @@ const permissionStore = usePermissionStore()
 const publicationStore = usePublicationConfigStore()
 const projectId = Number(route.params.projectId)
 const config = computed(() => publicationStore.config)
+const activeStep = ref(0)
+const evaluationMode = ref('others')
+const modeChanging = ref(false)
+const confirmingPublish = ref(false)
+const evaluatorPanel = ref(null)
+const stepContent = ref(null)
+const busy = computed(() => publicationStore.saving || publicationStore.publishing || modeChanging.value || confirmingPublish.value)
+const workflow = computed(() => analyzePublicationWorkflow(config.value, evaluationMode.value))
+const currentIssues = computed(() => [workflow.value.targetIssues, workflow.value.relationIssues, workflow.value.assignmentIssues.map(item => item.message)][activeStep.value] || [])
+const nextLabel = computed(() => activeStep.value === 1 && evaluationMode.value === 'self' ? '保存并检查发布条件' : activeStep.value === 2 ? '保存并检查发布条件' : `下一步：${PUBLICATION_STEPS[activeStep.value + 1]}`)
+const stepDescriptions = computed(() => [
+  config.value?.targets.length ? `已选 ${config.value.targets.length} 人` : '选择本轮被评价员工',
+  evaluationMode.value === 'self' ? '仅自评' : `计分关系权重 ${workflow.value.totalWeight}%`,
+  evaluationMode.value === 'self' ? '自动添加自评，无需分配' : workflow.value.assignmentIssues.length ? `待处理 ${workflow.value.assignmentIssues.length} 项` : '核对每人的评价安排',
+  publicationStore.dirty ? '修改后需重新检查' : config.value?.isPublishReady ? '检查已通过' : '保存后检查发布条件'
+])
 const canManage = computed(() => permissionStore.hasPermission('feedback:participant:manage'))
 const canPublishPermission = computed(() => permissionStore.hasPermission('feedback:project:publish'))
 const participantDirectory = computed(() => Array.from(publicationStore.participantDirectory.values()))
@@ -28,12 +47,12 @@ const canPublish = computed(
 )
 
 async function loadCandidates({ pageNum = 1, keyword = publicationStore.candidateKeyword } = {}) {
-  if (!canManage.value) return
+  if (!canManage.value || !config.value?.editable) return
   await publicationStore.loadCandidates({ pageNum, keyword })
 }
 
 async function saveConfig() {
-  if (publicationStore.saving) return
+  if (busy.value || !canManage.value) return null
   try {
     const saved = await publicationStore.save()
     if (!saved) return
@@ -42,13 +61,78 @@ async function saveConfig() {
     } else {
       ElMessage.success('配置已保存，发布前检查已通过')
     }
+    return saved
   } catch (error) {
     if (!error.status) ElMessage.warning(error.message)
   }
 }
 
+function showStep(step) {
+  activeStep.value = step
+  nextTick(() => stepContent.value?.scrollIntoView?.({ block: 'start' }))
+}
+
+async function goStep(step) {
+  if (busy.value) return
+  if (!config.value?.editable || !canManage.value || step <= activeStep.value) {
+    showStep(step)
+    return
+  }
+  const issuesByStep = [workflow.value.targetIssues, workflow.value.relationIssues, workflow.value.assignmentIssues.map(item => item.message)]
+  for (let index = 0; index < step; index += 1) {
+    if (index === 2 && evaluationMode.value === 'self') continue
+    if (issuesByStep[index].length) {
+      showStep(index)
+      ElMessage.warning(issuesByStep[index][0])
+      return
+    }
+  }
+  if (step === 3 && !await saveConfig()) return
+  showStep(step)
+}
+
+function nextStep() {
+  return goStep(activeStep.value === 1 && evaluationMode.value === 'self' ? 3 : activeStep.value + 1)
+}
+
+async function changeMode(mode) {
+  if (busy.value || !canManage.value || !config.value?.editable) return
+  if (mode === 'self') {
+    const configured = config.value.relations.some(item => item.relationCode !== SELF_RELATION_CODE && item.isEnabled)
+    if (configured) {
+      modeChanging.value = true
+      try {
+        await ElMessageBox.confirm('切换为仅自评将关闭其他评价关系，并移除已分配的他评人员。确认切换吗？', '切换为仅自评', { type: 'warning', confirmButtonText: '确认切换', cancelButtonText: '保留当前配置' })
+      } catch { return } finally { modeChanging.value = false }
+      for (const relation of config.value.relations) {
+        if (relation.relationCode !== SELF_RELATION_CODE) publicationStore.updateRelation(relation.relationCode, { isEnabled: false })
+      }
+    }
+  }
+  evaluationMode.value = mode
+}
+
+async function locateIssue(issue) {
+  if (busy.value) return
+  const destination = publicationIssueDestination(issue)
+  if (destination === 'editor') {
+    if (permissionStore.hasPermission('feedback:questionnaire:edit')) await router.push(`/hr/projects/${projectId}/editor`)
+    return
+  }
+  showStep(destination)
+  if (destination === 2) {
+    await nextTick()
+    const index = Number(issue.path?.split('.')[1])
+    evaluatorPanel.value?.locate({
+      targetUserId: issue.code === 'TARGET_SCORING_ASSIGNMENT_REQUIRED' ? config.value.targets[index]?.userId : undefined,
+      relationCode: issue.code === 'RELATION_POSITIVE_ASSIGNMENT_REQUIRED' ? config.value.relations[index]?.relationCode : undefined
+    })
+  }
+}
+
 async function publish() {
-  if (publicationStore.publishing || !canPublish.value) return
+  if (busy.value || !canPublish.value) return
+  confirmingPublish.value = true
   const preview = config.value.preview
   try {
     await ElMessageBox.confirm(
@@ -65,10 +149,13 @@ async function publish() {
   } catch (error) {
     if (error === 'cancel' || error === 'close') return
     if (!error.status) ElMessage.warning(error.message)
+  } finally {
+    confirmingPublish.value = false
   }
 }
 
 onBeforeRouteLeave(async () => {
+  if (busy.value) return false
   if (!publicationStore.dirty) return true
   try {
     await ElMessageBox.confirm('当前发布配置有未保存修改，确认离开吗？', '离开配置页', {
@@ -84,6 +171,8 @@ onBeforeRouteLeave(async () => {
 
 onMounted(async () => {
   await publicationStore.load(projectId)
+  evaluationMode.value = config.value.targets.length && !config.value.relations.some(item => item.isEnabled && item.relationCode !== SELF_RELATION_CODE) ? 'self' : 'others'
+  if (!config.value.editable || !canManage.value || config.value.isPublishReady) activeStep.value = 3
   await loadCandidates()
 })
 onBeforeUnmount(() => publicationStore.reset())
@@ -93,7 +182,18 @@ onBeforeUnmount(() => publicationStore.reset())
   <section v-loading="publicationStore.loading" class="publication-page">
     <header class="workspace-page-header workspace-detail-header">
       <div class="workspace-detail-heading">
-        <el-button class="workspace-detail-back" text aria-label="返回项目列表" title="返回项目列表" @click="router.push('/hr/projects')">
+        <el-button
+          v-if="config?.editable && permissionStore.hasPermission('feedback:questionnaire:edit')"
+          class="workspace-detail-back" text aria-label="返回问卷编辑" title="返回问卷编辑"
+          :disabled="busy"
+          @click="router.push(`/hr/projects/${projectId}/editor`)"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m10 6-6 6 6 6M4 12h16" />
+          </svg>
+          <span>返回问卷编辑</span>
+        </el-button>
+        <el-button v-else class="workspace-detail-back" text aria-label="返回项目列表" title="返回项目列表" :disabled="publicationStore.loading || busy" @click="router.push('/hr/projects')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m10 6-6 6 6 6M4 12h16" />
           </svg>
@@ -101,7 +201,7 @@ onBeforeUnmount(() => publicationStore.reset())
         </el-button>
         <el-divider direction="vertical" class="workspace-detail-divider" />
         <div class="workspace-detail-title">
-          <h1>人员关系与发布</h1>
+          <h1>{{ config && !config.editable ? '发布详情' : '人员关系与发布' }}</h1>
           <p class="workspace-detail-project">
             <span class="workspace-detail-project-label">所属项目</span>
             <span class="workspace-detail-project-name" :title="config?.projectName || '评价项目'">{{ config?.projectName || '评价项目' }}</span>
@@ -117,23 +217,17 @@ onBeforeUnmount(() => publicationStore.reset())
       </div>
     </header>
 
-    <el-alert
-      v-if="config && !config.editable"
-      title="项目已经发布，以下问卷版本、人员快照、关系和任务来源均为冻结只读信息。"
-      type="success"
-      :closable="false"
-      show-icon
-    />
-    <el-alert
-      v-else
-      title="选择被评价人、设置评价关系并分配评价人，保存配置后即可检查发布条件。"
-      type="info"
-      :closable="false"
-      show-icon
-    />
-
-    <template v-if="config">
-      <el-card shadow="never">
+    <PublicationDetails v-if="config && !config.editable" :config="config" />
+    <template v-if="config?.editable">
+      <nav class="publication-steps" aria-label="人员配置步骤">
+        <el-steps :active="activeStep" finish-status="success" align-center>
+          <el-step v-for="(title, index) in PUBLICATION_STEPS" :key="title" :status="index === activeStep ? 'process' : index < activeStep && ((index === 0 && !workflow.targetIssues.length) || (index === 1 && !workflow.relationIssues.length) || (index === 2 && !workflow.assignmentIssues.length)) ? 'success' : 'wait'" :description="stepDescriptions[index]">
+            <template #title><el-button text :disabled="busy" :aria-current="activeStep === index ? 'step' : undefined" @click="goStep(index)">{{ index + 1 }}. {{ title }}</el-button></template>
+          </el-step>
+        </el-steps>
+      </nav>
+      <div ref="stepContent" class="step-content">
+      <el-card v-show="activeStep === 0" shadow="never">
         <TargetSelectorPanel
           :rows="publicationStore.candidateRows"
           :total="publicationStore.candidateTotal"
@@ -141,7 +235,7 @@ onBeforeUnmount(() => publicationStore.reset())
           :page-size="publicationStore.candidatePageSize"
           :selected-targets="config.targets"
           :loading="publicationStore.candidatesLoading"
-          :editable="config.editable && canManage"
+          :editable="config.editable && canManage && !busy"
           @search="loadCandidates({ pageNum: 1, keyword: $event })"
           @page-change="loadCandidates({ pageNum: $event })"
           @add="publicationStore.addTarget"
@@ -149,10 +243,22 @@ onBeforeUnmount(() => publicationStore.reset())
         />
       </el-card>
 
-      <el-card shadow="never">
+      <el-card v-show="activeStep === 1" shadow="never">
+        <el-form :model="{ evaluationMode }" class="evaluation-mode" label-position="top">
+          <el-form-item label="本轮如何评价？">
+            <el-radio-group :model-value="evaluationMode" :disabled="!config.editable || !canManage || busy" @change="changeMode">
+              <el-radio-button value="others">自评 + 他人评价</el-radio-button>
+              <el-radio-button value="self">仅自评</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+          <p v-if="evaluationMode === 'self'">例如：张三填写问卷评价自己的表现。张三既是被评价人，也是评价人，评价关系为“自评”。</p>
+          <p v-else>例如：李四作为上级评价张三。张三是被评价人，李四是评价人，“上级”是评价关系。</p>
+        </el-form>
+        <el-alert v-if="evaluationMode === 'self'" title="每名被评价人只填写自己的问卷，无需分配其他评价人。下一步直接检查发布条件。" type="info" :closable="false" show-icon />
         <RelationConfigPanel
+          v-else
           :relations="config.relations"
-          :editable="config.editable && canManage"
+          :editable="config.editable && canManage && !busy"
           @update="publicationStore.updateRelation"
           @add="publicationStore.addCustomRelation"
           @remove="publicationStore.removeRelation"
@@ -160,8 +266,13 @@ onBeforeUnmount(() => publicationStore.reset())
         />
       </el-card>
 
-      <el-card shadow="never">
+      <el-card v-show="activeStep === 2" shadow="never">
+        <el-alert v-if="evaluationMode === 'self'" title="本轮仅自评，自评任务自动添加，无需分配他人。" type="info" :closable="false" show-icon />
         <EvaluatorSelectionPanel
+          v-else
+          ref="evaluatorPanel"
+          :summaries="workflow.targetSummaries"
+          :assignment-issues="workflow.assignmentIssues"
           :targets="config.targets"
           :relations="config.relations"
           :selections="config.evaluatorSelections"
@@ -171,40 +282,48 @@ onBeforeUnmount(() => publicationStore.reset())
           :candidate-page-num="publicationStore.candidatePageNum"
           :candidate-page-size="publicationStore.candidatePageSize"
           :loading="publicationStore.candidatesLoading"
-          :editable="config.editable && canManage"
+          :editable="config.editable && canManage && !busy"
           @search="loadCandidates({ pageNum: 1, keyword: $event })"
           @page-change="loadCandidates({ pageNum: $event })"
           @set-evaluators="publicationStore.setEvaluatorIds"
         />
       </el-card>
 
-      <el-card shadow="never">
+      <el-card v-show="activeStep === 3" shadow="never">
         <PublicationPreviewPanel
           :preview="config.preview"
           :issues="config.validationIssues"
           :ready="config.isPublishReady"
+          :targets="config.targets"
+          :participants="participantDirectory"
+          :stale="publicationStore.dirty"
+          :editable="config.editable && canManage && !busy"
+          :can-edit-questionnaire="config.editable && permissionStore.hasPermission('feedback:questionnaire:edit') && !busy"
+          @locate="locateIssue"
         />
       </el-card>
-
+      </div>
       <div v-if="config.editable" class="action-bar">
-        <div>
-          <strong>发布后不可修改</strong>
-          <span>发布后将生成评价任务，参评人员可在「我的待办」中填写。</span>
+        <div aria-live="polite">
+          <strong>{{ activeStep === 3 ? '发布后不可修改' : `第 ${activeStep + 1} 步：${PUBLICATION_STEPS[activeStep]}` }}</strong>
+          <span>{{ activeStep === 3 ? publicationStore.dirty ? '配置已修改，请保存并重新检查。' : '发布后生成评价任务，参评人员在「我的待办」中填写。' : currentIssues[0] || '本步已完成，可以继续；返回修改会保留当前配置。' }}</span>
         </div>
         <div class="action-buttons">
+          <el-button v-if="activeStep > 0" :disabled="busy" @click="goStep(activeStep === 3 && evaluationMode === 'self' ? 1 : activeStep - 1)">上一步</el-button>
           <el-button
             v-if="canManage"
             :loading="publicationStore.saving"
-            :disabled="publicationStore.publishing"
+            :disabled="publicationStore.publishing || modeChanging || confirmingPublish"
             @click="saveConfig"
           >
-            保存配置
+            {{ activeStep === 3 && publicationStore.dirty ? '保存并重新检查' : '保存配置' }}
           </el-button>
+          <el-button v-if="activeStep < 3" type="primary" :loading="publicationStore.saving" :disabled="publicationStore.publishing || modeChanging" @click="nextStep">{{ nextLabel }}</el-button>
           <el-button
-            v-if="canPublishPermission"
+            v-if="activeStep === 3 && canPublishPermission"
             type="primary"
             :loading="publicationStore.publishing"
-            :disabled="!canPublish"
+            :disabled="!canPublish || busy"
             @click="publish"
           >
             发布项目
@@ -216,18 +335,27 @@ onBeforeUnmount(() => publicationStore.reset())
 </template>
 
 <style scoped>
-.publication-page { display: grid; gap: 16px; padding-bottom: 96px; }
+.publication-page { display: flex; flex-direction: column; gap: 14px; min-height: calc(100dvh - 110px); }
+.publication-page > .workspace-page-header { padding: 14px 20px; }
+.publication-steps { position: sticky; top: 56px; z-index: 9; padding: 16px 12px 12px; background: var(--fb-surface, #fff); border: 1px solid var(--fb-border, #e4e7ed); border-radius: 8px; }
+.publication-steps:deep(.el-step__title .el-button) { height: 30px; font-weight: 600; color: inherit; }
+.publication-steps:deep(.el-step__description) { margin-top: 4px; font-size: 12px; }
+.step-content { flex: 1; min-width: 0; scroll-margin-top: 190px; }
+.evaluation-mode p { margin: 0 0 18px; color: var(--fb-text-muted, #64748b); font-size: 13px; }
+.evaluation-mode:deep(.el-form-item) { margin-bottom: 10px; }
 .header-status, .action-bar, .action-buttons { display: flex; align-items: center; gap: 14px; }
 .header-status { flex-shrink: 0; flex-wrap: wrap; }
 .action-bar { justify-content: space-between; }
 .dirty-state { color: #e6a23c; font-size: 13px; }
 .saved-state { color: #67c23a; font-size: 13px; }
-.action-bar { position: sticky; bottom: 12px; z-index: 8; padding: 14px 18px; border: 1px solid #dbeafe; border-radius: 10px; background: rgb(255 255 255 / 96%); box-shadow: 0 8px 28px rgb(15 23 42 / 12%); backdrop-filter: blur(8px); }
+.action-bar { position: sticky; bottom: 12px; z-index: 8; padding: 14px 18px; border: 1px solid var(--fb-primary-border, #dbeafe); border-radius: 10px; background: var(--fb-surface-floating, rgb(255 255 255 / 96%)); box-shadow: 0 8px 28px rgb(15 23 42 / 12%); backdrop-filter: blur(8px); }
 .action-bar > div:first-child { display: grid; gap: 3px; }
-.action-bar span { color: #64748b; font-size: 12px; }
+.action-bar span { color: var(--fb-text-muted, #64748b); font-size: 12px; }
 @media (max-width: 760px) {
+  .publication-steps { position: static; overflow-x: auto; }
+  .publication-steps:deep(.el-steps) { min-width: 590px; }
   .action-bar { align-items: flex-start; flex-direction: column; }
   .action-buttons { width: 100%; }
-  .action-buttons :deep(.el-button) { flex: 1; }
+  .action-buttons:deep(.el-button) { flex: 1; }
 }
 </style>

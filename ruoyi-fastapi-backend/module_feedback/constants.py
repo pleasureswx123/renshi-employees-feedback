@@ -18,6 +18,9 @@ class DefaultRelationDefinition(NamedTuple):
 
 SELF_RELATION_CODE = 'REL_SELF'
 
+# 与RuoYi的UserModel.check_admin保持一致：内置维护账号不作为评价参与人。
+BUILTIN_ADMIN_USER_ID = 1
+
 DEFAULT_RELATION_DEFINITIONS = (
     DefaultRelationDefinition(
         'REL_SUPERVISOR',

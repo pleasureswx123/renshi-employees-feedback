@@ -153,7 +153,7 @@ onMounted(loadProjects)
     <header class="page-header workspace-page-header">
       <div>
         <h1 class="page-heading">评价项目</h1>
-        <p class="page-description">配置问卷与参评人员，发布评价并跟进回收进度。</p>
+        <p class="page-description">配置问卷与参评人员，发布评价并跟进评价进度。</p>
       </div>
       <el-button
         v-if="permissionStore.hasPermission('feedback:project:add')"
@@ -224,7 +224,7 @@ onMounted(loadProjects)
               link
               @click="router.push(`/hr/projects/${row.projectId}/progress`)"
             >
-              回收进度
+              评价进度
             </el-button>
             <el-button
               v-if="row.status === ProjectStatus.COMPLETED && permissionStore.hasPermission('feedback:report:view')"

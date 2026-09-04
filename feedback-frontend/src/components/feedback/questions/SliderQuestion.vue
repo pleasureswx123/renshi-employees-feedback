@@ -37,20 +37,18 @@ function changeValue(value) {
       show-input
       aria-label="滑动评分"
       @input="changeValue"
+      @change="changeValue"
     />
-    <small v-if="!['editor', 'readonly'].includes(mode) && !modelValue?.touched" class="unanswered-hint">
+    <small v-if="mode === 'preview' && !modelValue?.touched" class="unanswered-hint">
       尚未作答，移动滑块或使用方向键后才会记录答案
     </small>
-    <el-button v-if="mode === 'answer' && !modelValue?.touched" link type="primary" @click="changeValue(decimalToNumber(displayValue))">
-      确认使用当前分值 {{ displayValue }}
-    </el-button>
   </section>
 </template>
 
 <style scoped>
 .question-block { display: grid; gap: 12px; }
-.question-heading { color: #111827; line-height: 1.6; }
+.question-heading { color: var(--fb-text-primary, #111827); line-height: 1.6; }
 .required-mark { margin-right: 4px; color: #f56c6c; }
-.question-description { margin: 0; color: #64748b; line-height: 1.6; }
+.question-description { margin: 0; color: var(--fb-text-muted, #64748b); line-height: 1.6; }
 .unanswered-hint { color: #e6a23c; }
 </style>

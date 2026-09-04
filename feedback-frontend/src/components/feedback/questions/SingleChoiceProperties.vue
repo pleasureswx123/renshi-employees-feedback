@@ -192,11 +192,11 @@ defineExpose({ validate })
 <style scoped>
 .option-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: 13px; }
 .option-editor { display: grid; grid-template-columns: 16px minmax(90px, 1fr) 110px 76px 28px; align-items: start; gap: 8px; margin-bottom: 16px; }
-.option-marker { margin-top: 8px; color: #a8abb2; }
-.option-editor :deep(.el-form-item) { min-width: 0; margin-bottom: 0; }
-.option-editor :deep(.el-form-item__label) { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.option-score :deep(.el-input-number) { width: 100%; }
-.option-reason :deep(.el-checkbox__label) { padding-left: 5px; font-size: 12px; }
+.option-marker { margin-top: 8px; color: var(--fb-text-disabled, #a8abb2); }
+.option-editor:deep(.el-form-item) { min-width: 0; margin-bottom: 0; }
+.option-editor:deep(.el-form-item__label) { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.option-score:deep(.el-input-number) { width: 100%; }
+.option-reason:deep(.el-checkbox__label) { padding-left: 5px; font-size: 12px; }
 .remove-option { width: 28px; height: 32px; padding: 0; }
 .add-option { margin-left: 24px; gap: 5px; }
 @container (max-width: 500px) {

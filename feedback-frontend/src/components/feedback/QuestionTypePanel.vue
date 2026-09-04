@@ -40,12 +40,14 @@ defineEmits(['add'])
 </template>
 
 <style scoped>
-.panel-title { margin-bottom: 12px; }
-.type-list { display: grid; gap: 8px; }
-.type-list .question-type-button { width: 100%; height: 38px; margin: 0; padding: 0 12px; justify-content: flex-start; border-radius: 5px; }
-.question-type-button :deep(> span) { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.question-type-icon { flex-shrink: 0; color: #7b8798; }
-.question-type-label { font-size: 13px; line-height: 1.4; }
+.type-panel { flex: none; padding: 12px 10px 10px; border: 1px solid var(--el-color-primary-light-7); border-top: 3px solid var(--el-color-primary); border-radius: 8px; background: var(--el-color-primary-light-9); box-shadow: 0 2px 8px rgb(64 158 255 / 8%); }
+.panel-title { margin-bottom: 10px; color: var(--fb-primary-text, #244d75); font-size: 14px; }
+.type-list { display: grid; gap: 6px; }
+.type-list .question-type-button { width: 100%; height: 32px; margin: 0; padding: 0 10px; justify-content: flex-start; border-color: var(--el-color-primary-light-7); border-radius: 5px; color: var(--fb-primary-text, #244d75); background: var(--fb-surface, #fff); }
+.type-list .question-type-button:hover, .type-list .question-type-button:focus-visible { border-color: var(--el-color-primary); color: var(--el-color-primary-dark-2); background: var(--el-color-primary-light-8); }
+.question-type-button:deep(> span) { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.question-type-icon { flex-shrink: 0; color: var(--el-color-primary); }
+.question-type-label { font-size: 13px; font-weight: 500; line-height: 1.4; }
 .question-type-button:hover .question-type-icon,
 .question-type-button:focus-visible .question-type-icon { color: #409eff; }
 .question-type-button:focus-visible { outline: 2px solid #409eff; outline-offset: 2px; }

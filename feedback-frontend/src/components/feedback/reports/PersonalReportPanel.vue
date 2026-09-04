@@ -50,5 +50,5 @@ const scoreText = score => score ?? '数据不足'
 <style scoped>
 .personal-report { display: grid; gap: 16px; min-width: 0; }
 h2, h3, p { margin: 0; overflow-wrap: anywhere; }
-.muted { color: #606266; line-height: 1.6; }
+.muted { color: var(--fb-text-regular, #606266); line-height: 1.6; }
 </style>

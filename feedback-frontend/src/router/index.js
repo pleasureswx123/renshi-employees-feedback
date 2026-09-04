@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { brand } from '@/config/brand'
 
 import { useAuthStore } from '@/stores/auth'
 import { usePermissionStore } from '@/stores/permission'
@@ -47,7 +48,7 @@ const routes = [
         name: 'hr-progress-entry',
         component: () => import('@/views/hr/ProjectProgressEntryView.vue'),
         meta: {
-          title: '回收进度',
+          title: '评价进度',
           workspace: 'hr',
           permissions: ['feedback:progress:view']
         }
@@ -65,6 +66,7 @@ const routes = [
         meta: {
           title: '问卷编辑器',
           activeMenu: '/hr/projects',
+          defaultSidebarCollapsed: true,
           workspace: 'hr',
           permissions: ['feedback:questionnaire:edit']
         }
@@ -85,7 +87,7 @@ const routes = [
         name: 'hr-project-progress',
         component: () => import('@/views/hr/ProjectProgressView.vue'),
         meta: {
-          title: '回收进度',
+          title: '评价进度',
           workspace: 'hr',
           permissions: ['feedback:progress:view'],
           activeMenu: '/hr/projects'
@@ -152,7 +154,7 @@ const router = createRouter({
 })
 
 router.beforeEach(async to => {
-  document.title = `${to.meta.title || '工作台'} - ${import.meta.env.VITE_APP_TITLE}`
+  document.title = `${to.meta.title || '工作台'} - ${brand.title}`
   const authStore = useAuthStore()
   const permissionStore = usePermissionStore()
 

@@ -34,7 +34,7 @@ describe('permission store', () => {
     expect(permissionStore.availableWorkspaces()).toHaveLength(2)
   })
 
-  it('progress-only用户默认进入安全回收进度入口而不是项目列表', () => {
+  it('progress-only用户默认进入安全评价进度入口而不是项目列表', () => {
     const authStore = useAuthStore()
     authStore.permissions = ['feedback:progress:view']
     const permissionStore = usePermissionStore()

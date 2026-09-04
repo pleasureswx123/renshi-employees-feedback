@@ -8,7 +8,7 @@
 ruoyi-fastapi-backend/
 ├─ module_feedback/                         # 已存在：评价核心模块入口
 │  ├─ __init__.py                           # 已存在：模块路由注册
-│  ├─ constants.py                          # 已存在：P5固定关系Code、类型和零权重默认协议
+│  ├─ constants.py                          # 已存在：P5固定关系Code、类型、零权重默认协议及RuoYi内置维护账号身份
 │  ├─ controller/
 │  │  ├─ feedback_controller.py             # 已存在：受登录保护的只读健康接口
 │  │  ├─ project_controller.py              # 已存在：项目、问卷、发布及P7进度/预检/完成接口
@@ -18,7 +18,7 @@ ruoyi-fastapi-backend/
 │  │  ├─ project_service.py                 # 已存在：P3项目事务及P5新项目固定关系初始化
 │  │  ├─ questionnaire_service.py           # 已存在：P4聚合草稿事务、恢复、校验和乐观锁
 │  │  ├─ state_transition_service.py        # 已存在：项目与任务状态门禁
-│  │  ├─ publication_service.py             # 已存在：P5聚合配置、发布校验、锁、快照和单事务发布
+│  │  ├─ publication_service.py             # 已存在：P5聚合配置、发布校验、系统账号参评拦截、锁、快照和单事务发布
 │  │  ├─ employee_service.py                # 已存在：P6身份归属、冻结问卷和只读历史
 │  │  ├─ answer_service.py                  # 已存在：P6草稿/提交事务、乐观锁、幂等与快照
 │  │  ├─ progress_service.py                # 已存在：P7统计、数据范围、预检和手动完成事务
@@ -29,7 +29,7 @@ ruoyi-fastapi-backend/
 │  │  ├─ project_dao.py                     # 已存在：项目查询、锁定和持久化
 │  │  ├─ questionnaire_dao.py               # 已存在：问卷草稿查询、锁定和整体替换
 │  │  ├─ assignment_dao.py                  # 已存在：评价任务查询与锁定
-│  │  ├─ publication_dao.py                 # 已存在：P5关系/目标/选择替换、人员锁定和冻结读取
+│  │  ├─ publication_dao.py                 # 已存在：P5关系/目标/选择替换、候选排除内置维护账号、人员锁定和冻结读取
 │  │  ├─ answer_dao.py                      # 已存在：答卷查询与锁定
 │  │  ├─ employee_dao.py                    # 已存在：P6本人任务分页统计与项目/任务锁
 │  │  ├─ progress_dao.py                    # 已存在：P7进度聚合、明细分页、项目/任务锁和完成审计
@@ -95,6 +95,7 @@ ruoyi-fastapi-backend/
    ├─ calculators/                           # 已存在：P8手算、多人多指标、缺失、自评、零分与精度测试
    ├─ enums/                                 # 已存在：枚举契约测试
    ├─ service/                               # 已存在：状态门禁、P3至P8真实服务/并发/报告及P9五种数据范围/就绪检查
+   │  └─ test_participant_eligibility_postgresql.py # 已存在：内置维护账号排除、同部门管理角色员工可参评、旧草稿拦截及历史保留
    ├─ entity/                                # 已存在：模型、约束元数据、P3/P4 VO及P5固定关系测试
    ├─ dao/                                   # 已存在：DAO单元及真实PostgreSQL事务测试
    └─ migration/                             # 已存在：结构、权限/审计/精度保护及P9全新库备份恢复/接管失败回滚
@@ -133,12 +134,12 @@ feedback-frontend/
 │  │  ├─ WorkspaceNavigation.vue            # 已存在：桌面侧栏与移动抽屉共用权限菜单
 │  │  ├─ WorkspaceIcon.vue                  # 已存在：工作台本地图标
 │  │  └─ feedback/
-│  │     ├─ QuestionnaireOutline.vue        # 已存在：多页大纲、页面重命名、排序和跨页移动
-│  │     ├─ QuestionTypePanel.vue           # 已存在：五种题型图标入口与悬浮说明
+│  │     ├─ QuestionnaireOutline.vue        # 已存在：独立滚动的小尺寸多页大纲、页面重命名、排序和跨页移动
+│  │     ├─ QuestionTypePanel.vue           # 已存在：固定在左栏底部的五种题型入口与悬浮说明
 │  │     ├─ IndicatorPanel.vue              # 已存在：指标、权重和题目绑定
 │  │     ├─ RichTextEditor.vue              # 已存在：受限Tiptap JSON编辑、Iconify图标工具栏与只读渲染
-│  │     ├─ EmployeeTaskCard.vue             # 已存在：P6被评价人任务卡片与权限入口
-│  │     ├─ publication/                    # 已存在：P5目标、关系、评价人双栏和发布预览组件
+│  │     ├─ EmployeeTaskCard.vue             # 已存在：P6被评价人任务卡片、状态图标与权限入口
+│  │     ├─ publication/                    # 已存在：P5目标、关系、评价人双栏、发布预览及PublicationDetails冻结详情组件
 │  │     ├─ progress/                       # 已存在：P7进度KPI、明细列表和完成预检抽屉
 │  │     ├─ reports/PersonalReportPanel.vue # 已存在：P8个人指标、关系权重和题目明细表格
 │  │     └─ questions/
@@ -149,13 +150,13 @@ feedback-frontend/
 │  │        ├─ SingleChoiceProperties.vue   # 已存在：画布内紧凑选项、分值、附加说明设置
 │  │        ├─ ScoreRangeProperties.vue     # 已存在：三种区间评分题属性表单
 │  │        ├─ TextProperties.vue           # 已存在：问答题属性表单
-│  │        ├─ SingleChoiceQuestion.vue      # 已存在：单选题编辑/只读渲染
+│  │        ├─ SingleChoiceQuestion.vue      # 已存在：单选题编辑/答题/只读渲染，答题选项无边框
 │  │        ├─ StarRatingQuestion.vue        # 已存在：星级题编辑/只读渲染
 │  │        ├─ NumericInputQuestion.vue      # 已存在：数字题编辑/只读渲染
-│  │        ├─ SliderQuestion.vue            # 已存在：滑动题编辑/只读渲染
+│  │        ├─ SliderQuestion.vue            # 已存在：滑动题编辑/答题/只读渲染，点击当前分值可作答
 │  │        └─ TextQuestion.vue              # 已存在：问答题编辑/只读渲染
 │  ├─ layouts/
-│  │  ├─ WorkspaceLayout.vue                # 已存在：深色侧栏、面包屑、折叠与响应式工作台框架
+│  │  ├─ WorkspaceLayout.vue                # 已存在：侧栏、面包屑、用户下拉菜单与编辑器视口布局
 │  │  ├─ HrLayout.vue                       # 已存在
 │  │  └─ EmployeeLayout.vue                 # 已存在
 │  ├─ router/
@@ -175,7 +176,9 @@ feedback-frontend/
 │  │  ├─ transportCryptoPolicy.js           # 已存在：后端传输策略同步
 │  │  ├─ transportCrypto.js                 # 已存在：加解密信封实现
 │  │  ├─ questionnaireDraft.js              # 已存在：P4草稿规范化、校验和满分预览
+│  │  ├─ questionnaireWorkflow.js           # 已存在：先问卷后指标的分步完整性提示
 │  │  ├─ publicationConfig.js               # 已存在：P5配置规范化、固定关系与序列化校验
+│  │  ├─ publicationWorkflow.js             # 已存在：人员配置四步引导、定点权重预检与问题定位
 │  │  ├─ answerSheet.js                     # 已存在：P6五题型答案校验、恢复和定点序列化
 │  │  ├─ fixedDecimal.js                    # 已存在：四位定点数运算与序列化
 │  │  └─ stableCode.js                      # 已存在：页面、题目、选项和指标稳定标识
@@ -187,7 +190,7 @@ feedback-frontend/
 │     │  ├─ QuestionnaireEditorView.vue      # 已存在：P4五题型、多页、指标设计器
 │     │  ├─ PublicationConfigView.vue        # 已存在：P5人员关系配置、权威预览、发布和只读复核
 │     │  ├─ ProjectProgressEntryView.vue     # 已存在：P7仅进度权限的项目定位入口
-│     │  ├─ ProjectProgressView.vue          # 已存在：P7回收进度、筛选、预检和完成页面
+│     │  ├─ ProjectProgressView.vue          # 已存在：P7评价进度、筛选、任务状态关联的完成/提前结束入口及实时预检，复用详情页标题样式
 │     │  ├─ ReportProjectsView.vue           # 已存在：P8仅报告权限可用的已完成项目列表
 │     │  ├─ ProjectReportsView.vue           # 已存在：P8生成、团队排名、个人报告抽屉
 │     │  └─ SubmittedAnswersView.vue         # 已存在：P8独立答案权限入口、列表和只读五题型抽屉
@@ -195,7 +198,7 @@ feedback-frontend/
 │     │  ├─ EmployeeProjectsView.vue         # 已存在：P6我的待办项目列表
 │     │  ├─ EmployeeProjectView.vue          # 已存在：P6本人任务与独立进度
 │     │  ├─ EmployeeHistoryView.vue          # 已存在：P6本人已提交历史
-│     │  └─ AnswerSheetView.vue              # 已存在：P6分页表单、暂存、确认提交和只读详情
+│     │  └─ AnswerSheetView.vue              # 已存在：P6独立进度、连续题号、底部分页、暂存、确认提交和只读详情
 │     └─ shared/PlaceholderView.vue          # 已存在：明确未实现业务边界
 └─ tests/
    ├─ api/                                   # 已存在：登录、项目、草稿、P5发布、P7完成和P8报告测试
@@ -205,13 +208,17 @@ feedback-frontend/
    ├─ stores/                                # 已存在：权限、P4草稿、P5发布、P6答题、P7进度和P8报告隔离测试
    ├─ utils/                                 # 已存在：四位定点数和P5配置协议测试
    ├─ e2e/                                   # 已存在：登录、P4、P5发布及P7进度/完成浏览器测试（Mock接口）
+   │  └─ editor-layout.spec.js                # 已存在：长问卷独立滚动、题型入口可见、紧凑工具栏与两种PC窗口边界
    └─ live-e2e/employee-answering.spec.js    # 已存在：P6至P9两条真实闭环，覆盖场景A至F、权限和数据库/审计对账
 ```
 
 工作台统一样式及导航补充：
 
 - `feedback-frontend/src/styles/workspace.css`：标题、筛选区、表格、卡片、弹窗与窄屏样式，仅应用于工作台。
-- `feedback-frontend/src/stores/workspaceUi.js`：折叠侧栏与窄屏状态，只保存界面偏好。
+- `feedback-frontend/src/stores/workspaceUi.js`：折叠侧栏、窄屏状态与主题偏好；主题刷新恢复及同源标签页同步。
+- `feedback-frontend/src/components/WorkspaceDisplayControls.vue`：共用顶部全屏/退出和浅色/深色切换入口，处理全屏事件、浏览器不支持和请求失败。
+- `feedback-frontend/src/utils/appearance.js`、`src/styles/theme.css`：浏览器主题偏好读写、根节点主题应用及Element Plus/业务区域语义颜色；`src/main.js`在挂载前恢复主题。
+- `feedback-frontend/tests/components/WorkspaceDisplayControls.test.js`、`tests/e2e/workspace-display.spec.js`：主题持久化、存储异常、全屏状态、真实浏览器全屏及暗色问卷/弹窗/输入保留回归。
 - `feedback-frontend/src/utils/workspaceNavigation.js`：按权限生成菜单及子页面定位，保留仅进度权限的独立入口。
 - `feedback-frontend/src/utils/displayFormat.js`：显示日期时间，去掉数据库小数秒，不推断或转换时区。
 - `feedback-frontend/tests/utils/workspaceNavigation.test.js`、`tests/components/ProjectProgressNavigation.test.js`：权限导航、面包屑、折叠、移动抽屉和时间显示回归。
@@ -232,6 +239,12 @@ feedback-frontend/
 - 管理端各 `.env.*` 的 `VITE_FEEDBACK_APP_URL`：独立评价平台访问地址；不包含身份令牌。
 
 两端登录页采用统一的项目标识与视觉，分别说明系统管理和 HR/员工评价职责：
+
+- 两端`src/config/brand.js`、`public/brand-mark.svg`和`public/favicon.svg`：同见品牌名称、管理中心/评价平台说明与配色标识；各自独立构建，详见[名称与标识](./19-brand-identity.md)。各环境`VITE_APP_TITLE`及HTML元信息同步采用新名称。
+- 两端`public/company_logo.svg`：用户提供的LAPUTTA公司标识，管理端保留评价端原稿的逐字节副本；两端`src/config/brand.js`分别配置公司名称及公共资源地址。登录页在全屏背景左上放大展示，保留原始比例。
+- `feedback-frontend/src/assets/login/feedback-background.webp`、`feedback-background-compact.webp`：评价端玻璃环形背景及窄屏资源。
+- `ruoyi-fastapi-frontend/src/assets/login/admin-background.webp`、`admin-background-compact.webp`：管理端玻璃建筑背景及窄屏资源。两端登录组件各自导入，用`picture`按窗口宽度选择；登录样式提供全屏背景、右侧深色表单及窄屏布局。
+- `feedback-frontend/src/layouts/WorkspaceLayout.vue`、`ruoyi-fastapi-frontend/src/layout/components/Sidebar/index.vue`：展开侧栏底部展示公司标识，折叠后隐藏；管理端菜单独立滚动，不与底部标识重叠。
 
 - `ruoyi-fastapi-frontend/src/views/login.vue`、`src/assets/styles/login-entry.css`：管理端登录，保留公司账号、验证码、记住密码及现有注册开关。
 - `feedback-frontend/src/views/auth/LoginView.vue`、`src/styles/login-entry.css`：评价端登录，按现有权限进入工作台。

@@ -16,6 +16,7 @@ const store = useProjectProgressStore()
 const { filters } = storeToRefs(store)
 const filterFormRef = ref()
 const drawerVisible = ref(false)
+const completionEntry = ref('normal')
 const errorMessage = ref('')
 
 const statusOptions = [
@@ -24,13 +25,17 @@ const statusOptions = [
   { value: 'SUBMITTED', label: '已提交' },
   { value: 'CLOSED_INCOMPLETE', label: '关闭未完成' }
 ]
-const statusLabels = { PREPARING: '准备阶段', ACTIVE: '进行中', COMPLETED: '已完成' }
+const statusLabels = { PREPARING: '准备阶段', ACTIVE: '进行阶段', COMPLETED: '已完成' }
+const backLabel = computed(() => permissionStore.hasPermission('feedback:project:list') ? '返回项目列表' : '返回评价进度入口')
 const showCompletionAction = computed(() =>
   permissionStore.hasPermission('feedback:project:complete') &&
   store.project?.projectStatus === 'ACTIVE' &&
   store.dataScopeComplete
 )
-const canStartCompletion = computed(() => showCompletionAction.value && !store.completionResultUnknown)
+const remainingCount = computed(() => (store.summary?.pendingCount || 0) + (store.summary?.draftCount || 0))
+const allSubmitted = computed(() => store.summary?.totalCount > 0 && store.summary.submittedCount === store.summary.totalCount)
+const canStartCompletion = computed(() => showCompletionAction.value && store.summary?.totalCount > 0 &&
+  !store.completionResultUnknown && !store.loading && !store.prechecking && !store.completing)
 
 function validatePositiveInteger(_rule, value, callback) {
   if (value === null || value === undefined || value === '') return callback()
@@ -48,7 +53,7 @@ async function load(projectId, options) {
   try {
     await store.load(projectId, options)
   } catch (error) {
-    errorMessage.value = error.message || '回收进度加载失败'
+    errorMessage.value = error.message || '评价进度加载失败'
   }
 }
 
@@ -95,8 +100,9 @@ async function changePage(pageNum) {
   }
 }
 
-async function openCompletionPrecheck() {
-  if (!canStartCompletion.value || store.prechecking) return
+async function openCompletionPrecheck(early = false) {
+  if (!canStartCompletion.value || (early ? remainingCount.value === 0 : !allSubmitted.value)) return
+  completionEntry.value = early ? 'early' : 'normal'
   try {
     const precheck = await store.precheckCompletion()
     if (precheck?.projectStatus === 'COMPLETED') drawerVisible.value = true
@@ -146,46 +152,57 @@ onBeforeUnmount(() => { drawerVisible.value = false })
 
 <template>
   <section class="progress-page">
-    <header class="page-header workspace-page-header">
-      <div class="heading-copy">
+    <header class="workspace-page-header workspace-detail-header">
+      <div class="workspace-detail-heading">
         <el-button
-          v-if="permissionStore.hasPermission('feedback:project:list')"
-          link
-          type="primary"
-          @click="$router.push('/hr/projects')"
+          class="workspace-detail-back" text :aria-label="backLabel" :title="backLabel"
+          @click="$router.push(permissionStore.hasPermission('feedback:project:list') ? '/hr/projects' : '/hr/progress')"
         >
-          返回项目列表
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m10 6-6 6 6 6M4 12h16" />
+          </svg>
+          <span>返回</span>
         </el-button>
-        <el-button
-          v-else
-          link
-          type="primary"
-          @click="$router.push('/hr/progress')"
-        >
-          返回回收进度入口
-        </el-button>
-        <h1 class="page-heading">{{ store.project?.projectName || '回收进度' }}</h1>
-        <p class="page-description">统计与明细均来自服务端冻结任务；筛选只影响明细，不改变顶部全量统计。</p>
+        <el-divider direction="vertical" class="workspace-detail-divider" />
+        <div class="workspace-detail-title">
+          <h1>评价进度</h1>
+          <p class="workspace-detail-project">
+            <span class="workspace-detail-project-label">所属项目</span>
+            <span class="workspace-detail-project-name" :title="store.project?.projectName">{{ store.project?.projectName || '加载中…' }}</span>
+          </p>
+        </div>
       </div>
       <div v-if="store.project" class="project-actions">
+        <el-tag :type="store.project.projectStatus === 'ACTIVE' ? 'success' : 'info'">
+          {{ statusLabels[store.project.projectStatus] || store.project.projectStatus }}
+        </el-tag>
         <el-button
           v-if="store.project.projectStatus === 'COMPLETED' && permissionStore.hasPermission('feedback:report:view')"
           type="primary" @click="$router.push(`/hr/projects/${route.params.projectId}/reports`)"
         >查看报告</el-button>
-        <el-tag :type="store.project.projectStatus === 'ACTIVE' ? 'success' : 'info'" size="large">
-          {{ statusLabels[store.project.projectStatus] || store.project.projectStatus }}
-        </el-tag>
-        <el-button
-          v-if="showCompletionAction"
-          type="danger"
-          :loading="store.prechecking"
-          :disabled="!canStartCompletion || store.loading || store.prechecking || store.completing"
-          @click="openCompletionPrecheck"
-        >
-          完成项目
-        </el-button>
+        <div v-if="showCompletionAction" class="completion-actions">
+          <span class="completion-hint" role="status">
+            <template v-if="remainingCount">还有 {{ remainingCount }} 份未提交</template>
+            <template v-else-if="allSubmitted">全部评价已提交</template>
+            <template v-else>暂无可完成的评价任务</template>
+          </span>
+          <el-button
+            :type="allSubmitted ? 'danger' : ''"
+            :loading="store.prechecking && completionEntry === 'normal'"
+            :disabled="!canStartCompletion || !allSubmitted"
+            @click="openCompletionPrecheck(false)"
+          >完成项目</el-button>
+          <el-button
+            v-if="remainingCount > 0"
+            link type="danger"
+            :loading="store.prechecking && completionEntry === 'early'"
+            :disabled="!canStartCompletion"
+            @click="openCompletionPrecheck(true)"
+          >提前结束</el-button>
+        </div>
       </div>
     </header>
+    <p class="progress-hint">查看评价任务的填写与提交情况。筛选只影响下方任务明细，不改变顶部统计。</p>
 
     <el-alert
       v-if="!store.dataScopeComplete && store.scopeMessage"
@@ -277,24 +294,24 @@ onBeforeUnmount(() => { drawerVisible.value = false })
 
 <style scoped>
 .progress-page { display: grid; gap: 20px; min-width: 0; }
-.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
-.heading-copy { min-width: 0; }
-.page-heading { margin-top: 8px; overflow-wrap: anywhere; }
-.project-actions { display: flex; align-items: center; flex-shrink: 0; gap: 12px; }
+.project-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.completion-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.completion-actions .el-button + .el-button { margin-left: 0; }
+.completion-hint { color: var(--fb-text-muted, #64748b); font-size: 13px; line-height: 1.6; }
+.progress-hint { margin: -8px 4px -4px; color: var(--fb-text-muted, #7b8798); font-size: 13px; line-height: 1.8; }
 .detail-card { min-width: 0; }
 .completion-issue { display: flex; align-items: center; gap: 12px; }
-.completion-issue :deep(.el-alert) { flex: 1; min-width: 0; }
+.completion-issue:deep(.el-alert) { flex: 1; min-width: 0; }
 .filter-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 16px; }
-.filter-form :deep(.el-select),
+.filter-form:deep(.el-select),
 .filter-form :deep(.el-input-number) { width: 100%; }
 .filter-actions { align-self: end; }
 .pagination-row { display: flex; justify-content: flex-end; max-width: 100%; margin-top: 20px; overflow-x: auto; }
 @media (max-width: 900px) { .filter-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
-  .page-header { flex-direction: column; }
   .project-actions { width: 100%; justify-content: space-between; }
   .filter-form { grid-template-columns: minmax(0, 1fr); }
   .pagination-row { justify-content: flex-start; }
-  .pagination-row :deep(.el-pagination__total) { display: none; }
+  .pagination-row:deep(.el-pagination__total) { display: none; }
 }
 </style>

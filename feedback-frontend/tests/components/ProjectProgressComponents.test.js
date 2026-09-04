@@ -36,7 +36,7 @@ function completionPrecheck(overrides = {}) {
   }
 }
 
-describe('回收进度KPI', () => {
+describe('评价进度KPI', () => {
   it('渲染六张服务端KPI并通过点击发出精确状态筛选', async () => {
     const wrapper = mount(ProgressKpiGrid, {
       global: { plugins: [ElementPlus] },
@@ -108,6 +108,10 @@ describe('完成项目预检抽屉', () => {
 
     expect(document.body.textContent).toContain('李四')
     expect(document.body.textContent).toContain('完成后未提交任务将关闭。')
+    expect(document.body.textContent).toContain('还有 3 份评价未提交')
+    expect(document.body.textContent).toContain('报告仅使用 6 份已提交答卷')
+    expect(document.body.textContent).toContain('项目结束后不能重新打开')
+    expect([...document.body.querySelectorAll('button')].find(item => item.textContent.includes('确认提前结束')).disabled).toBe(true)
     const textarea = document.body.querySelector('textarea')
     textarea.value = '  😀本轮截止  '
     textarea.dispatchEvent(new Event('input'))
@@ -115,7 +119,7 @@ describe('完成项目预检抽屉', () => {
     checkbox.checked = true
     checkbox.dispatchEvent(new Event('change'))
     await flushPromises()
-    const submit = [...document.body.querySelectorAll('button')].find(item => item.textContent.includes('确认完成项目'))
+    const submit = [...document.body.querySelectorAll('button')].find(item => item.textContent.includes('确认提前结束'))
     submit.click()
     await flushPromises()
 
@@ -136,7 +140,7 @@ describe('完成项目预检抽屉', () => {
     checkbox.checked = true
     checkbox.dispatchEvent(new Event('change'))
     await flushPromises()
-    const submit = [...document.body.querySelectorAll('button')].find(item => item.textContent.includes('确认完成项目'))
+    const submit = [...document.body.querySelectorAll('button')].find(item => item.textContent.includes('确认提前结束'))
     submit.click()
     await flushPromises()
     expect(wrapper.emitted('submit')).toBeUndefined()

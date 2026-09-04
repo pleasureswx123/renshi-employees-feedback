@@ -110,7 +110,7 @@ defineExpose({ validate })
 <style scoped>
 .score-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; max-width: 560px; }
 .range-row { display: contents; }
-.setting-hint { margin: 0; align-self: center; color: #909399; font-size: 12px; }
-.score-settings :deep(.el-alert) { grid-column: 1 / -1; }
-.range-row :deep(.el-input-number), :deep(.el-input-number) { width: 100%; }
+.setting-hint { margin: 0; align-self: center; color: var(--fb-text-muted, #909399); font-size: 12px; }
+.score-settings:deep(.el-alert) { grid-column: 1 / -1; }
+.range-row:deep(.el-input-number), :deep(.el-input-number) { width: 100%; }
 </style>
