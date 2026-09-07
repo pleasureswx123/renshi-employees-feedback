@@ -1,5 +1,11 @@
 # PostgreSQL 生产部署
 
+## 公司内网固定部署入口
+
+`192.168.10.122` 的实际部署参数、端口隔离、目录、管理员初始化、快速升级命令及恢复步骤统一维护在仓库根 [README](../../README.md#公司内网部署与日常更新)。该服务器使用 `tongjian-prod`、12680/12681，不能套用下文通用示例的 `tongjian`、12580/12581（服务器上这两个端口已有其他项目）。
+
+本地 PowerShell 快速发布：`.\deploy\remote-deploy.ps1`。默认发布已提交 HEAD；首次工作区快照需显式 `-WorkingTree`。详细执行与验收见 [内网部署记录](./23-intranet-deployment-plan.md)。
+
 ## 交付结构
 
 `docker-compose.pg.yml` 部署管理前端、评价前端、唯一业务后端、PostgreSQL 17、Redis 7.4，以及一次性 `feedback-migrate` 任务。
@@ -94,7 +100,9 @@ docker compose --env-file .env.deploy -f docker-compose.pg.yml cp ruoyi-pg:/tmp/
 
 Alembic现优先采用显式 `APP_ENV`，未设置才回退到 `alembic.ini` 的配置；生产命令必须先设置 `APP_ENV=prod`。备份后运行 `python -m alembic upgrade head`，然后执行结构核验，最后 `python app.py --env prod`。前端单独构建，管理端构建前需设置 `VITE_FEEDBACK_APP_URL`。
 
-## 验证记录
+## 服务器部署前的本地验证记录（历史）
+
+以下是本地网络受限时的历史结果。后续已在 192.168.10.122 完成三个镜像构建、迁移、两端登录及备份恢复验证，当前状态见[内网部署验收](./23-intranet-deployment-plan.md)。
 
 本次本地已通过部署入口与配置测试、相关CLI/代码生成测试、28项模拟接口浏览器测试及2项真实业务浏览器测试。Docker镜像和容器运行结果以本次最终回执及部署前检查报告的追加记录为准；不将配置校验描述为容器运行或服务器上线成功。
 

@@ -299,3 +299,12 @@ docs/feedback/
 - `ruoyi-fastapi-backend/scripts/feedback_container.py`、`feedback_deploy_init.py`：文件密钥、生产数据源、迁移和启动核验、独立密钥生成。
 - `ruoyi-fastapi-backend/tests/scripts/test_feedback_container.py`、`test_feedback_container_postgresql.py`：部署保护边界和真实新库迁移回归。
 - 部署与回退流程见[生产部署手册](./22-production-docker-deployment.md)，本次不改变业务数据模型或计分规则。
+
+## 2026-09-07 内网服务器快速发布
+
+- `deploy/remote-deploy.ps1`、`deploy/remote_deploy.py`：本地无密钥源码包、提交/快照标识、SSH 上传。
+- `deploy/release.sh`、`deploy/server_guard.py`：独立项目发布锁、先构建后备份/迁移、HTTP策略检查、其他项目基线核对。
+- `docker-compose.intranet.yml`：用户明确选择的内网 HTTP 策略；保留认证，关闭应用层传输加密。
+- `ruoyi-fastapi-backend/scripts/feedback_bootstrap_admin.py`：首次管理员随机密码与演示账号停用，不在升级时重置。
+- `deploy/tests/`：源码交付过滤、锁文件、HTTP策略及原有容器保护回归。
+- 根 `README.md` 为实际服务器环境、网址、快速部署和恢复操作入口。

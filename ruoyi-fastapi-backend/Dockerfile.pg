@@ -1,4 +1,5 @@
-FROM python:3.11-slim-bookworm
+ARG IMAGE_PREFIX=
+FROM ${IMAGE_PREFIX}python:3.11-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 TZ=Asia/Shanghai
 WORKDIR /app
 # psycopg2 需要编译工具、C 标准头文件和 libpq，字体供验证码使用。

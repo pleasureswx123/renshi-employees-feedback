@@ -25,6 +25,7 @@
 20. [系统问卷模板](./20-system-questionnaire-templates.md)
 21. [2026-09-07部署前检查](./21-deployment-readiness-review.md)
 22. [PostgreSQL生产Docker部署](./22-production-docker-deployment.md)
+23. [内网快速部署实施与验收](./23-intranet-deployment-plan.md)
 
 ## 文档维护规则
 
@@ -36,6 +37,8 @@
 - 页面原型只作为交互参考，业务规则以本目录文档和后端约束为准。
 
 ## 当前阶段
+
+最新部署状态：2026-09-07 已部署到公司内网服务器，实际入口、两个 Compose 文件的组合方式及日常维护命令见仓库根 [README](../../README.md)。部署验证边界见[内网验收记录](./23-intranet-deployment-plan.md)。下方为 2026-09-03 及之后各阶段的历史快照，其中“尚未部署”等描述仅适用于记录当时。
 
 截至2026-09-03，P0至P8已经完成并通过各自阶段门禁，P8已本地提交为`b59e62b`；P9实现及本地首期业务验收已完成并提交为`c817b32`。随后完成用户指定的内置浏览器全流程复核及修复，最新结果见[P0–P9浏览器验收](./18-p0-p9-browser-acceptance.md)。以下较早阶段的计数是当时验收快照。尚未推送或生产部署，不声明全仓库测试全绿。
 

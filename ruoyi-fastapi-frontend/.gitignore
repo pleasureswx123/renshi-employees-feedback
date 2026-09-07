@@ -19,5 +19,5 @@ selenium-debug.log
 *.sln
 *.local
 
-package-lock.json
+# npm ci 与生产镜像构建必须交付 package-lock.json。
 yarn.lock

@@ -1,0 +1,10 @@
+# 用户明确选择公司内网 HTTP；关闭依赖安全上下文的应用层传输加密。
+# 登录鉴权、角色权限和数据库认证不受此配置影响。
+x-http-environment: &http-environment
+  TRANSPORT_CRYPTO_ENABLED: "false"
+  TRANSPORT_CRYPTO_MODE: "off"
+services:
+  ruoyi-backend-pg:
+    environment: *http-environment
+  feedback-migrate:
+    environment: *http-environment

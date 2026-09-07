@@ -1,377 +1,231 @@
-<h1 align="center">
-    <img alt="logo" src="./ruoyi-fastapi-frontend/src/assets/logo/logo.png">
-</h1>
-<h1 align="center" style="margin: 30px 0 30px; font-weight: bold;">RuoYi-Vue3-FastAPI</h1>
-<h4 align="center">基于RuoYi-Vue3+FastAPI前后端分离的快速开发框架</h4>
-<p align="center">
-    <a href="https://gitee.com/insistence2022/RuoYi-Vue3-FastAPI/stargazers">
-        <img alt="Gitee" src="https://gitee.com/insistence2022/RuoYi-Vue3-FastAPI/badge/star.svg?theme=dark">
-    </a>
-    <a href="https://github.com/insistence/RuoYi-Vue3-FastAPI">
-        <img alt="Github" src="https://img.shields.io/github/stars/insistence/RuoYi-Vue3-FastAPI?style=social">
-    </a>
-    <a href="https://github.com/insistence/RuoYi-Vue3-FastAPI/actions?query=branch%3Amaster+event%3Apush+workflow%3A%22%22Playwright+Tests%22%22">
-        <img alt="Playwright Tests" src="https://github.com/insistence/RuoYi-Vue3-FastAPI/workflows/Playwright Tests/badge.svg">
-    </a>
-    <a href="https://github.com/insistence/RuoYi-Vue3-FastAPI/actions?query=branch%3Amaster+event%3Apush+workflow%3A%22%22Ruff+Check%22%22">
-        <img alt="Ruff Check" src="https://github.com/insistence/RuoYi-Vue3-FastAPI/workflows/Ruff Check/badge.svg">
-    </a>
-    <a href="https://gitee.com/insistence2022/RuoYi-Vue3-FastAPI">
-        <img alt="project version" src="https://img.shields.io/badge/version-1.10.0-brightgreen.svg">
-    </a>
-    <a href="https://github.com/astral-sh/ruff">
-        <img alt="Ruff" src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json">
-    </a>
-    <a href="https://gitee.com/insistence2022/RuoYi-Vue3-FastAPI/blob/master/LICENSE">
-        <img alt="LICENSE" src="https://img.shields.io/github/license/mashape/apistatus.svg">
-    </a>
-    <img alt="node version" src="https://img.shields.io/badge/node-≥18-blue">
-    <img alt="python version" src="https://img.shields.io/badge/python-≥3.10-blue">
-    <img alt="mysql version" src="https://img.shields.io/badge/MySQL-≥5.7-blue">
-    <img alt="redis version" src="https://img.shields.io/badge/redis-≥6.2-blue">
-</p>
+# 同见 · 员工反馈与 360° 评价平台
 
-## 平台简介
+多方反馈，看见成长。
 
-RuoYi-Vue3-FastAPI是一套全部开源的快速开发平台，毫无保留给个人及企业免费使用。
+同见用于公司内部的员工反馈与多关系评价。HR 配置问卷、参评人员及评价关系，发布后由员工登录填写，HR 跟进回收、手动完成项目并查看报告。系统管理端统一维护账号、组织和权限。
 
-> 本仓库正在此基础上建设员工反馈与 360° 评价平台。项目采用 PostgreSQL，编码前的产品、架构、数据和验收基线见 [Feedback 项目文档](./docs/feedback/README.md)，仓库协作约束见 [AGENTS.md](./AGENTS.md)。
+- [评价平台（HR / 员工）](http://192.168.10.122:12681/)
+- [管理中心（账号 / 组织 / 权限）](http://192.168.10.122:12680/)
+- [项目设计与验收文档](./docs/feedback/README.md)
 
-* 前端采用Vue3、Element Plus，基于<u>[RuoYi-Vue3](https://github.com/yangzongzhuan/RuoYi-Vue3)</u>前端项目修改。
-* 移动端采用uni-app、Vue3、Vite，内置tailwindcss，基于<u>[RuoYi-App](https://github.com/yangzongzhuan/RuoYi-App)</u>项目修改。
-* 后端采用FastAPI、sqlalchemy、MySQL（PostgreSQL）、Redis、OAuth2 & Jwt。
-* 权限认证使用OAuth2 & Jwt，支持多终端认证系统。
-* 支持加载动态权限菜单，多方式轻松权限控制。
-* Vue2版本：
-  * Gitte仓库地址：<https://gitee.com/insistence2022/RuoYi-Vue-FastAPI>
-  * GitHub仓库地址：<https://github.com/insistence/RuoYi-Vue-FastAPI>
-* 纯Python版本：
-  * Gitte仓库地址：<https://gitee.com/insistence2022/dash-fastapi-admin>
-  * GitHub仓库地址：<https://github.com/insistence/Dash-FastAPI-Admin>
-* 特别鸣谢：<u>[RuoYi-Vue3](https://github.com/yangzongzhuan/RuoYi-Vue3)</u>、<u>[RuoYi-App](https://github.com/yangzongzhuan/RuoYi-App)</u>
+## 功能与业务约定
 
-## 内置功能
+| 使用方 | 主要能力 |
+| --- | --- |
+| HR 工作台 | 创建评价项目、使用系统问卷模板、编辑题目与指标、配置参评关系、发布、跟进回收、手动完成及查看报告 |
+| 员工工作台 | 我的待办、按被评价人逐人暂存和提交、查看本人已提交评价 |
+| 管理中心 | 用户、部门、岗位、角色、菜单、权限配置，以及日志和运行监控 |
 
-1. 用户管理：用户是系统操作者，该功能主要完成系统用户配置。
-2. 角色管理：角色菜单权限分配、设置角色按机构进行数据范围权限划分。
-3. 菜单管理：配置系统菜单，操作权限，按钮权限标识等。
-4. 部门管理：配置系统组织机构（公司、部门、小组）。
-5. 岗位管理：配置系统用户所属担任职务。
-6. 字典管理：对系统中经常使用的一些较为固定的数据进行维护。
-7. 参数管理：对系统动态配置常用参数。
-8. 通知公告：系统通知公告信息发布维护。
-9. 操作日志：系统正常操作日志记录和查询；系统异常信息日志记录和查询。
-10. 登录日志：系统登录日志记录查询包含登录异常。
-11. 在线用户：当前系统中活跃用户状态监控。
-12. 定时任务：在线（添加、修改、删除）任务调度包含执行结果日志。
-13. 服务监控：监视当前系统CPU、内存、磁盘、堆栈等相关信息。
-14. 缓存监控：对系统的缓存信息查询，命令统计等。
-15. 传输加密：支持前后端请求加密、响应解密、公钥轮换、运行策略下发与监控统计。
-16. 在线构建器：拖动表单元素生成相应的HTML代码。
-17. 系统接口：根据业务代码自动生成相关的api接口文档。
-18. 代码生成：配置数据库表信息一键生成前后端代码（python、sql、vue、js），支持下载。
-19. AI管理：提供AI模型管理和AI对话功能。
-20. 文件管理：统一管理公开文件和受保护附件，支持访问控制、业务引用保护、操作审计、回收站、保留策略及存储对账。
-21. 插件系统：支持插件发现、安装、启停、升级、卸载与清理，提供依赖与配置管理、迁移与种子、定时任务、菜单权限、批量预演、健康诊断、操作审计及前后端插件脚手架。
+项目按“准备阶段 → 进行阶段 → 已完成”流转。发布时冻结问卷与计分配置；已提交答卷不可修改，原始答案保留。项目由 HR 手动完成，完成后未提交任务关闭。正式得分由后端计算，报告使用已提交答卷并展示完成率和缺失情况。
 
-## 演示图
+当前通过已登录账号参评，不提供公开匿名链接、二维码、小程序或自动结束项目。系统问卷模板随代码发布，具体规则见[系统问卷模板](./docs/feedback/20-system-questionnaire-templates.md)。
 
-<table>
-    <tr>
-        <td>
-            <img alt="login" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/login.png">
-        </td>
-        <td>
-            <img alt="dashboard" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/dashboard.png">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt="user" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/user.png">
-        </td>
-        <td>
-            <img alt="role" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/role.png">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt="menu" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/menu.png">
-        </td>
-        <td>
-            <img alt="dept" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/dept.png">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt=""post src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/post.png">
-        </td>
-        <td>
-            <img alt="dict" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/dict.png">
-        </td>
-    </tr>  
-    <tr>
-        <td>
-            <img alt="config" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/config.png">
-        </td>
-        <td>
-            <img alt="notice" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/notice.png">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt="operLog" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/operLog.png">
-        </td>
-        <td>
-            <img alt="loginLog" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/loginLog.png">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt="online" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/online.png">
-        </td>
-        <td>
-            <img alt="job" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/job.png">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt="server" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/server.png">
-        </td>
-        <td>
-            <img alt="cache" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/cache.png">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt="cacheList" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/cacheList.png">
-        </td>
-        <td>
-            <img alt="form" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/form.png">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt="api" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/api.png">
-        </td>
-        <td>
-            <img alt="gen" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/gen.png">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt="aiModel" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/aiModel.png">
-        </td>
-        <td>
-            <img alt="aiChat" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/aiChat.png">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt="file" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/file.png">
-        </td>
-        <td>
-            <img alt="plugin" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/plugin.png">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt="profile" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/web/profile.png">
-        </td>
-    </tr>
-</table>
+## 工程结构与技术栈
 
-<table>
-    <tr>
-        <td>
-            <img alt="applogin" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/app/login.png">
-        </td>
-        <td>
-            <img alt="appWorkbench" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/app/workbench.png">
-        </td>
-        <td>
-            <img alt="appProfile" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/vue3/app/profile.png">
-        </td>
-    </tr>
-</table>
+| 目录 | 职责 | 技术栈 |
+| --- | --- | --- |
+| `feedback-frontend/` | 评价业务平台，包含 HR / 员工工作台 | Vue 3、Vite、Element Plus、Pinia、Vue Router、Axios |
+| `ruoyi-fastapi-frontend/` | 系统管理端，不承载评价业务页面 | 复用 RuoYi 管理端基础能力 |
+| `ruoyi-fastapi-backend/` | 唯一业务后端，评价核心模块为 `module_feedback` | FastAPI、SQLAlchemy 异步会话、Pydantic、Alembic、Redis、JWT/OAuth2 |
+| `deploy/` | 打包、远程发布、保护检查和部署测试 | PowerShell、Python、Bash、SSH/SCP |
+| `docs/feedback/` | 产品、架构、迁移、验收与运维文档 | 中文项目文档 |
 
-## 在线体验
+数据库固定使用 **PostgreSQL**。评价业务复用现有系统用户、部门、角色和权限，不建立第二套身份体系。`ruoyi-fastapi-*` 目录名保留上游工程命名，产品名称统一为“同见”。仓库保留的其他上游工程和示例不属于当前部署入口。
 
-* *账号：admin*
-* *密码：admin123*
-* 演示地址：<a href="https://vfadmin.insistence.tech">vfadmin管理系统<a>
+## 公司内网部署与日常更新
 
-## 项目开发及发布相关
+### 实际运行的 Compose 配置
 
-### 传输层加解密配置说明
+**服务器同时使用以下两个文件，顺序固定，不能只执行其中一个：**
 
-后端密钥配置与轮换说明：[ruoyi-fastapi-backend/docs/transport_crypto_config.md](./ruoyi-fastapi-backend/docs/transport_crypto_config.md)
+| 文件 / 参数 | 职责 |
+| --- | --- |
+| [`docker-compose.pg.yml`](./docker-compose.pg.yml) | 主配置：管理前端、评价前端、唯一后端、PostgreSQL、Redis、迁移任务，以及持久化卷和网络 |
+| [`docker-compose.intranet.yml`](./docker-compose.intranet.yml) | 内网覆盖配置：对后端与迁移任务关闭应用层传输加密，支持本项目约定的 HTTP 访问 |
+| `-p tongjian-prod` | 固定 Compose 项目名，决定容器、网络和数据卷的归属 |
+| `--env-file .env.deploy` | 读取当前发布版本的端口、访问地址、镜像标签和密钥目录等部署参数 |
 
-### 开发
+SSH 登录服务器后，完整查看命令为：
 
 ```bash
-# 克隆项目
-git clone https://gitee.com/insistence2022/RuoYi-Vue3-FastAPI.git
-
-# 进入项目根目录
-cd RuoYi-Vue3-FastAPI
+cd /opt/tongjian/current
+docker compose -p tongjian-prod --env-file .env.deploy \
+  -f docker-compose.pg.yml \
+  -f docker-compose.intranet.yml ps -a
 ```
 
-#### 前端
+快速部署脚本已封装上述组合。手动维护同样必须带齐项目名、环境文件和两个 `-f` 参数；仅执行主配置会丢失内网 HTTP 的加密策略覆盖，不指定项目名则可能操作另一个 Compose 项目。
 
-```bash
-# 进入前端目录
-cd ruoyi-fastapi-frontend
+### 服务器、网址与端口
 
-# 安装依赖
-npm install 或 yarn --registry=https://registry.npmmirror.com
+目标服务器：`root@192.168.10.122`，主机名 `lbt-Precision-T1700`，Ubuntu 24.04.4 LTS，8 逻辑 CPU / 32 GB 内存；Docker Engine 29.5.2、Compose v5.1.4（2026-09-07 实测）。
 
-# 建议不要直接使用 cnpm 安装依赖，会有各种诡异的 bug。可以通过如下操作解决 npm 下载速度慢的问题
-npm install --registry=https://registry.npmmirror.com
+| 服务 | 访问入口 / 端口 | 运行方式 |
+| --- | --- | --- |
+| 同见评价平台（HR / 员工） | http://192.168.10.122:12681/ | `tongjian-prod-feedback-frontend-1`，容器 Nginx 80 |
+| 同见系统管理端 | http://192.168.10.122:12680/ | `tongjian-prod-ruoyi-frontend-1`，容器 Nginx 80 |
+| 同见业务后端 | 容器内部 9099，不映射宿主端口 | `tongjian-prod-ruoyi-backend-pg-1` |
+| 同见 PostgreSQL 17 | 容器内部 5432，不映射宿主端口 | `tongjian-prod-ruoyi-pg-1`，数据库 `ruoyi_feedback_prod` |
+| 同见 Redis 7.4 | 容器内部 6379，不映射宿主端口 | `tongjian-prod-ruoyi-redis-1`，应用使用逻辑库 2 |
+| 数据库迁移 | 无端口，一次性容器，完成后删除 | `feedback-migrate`，每次发布执行 Alembic + 结构核验 |
 
-# 启动服务
-npm run dev 或 yarn dev
-```
+浏览器 → 内网 IP 的 12680/12681 → 对应容器 Nginx → `/prod-api/` 去除前缀 → 同一个后端 9099 → 独立 PostgreSQL / Redis。两端都支持 history 路由刷新；管理端跳转评价平台的 URL 在构建时注入。用户于 2026-09-07 明确选择公司内网 HTTP。`docker-compose.intranet.yml` 对后端和迁移任务设置 `TRANSPORT_CRYPTO_ENABLED=false`、`TRANSPORT_CRYPTO_MODE=off`，两个前端从服务器读取该策略，无需修改业务代码。原因是 Web Crypto 在普通内网 HTTP 上不可用（[浏览器约束](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto)）。登录鉴权和角色权限仍启用，但密码、Token、评价内容没有传输加密保护，不应把当前端口暴露到公网。以后接入 HTTPS 时，先部署可信证书和代理、修改公开 URL，再移除内网覆盖配置中的这两个关闭项，并重建前端、验证加密登录。
 
-#### 移动端
+**与已有项目隔离：** 不使用已经属于 Shot Grid 的 `12580/12581/12582`；不复用其数据库、Redis、密钥、网络和卷。宿主机现有 Nginx 是宝塔管理的实例，主配置 `/www/server/nginx/conf/nginx.conf`，监听 80/888；同见使用自己的容器 Nginx，不修改或重启宿主 Nginx。也不重启 Docker 或操作系统。
 
-```bash
-# 进入移动端目录
-cd ruoyi-fastapi-app
+2026-09-07 部署前基线：Shot Grid 五个容器健康，管理端与业务端返回 HTTP 200；Agent Factory 使用 39081/39082；Gatekeeper 使用 3000/8000/5555/5432/6379。Canvas 的 `demiurge-ai-canvas-web-gateway-1` 在本次部署前已反复重启，应作为独立既有问题处理。服务器存在待更新/重启提示，本项目发布不执行系统升级或重启。
 
-# 安装依赖
-npm install -g pnpm
-pnpm install
+### 以后迭代完成后的快速部署命令
 
-# 启动 H5
-pnpm dev:h5
-
-# 启动微信小程序
-pnpm dev:mp-weixin
-```
-
-移动端详细文档请参考：[ruoyi-fastapi-app/README.md](./ruoyi-fastapi-app/README.md)
-
-#### 后端
-
-Windows PowerShell 开发环境统一使用后端目录下的独立虚拟环境，禁止复用 Hermes 或其他应用自身的虚拟环境。首次初始化时，先确认 `python` 是独立安装或由 `uv` 管理的 Python 3.11，而不是其他应用目录中的解释器：
+在本地仓库根目录 PowerShell 执行：
 
 ```powershell
-# 进入后端目录
-cd D:\work\renshi-employees-feedback\ruoyi-fastapi-backend
+.\deploy\remote-deploy.ps1
+```
 
-# 创建前确认当前命令不是其他应用虚拟环境中的 Python
-Get-Command python
+前提：SSH 免密可连接 `root@192.168.10.122`；本地有 Python 3（优先自动使用后端 `.venv`）、Git、OpenSSH；**先完成验证并提交本次代码**。默认只打包当前 `HEAD`，不会部署未提交改动，不要求先推送 Git 远端；`.env.dev`、密钥、依赖目录、日志与输出不会进入发布包。不要把“本地修改了”当作“服务器已经更新”。
+
+首次交付部署脚本尚未提交时，可显式发布工作区快照：
+
+```powershell
+.\deploy\remote-deploy.ps1 -WorkingTree
+# 只生成并检查源码包，不连接服务器：
+.\deploy\remote-deploy.ps1 -PackageOnly
+```
+
+工作区快照包含 Git 可见的未提交文件并排除敏感/本地配置，版本号包含 HEAD、UTC 时间和内容摘要；`release-manifest.json` 明确记录是否工作区快照。普通迭代优先使用默认的已提交版本发布。
+
+自动流程：打包 → 上传新版本目录 → 配置/端口检查 → 保存其他容器基线 → **串行构建三个镜像** → 构建成功后停止同见写入 → 备份数据库/文件/密钥 → 每次重新执行迁移 → 后端健康 → 两端启动 → HTTP/API 校验 → 核对其他运行容器未重启/替换 → 切换 `current`。构建失败不会停止现有同见服务；升级维护窗口从停止同见开始，其他项目不参与。
+
+包源：该服务器 Docker Hub 直连超时，使用 `docker.m.daocloud.io/library/` 镜像前缀，APT/Python 使用清华源，npm 使用镜像源。均为部署参数，不修改 Docker daemon 全局配置；依赖层有缓存，业务代码修改可复用。运行容器设置 CPU/内存上限；发布按项目加锁，拒绝并发部署。
+
+### 服务器目录、配置与持久化
+
+| 位置 | 用途 |
+| --- | --- |
+| `/opt/tongjian/current` | 指向最后一次通过发布检查的版本目录 |
+| `/opt/tongjian/releases/<版本号>/` | 每次独立源码、Compose、`.env.deploy`、版本清单 |
+| `/opt/tongjian/shared/.env.deploy` | 下一次发布读取的持久部署参数，不存密码 |
+| `/opt/tongjian/shared/secrets/` | 数据库、Redis、JWT、传输 RSA 密钥；目录 700 / 文件 600 |
+| `/opt/tongjian/shared/initial-admin-password` | 首次随机管理员密码，root 可读；管理员用户名 `admin` |
+| `/opt/tongjian/logs/<版本号>.log` | 每次发布日志；同目录 `*-before.json` 为其他容器基线 |
+| `/opt/tongjian/backups/<版本号>/` | 升级前 `database.dump`、`files.tar.gz`、密钥及上一版本路径 |
+| `/opt/tongjian/incoming/` | 上传的无密钥源码包 |
+
+固定 Compose 项目名 **`tongjian-prod`**。数据卷为 `tongjian-prod_postgres_data`、`tongjian-prod_redis_data`、`tongjian-prod_backend_files`、`tongjian-prod_backend_logs`；网络为 `tongjian-prod_ruoyi-network`。不随版本目录变化而更名，**不要执行 `down -v`、全局 prune 或覆盖旧项目目录**。
+
+首次为独立空库：官方 PostgreSQL 入口仅在新数据卷导入系统基线，再执行评价 Alembic 迁移。不会把本地开发账号、员工、评价项目和答卷同步到服务器。脚本在开放入口前随机化管理员密码、停用演示账号；普通升级不重置管理员密码。管理员通过 SSH 在自己终端读取初始密码并登录后修改，不要贴到聊天或提交 Git：
+
+```powershell
+ssh root@192.168.10.122 'cat /opt/tongjian/shared/initial-admin-password'
+```
+
+后续在管理端创建正式用户、部门与角色，为 HR / 员工配置评价权限。修改管理员密码后，初始密码文件不再表示当前密码，按公司密码管理方式保管新密码。
+
+### 状态、日志和故障恢复
+
+SSH 登录后执行：
+
+```bash
+cd /opt/tongjian/current
+docker compose -p tongjian-prod --env-file .env.deploy -f docker-compose.pg.yml -f docker-compose.intranet.yml ps -a
+docker compose -p tongjian-prod --env-file .env.deploy -f docker-compose.pg.yml -f docker-compose.intranet.yml logs --tail 100 ruoyi-backend-pg
+cat release-manifest.json
+```
+
+发布失败先看 `/opt/tongjian/logs/<版本号>.log`。`current` 仅在校验通过后改变；**它不保证失败时运行容器仍是旧镜像**，因为数据库迁移和应用启动可能已发生。备份是受限文件，不上传仓库；本次首次空库备份已恢复到独立临时数据库验证通过。以后有真实员工和答卷后，仍需定期执行独立库恢复演练；仅校验 dump 目录可读不等于恢复成功。另行把备份复制到受控的其他机器，避免服务器磁盘故障同时丢失原数据和备份。
+
+- 构建/上传失败：旧服务仍运行，修复包源或构建错误后重新执行快速命令。
+- 备份/迁移/启动失败：同见可能仍在维护状态；先查日志与迁移版本，禁止盲目重放初始化 SQL、删除卷或自动 Alembic 降级。
+- 需要回退应用：从对应备份的 `previous-release` 找到完整旧版本路径，先确认旧代码兼容当前数据库结构，再进入旧目录执行以下命令。不能确认兼容时，先在独立库恢复备份验证，避免覆盖正式已提交答卷。
+
+```bash
+# 先 cd 到经确认兼容的旧版本目录，而不是猜测版本号。
+docker compose -p tongjian-prod --env-file .env.deploy -f docker-compose.pg.yml -f docker-compose.intranet.yml up -d --no-deps --wait --wait-timeout 180 ruoyi-backend-pg
+docker compose -p tongjian-prod --env-file .env.deploy -f docker-compose.pg.yml -f docker-compose.intranet.yml up -d --no-deps ruoyi-frontend feedback-frontend
+python3 deploy/server_guard.py health 192.168.10.122 12680 12681
+# 检查通过后，才把 current 指向当前已验证的旧目录。
+ln -sfn "$PWD" /opt/tongjian/current
+```
+
+通用部署说明见 [PostgreSQL Docker 部署](./docs/feedback/22-production-docker-deployment.md)，实施与验收记录见 [内网部署计划](./docs/feedback/23-intranet-deployment-plan.md)。2026-09-07 已部署并通过两个前端的真实登录、刷新、鉴权与空库备份恢复验证；原有正常服务未被重启或替换。首次发布采用显式工作区快照；后续迭代应先提交代码再使用默认快速部署命令。最新版本号以服务器 `current/release-manifest.json` 为准。
+
+## 本地开发
+
+以下命令从仓库根目录开始，三个服务分别在独立 PowerShell 终端运行。推荐与生产构建一致的 Python 3.11、Node.js 22；开发数据库使用 PostgreSQL，Redis 使用兼容版本，建议与部署的 Redis 7.4 对齐。不要把开发配置指向正式库。
+
+### 后端
+
+首次安装使用项目自己的虚拟环境，已有 `.venv` 时不要重复创建。创建前确认 `python` 来自独立 Python 安装，不要复用其他应用的虚拟环境。
+
+```powershell
+cd .\ruoyi-fastapi-backend
 python --version
-
-# 使用独立的 Python 3.11 创建项目虚拟环境
 python -m venv .venv
-
-# 激活后，后续 python、pip 和 ruoyi 都应来自当前后端 .venv
-.\.venv\Scripts\Activate.ps1
-Get-Command python
-
-# PostgreSQL 版本依赖；requirements-pg.txt 已包含项目自身安装项
-python -m pip install -r requirements-pg.txt
-Get-Command ruoyi
-
-# 启动前先检查数据库、Redis 和传输加密配置
-ruoyi app doctor --env=dev
-
-# 启动后端
-ruoyi app run --env=dev
+.\.venv\Scripts\python.exe -m pip install -r requirements-pg.txt
 ```
 
-如果 `Get-Command python` 在创建虚拟环境前指向 Hermes 或其他应用的 `venv`，应先改用独立 Python 3.11 的完整路径在后端目录创建 `.venv`，否则基础解释器仍可能随该应用更新而失效。
+在后端 `.env.dev` 配置开发数据库、Redis 和应用参数。新库先初始化 PostgreSQL 系统基线，再执行 Alembic；已有库不得重放含删表语句的初始化 SQL。具体新库、旧库接管和结构核验步骤见[启动与迁移手册](./docs/feedback/17-operations-runbook.md#3-数据库升级与接管)。
 
-```bash
-# 进入后端目录
-cd ruoyi-fastapi-backend
+配置和迁移就绪后，在后端目录启动：
 
-# 如果使用的是MySQL数据库，请执行以下命令安装项目依赖环境
-pip3 install -r requirements.txt
-# 如果使用的是PostgreSQL数据库，请执行以下命令安装项目依赖环境
-pip3 install -r requirements-pg.txt
-
-# 安装AI插件依赖，如果不需要AI插件，可忽略此步骤
-ruoyi plugin install-deps ai
-
-# 配置环境
-在.env.dev文件中配置开发环境的数据库和redis
-
-# 运行sql文件
-1.新建数据库ruoyi-fastapi(默认，可修改)
-2.如果使用的是MySQL数据库，使用命令或数据库连接工具运行sql文件夹下的ruoyi-fastapi.sql；如果使用的是PostgreSQL数据库，使用命令或数据库连接工具运行sql文件夹下的ruoyi-fastapi-pg.sql
-
-# 运行后端
-ruoyi app run --env=dev
+```powershell
+.\.venv\Scripts\ruoyi.exe app doctor --env=dev
+.\.venv\Scripts\ruoyi.exe app run --env=dev
 ```
 
-后端 CLI 使用说明请参考：[ruoyi-fastapi-backend/docs/cli_usage.md](./ruoyi-fastapi-backend/docs/cli_usage.md)
+后端本地端口为 `9099`。配置需要排查时参阅 [CLI 使用说明](./ruoyi-fastapi-backend/docs/cli_usage.md)。`.env.prod` 是生产模板；服务器实际数据源和密钥由容器入口根据 Compose 参数及文件密钥注入，不使用本地 `.env.dev`。
 
-#### 访问
+### 评价前端
 
-```bash
-# 默认账号密码
-账号：admin
-密码：admin123
-
-# 浏览器访问
-地址：http://localhost:80
+```powershell
+cd .\feedback-frontend
+npm ci
+npm run dev -- --host 127.0.0.1 --port 5174 --strictPort
 ```
 
-### 发布
+访问 `http://localhost:5174/`，开发 API 通过 `/dev-api` 代理到本地后端。使用 `localhost` 进行开发，不能把开发服务器直接当作内网生产入口。
 
-#### 前端
+### 管理前端
 
-```bash
-# 构建测试环境
-npm run build:stage 或 yarn build:stage
-
-# 构建生产环境
-npm run build:prod 或 yarn build:prod
+```powershell
+cd .\ruoyi-fastapi-frontend
+npm ci
+npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
-#### 后端
+访问 `http://localhost:5173/`。这里显式指定 5173，避免沿用上游 Vite 配置的 80 端口。开发时在该工程的开发环境配置中将 `VITE_FEEDBACK_APP_URL` 指向 `http://localhost:5174/`；服务器地址由部署脚本在构建时注入。账号和密码以各自数据库实际配置为准，不使用外部演示系统凭据。
 
-```bash
-# 配置环境
-在.env.prod文件中配置生产环境的数据库和redis
+### 修改与验证
 
-# 运行后端
-ruoyi app run --env=prod
+编码前阅读 [AGENTS.md](./AGENTS.md) 和相关产品、架构文档。数据库结构通过 Alembic 交付；产品状态、评分或范围变化同步更新业务文档。
+
+常用定向验证命令：
+
+```powershell
+# 仓库根目录：发布包、HTTP策略和其他项目保护检查
+.\ruoyi-fastapi-backend\.venv\Scripts\python.exe -m pytest deploy/tests -q
+
+# 评价前端目录：单元测试和构建
+cd .\feedback-frontend
+npm test
+npm run build
 ```
 
-### Docker Compose部署方式
+后端和真实业务 E2E 按修改范围选择测试，并使用隔离数据库；不要直接向正式库写入测试项目。历史通过记录不替代本次代码验证，具体验收边界见下方文档。
 
-> ⚠️ **警告：** 默认未做数据持久化配置，请注意数据备份或自行配置持久化
+## 文档导航与验收边界
 
-#### MySQL版本
+| 文档 | 查阅内容 |
+| --- | --- |
+| [项目文档索引](./docs/feedback/README.md) | 产品基线、工程边界、数据模型和分阶段实施 |
+| [本地启动与数据库运维](./docs/feedback/17-operations-runbook.md) | 开发启动、迁移、权限和旧库接管 |
+| [通用 PostgreSQL Docker 部署](./docs/feedback/22-production-docker-deployment.md) | 容器入口、文件密钥、迁移与通用部署原理 |
+| [内网服务器部署验收](./docs/feedback/23-intranet-deployment-plan.md) | 2026-09-07 实际发布版本、环境检查、登录和备份恢复证据 |
+| [品牌与名称约定](./docs/feedback/19-brand-identity.md) | 同见名称、标识及两个平台的命名 |
 
-```bash
-docker compose -f docker-compose.my.yml up -d --build
-```
+本 README 的服务器版本、端口和运行结论来自 2026-09-07 部署验收。后续调整服务器地址、端口、Compose、代理或发布流程时，应同步更新本文件；每次实际发布版本以服务器 `release-manifest.json` 和发布日志为准。已部署及登录检查通过不等于覆盖所有真实业务场景，正式用户、组织与权限仍需由公司管理员配置。
 
-#### PostgreSQL版本
+## 来源与许可证
 
-```bash
-docker compose -f docker-compose.pg.yml up -d --build
-```
-
-## 交流与赞助
-
-如果有对本项目及FastAPI感兴趣的朋友，欢迎加入知识星球一起交流学习，让我们一起变得更强。如果你觉得这个项目帮助到了你，你可以请作者喝杯咖啡表示鼓励☕。扫描下面微信二维码添加微信备注VF-Admin即可进群。
-<table>
-    <tr>
-        <td>
-            <img alt="zsxq" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/common/zsxq.jpg">
-        </td>
-        <td>
-            <img alt="zanzhu" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/common/zanzhu.jpg">
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img alt="wxcode" src="https://gitee.com/insistence2022/ruoyi-fastapi-pictures/raw/master/common/wxcode.jpg">
-        </td>
-    </tr>
-</table>
+本项目基于 RuoYi-Vue3-FastAPI 二次开发，保留并复用其系统管理与后端公共能力。感谢上游作者及贡献者；原有版权与许可声明见 [LICENSE](./LICENSE)。
