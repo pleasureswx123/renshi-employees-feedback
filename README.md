@@ -84,6 +84,45 @@ docker compose -p tongjian-prod --env-file .env.deploy \
 
 快速部署脚本已封装上述组合。手动维护同样必须带齐项目名、环境文件和两个 `-f` 参数；仅执行主配置会丢失内网 HTTP 的加密策略覆盖，不指定项目名则可能操作另一个 Compose 项目。
 
+### 生产拓扑
+
+以下拓扑对应当前公司内网 HTTP 部署：服务器 `192.168.10.122`，Compose 项目 `tongjian-prod`，由上述两个 Compose 文件与 `.env.deploy` 共同确定运行配置。
+
+```mermaid
+flowchart TB
+    Browser["公司内网浏览器"]
+    subgraph Server["192.168.10.122 · Ubuntu · Docker"]
+        subgraph Network["同见专用网络：tongjian-prod_ruoyi-network"]
+            Admin["管理端 ruoyi-frontend<br/>Nginx :80 · 静态页面与 API 代理"]
+            Feedback["评价平台 feedback-frontend<br/>Nginx :80 · HR / 员工工作台"]
+            Backend["唯一后端 ruoyi-backend-pg:9099<br/>FastAPI · 认证 / 系统管理 / 评价业务"]
+            PG[("PostgreSQL 17<br/>ruoyi-pg:5432<br/>ruoyi_feedback_prod")]
+            Redis[("Redis 7.4<br/>ruoyi-redis:6379<br/>应用逻辑库 2")]
+            Migrate["feedback-migrate<br/>发布时运行的迁移任务"]
+        end
+        Volumes["Docker 持久化卷<br/>postgres_data / redis_data<br/>backend_files / backend_logs"]
+        Release["/opt/tongjian<br/>current → releases/版本目录<br/>shared：部署配置与密钥<br/>backups：发布前备份"]
+        Existing["其他项目与宿主机 Nginx<br/>使用各自端口、网络及数据"]
+    end
+    Browser -->|"HTTP :12680 → 容器 :80"| Admin
+    Browser -->|"HTTP :12681 → 容器 :80"| Feedback
+    Admin -->|"/prod-api/ 去除前缀"| Backend
+    Feedback -->|"/prod-api/ 去除前缀"| Backend
+    Backend --> PG
+    Backend --> Redis
+    Migrate -.->|"Alembic 迁移与结构核验"| PG
+    PG --- Volumes
+    Redis --- Volumes
+    Backend --- Volumes
+    Release -.->|"配置与文件密钥"| Backend
+    Release -.->|"发布时执行"| Migrate
+```
+
+- **访问链路：** 浏览器直接访问映射到两个前端容器的端口，各自的 Nginx 提供静态页面并将 API 请求转发到同一个后端。此链路不经过宿主机宝塔 Nginx。
+- **内部通信：** 后端 `9099`、PostgreSQL `5432`、Redis `6379` 仅在 Docker 网络内使用，不映射宿主机端口。数据库和缓存由两个前端共用的唯一后端访问。
+- **数据与版本：** 图中数据卷使用简写，实际名称带 `tongjian-prod_` 前缀。更新应用镜像保留数据卷；`current` 指向已验证的发布目录，部署前备份保存在 `/opt/tongjian/backups/`。
+- **启动与迁移：** PostgreSQL、Redis 就绪后执行一次性迁移，迁移成功后启动后端，后端健康后启动两个前端。迁移任务不是常驻 Web 服务。
+
 ### 服务器、网址与端口
 
 目标服务器：`root@192.168.10.122`，主机名 `lbt-Precision-T1700`，Ubuntu 24.04.4 LTS，8 逻辑 CPU / 32 GB 内存；Docker Engine 29.5.2、Compose v5.1.4（2026-09-07 实测）。
