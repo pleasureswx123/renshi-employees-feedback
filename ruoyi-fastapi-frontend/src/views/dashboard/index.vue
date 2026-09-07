@@ -19,7 +19,7 @@
       </div>
     </el-card>
 
-    <section aria-labelledby="overview-title">
+    <section v-if="availableMetrics.length" aria-labelledby="overview-title">
       <div class="section-heading">
         <div>
           <h2 id="overview-title">组织与权限概览</h2>
@@ -31,7 +31,7 @@
         </div>
       </div>
       <div class="metrics-grid" :aria-busy="loading">
-        <el-card v-for="metric in metrics" :key="metric.key" shadow="never" class="metric-card">
+        <el-card v-for="metric in availableMetrics" :key="metric.key" shadow="never" class="metric-card">
           <div class="metric-heading">
             <h3>{{ metric.label }}</h3>
             <el-icon :size="20" class="metric-icon"><component :is="metric.icon" /></el-icon>
@@ -112,6 +112,7 @@ const metrics = [
   { key: 'departments', label: '组织部门', permission: overviewPermissions.departments, icon: Connection, hint: '包含公司、部门与下级团队' },
   { key: 'roles', label: '授权角色', permission: overviewPermissions.roles, icon: Lock, hint: '已建立的系统角色' }
 ]
+const availableMetrics = computed(() => metrics.filter(metric => checkPermi([metric.permission])))
 const entries = [
   { title: '用户管理', description: '维护姓名、部门与账号状态', path: '/system/user', permission: 'system:user:list', icon: User },
   { title: '部门管理', description: '维护公司、部门与团队结构', path: '/system/dept', permission: 'system:dept:list', icon: Connection },
@@ -197,7 +198,7 @@ onBeforeUnmount(() => {
 .section-heading p { margin-top: 6px; color: var(--el-text-color-secondary); font-size: 13px; }
 .refresh-action { display: flex; align-items: center; gap: 12px; }
 .updated-time { color: var(--el-text-color-secondary); font-size: 12px; white-space: nowrap; }
-.metrics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
 .metric-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
 .metric-heading h3 { font-size: 14px; font-weight: 500; color: var(--el-text-color-regular); }
 .metric-icon { color: var(--el-color-primary); }
