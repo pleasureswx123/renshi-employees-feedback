@@ -1,9 +1,10 @@
 <script setup>
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import {
+  listSystemTemplates,
   createProject,
   listProjects,
   removeProject,
@@ -12,7 +13,7 @@ import {
 import { ProjectStatus } from '@/constants/feedbackEnums'
 import { usePermissionStore } from '@/stores/permission'
 import WorkspaceIcon from '@/components/WorkspaceIcon.vue'
-import { formatTableDate } from '@/utils/displayFormat'
+import { formatDateTime } from '@/utils/displayFormat'
 import { useWorkspaceUiStore } from '@/stores/workspaceUi'
 
 const router = useRouter()
@@ -26,7 +27,18 @@ const projectFormRef = ref()
 const rows = ref([])
 const total = ref(0)
 const filters = reactive({ projectName: '', status: '', pageNum: 1, pageSize: 10 })
-const projectForm = reactive({ projectId: null, projectName: '', description: '', lockVersion: 0 })
+const templates = ref([])
+const templatesLoading = ref(false)
+const templatesError = ref('')
+const selectedTemplate = computed(() => templates.value.find(item => item.templateKey === projectForm.templateKey))
+async function loadTemplates() {
+  templatesLoading.value = true
+  templatesError.value = ''
+  try { const response = await listSystemTemplates(); templates.value = response.data || [] }
+  catch (error) { templatesError.value = error.message || '模板加载失败，请重试' }
+  finally { templatesLoading.value = false }
+}
+const projectForm = reactive({ templateKey: '', projectId: null, projectName: '', description: '', lockVersion: 0 })
 const projectRules = {
   projectName: [
     { required: true, message: '请填写项目名称', trigger: 'blur' },
@@ -73,6 +85,7 @@ function handleReset() {
 }
 
 function resetProjectForm() {
+  projectForm.templateKey = ''
   projectForm.projectId = null
   projectForm.projectName = ''
   projectForm.description = ''
@@ -82,6 +95,7 @@ function resetProjectForm() {
 
 function openCreateDialog() {
   resetProjectForm()
+  loadTemplates()
   dialogMode.value = 'create'
   dialogVisible.value = true
 }
@@ -105,7 +119,8 @@ async function submitProject() {
       const response = await createProject({
         projectName: projectForm.projectName,
         description: projectForm.description || null,
-        questionnaireTitle: projectForm.projectName
+        questionnaireTitle: projectForm.projectName,
+        ...(projectForm.templateKey ? { templateKey: projectForm.templateKey } : {})
       })
       ElMessage.success('项目已创建，正在进入问卷编辑器')
       dialogVisible.value = false
@@ -150,10 +165,13 @@ onMounted(loadProjects)
 
 <template>
   <section class="project-page">
-    <header class="page-header workspace-page-header">
-      <div>
+    <header class="page-header">
+      <div class="project-heading-group">
+        <div class="project-heading-icon"><WorkspaceIcon name="project" /></div>
+        <div>
         <h1 class="page-heading">评价项目</h1>
         <p class="page-description">配置问卷与参评人员，发布评价并跟进评价进度。</p>
+        </div>
       </div>
       <el-button
         v-if="permissionStore.hasPermission('feedback:project:add')"
@@ -164,7 +182,7 @@ onMounted(loadProjects)
       </el-button>
     </header>
 
-    <el-card shadow="never">
+    <el-card shadow="never" class="project-filter-card">
       <el-form :model="filters" inline class="filter-form workspace-filter">
         <el-form-item label="项目名称">
           <el-input
@@ -189,23 +207,31 @@ onMounted(loadProjects)
           <el-button :disabled="loading" @click="handleReset"><WorkspaceIcon name="refresh" />重置</el-button>
         </el-form-item>
       </el-form>
+    </el-card>
 
-      <el-table v-loading="loading" :data="rows" empty-text="暂无评价项目">
-        <el-table-column prop="projectName" label="项目名称" min-width="200" show-overflow-tooltip />
+    <el-card shadow="never" class="project-list-card">
+      <div class="list-caption"><h2>项目列表</h2><span>共 {{ total }} 个项目</span></div>
+      <el-table v-loading="loading" :data="rows" empty-text="暂无评价项目" class="project-table">
+        <el-table-column prop="projectName" label="项目名称" min-width="220" show-overflow-tooltip>
+          <template #default="{ row }"><div class="project-name-cell"><WorkspaceIcon name="project" /><strong>{{ row.projectName }}</strong></div></template>
+        </el-table-column>
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
             <el-tag :type="statusMeta(row.status).type">{{ statusMeta(row.status).label }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createBy" label="创建人" width="100" show-overflow-tooltip />
-        <el-table-column prop="createTime" label="创建时间" width="165" :formatter="formatTableDate" />
-        <el-table-column prop="updateTime" label="最近更新" width="165" :formatter="formatTableDate" />
-        <el-table-column label="操作" width="340" :fixed="ui.compact ? false : 'right'">
+        <el-table-column prop="createBy" label="创建人" width="90" show-overflow-tooltip />
+        <el-table-column label="创建 / 更新时间" width="215" class-name="date-column">
+          <template #default="{ row }"><div class="project-times"><span>创建 {{ formatDateTime(row.createTime) }}</span><span>更新 {{ formatDateTime(row.updateTime) }}</span></div></template>
+        </el-table-column>
+        <el-table-column label="操作" width="320" :fixed="ui.compact ? false : 'right'">
           <template #default="{ row }">
+            <div class="project-row-actions">
             <el-button
               v-if="row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:questionnaire:edit')"
               type="primary"
-              link
+              plain
+              size="small"
               @click="router.push(`/hr/projects/${row.projectId}/editor`)"
             >
               编辑问卷
@@ -245,6 +271,7 @@ onMounted(loadProjects)
             >
               删除
             </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -263,8 +290,9 @@ onMounted(loadProjects)
 
     <el-dialog
       v-model="dialogVisible"
+      class="project-dialog"
       :title="dialogMode === 'create' ? '创建评价项目' : '编辑评价项目'"
-      width="560px"
+      width="min(560px, 94vw)"
       destroy-on-close
       :close-on-click-modal="!mutating"
       :close-on-press-escape="!mutating"
@@ -273,6 +301,7 @@ onMounted(loadProjects)
     >
       <el-form
         ref="projectFormRef"
+        class="project-create-form"
         :model="projectForm"
         :rules="projectRules"
         :disabled="mutating"
@@ -285,12 +314,22 @@ onMounted(loadProjects)
           <el-input
             v-model="projectForm.description"
             type="textarea"
-            :rows="4"
+            :rows="2"
             maxlength="5000"
             show-word-limit
             placeholder="说明评价目的和适用范围"
           />
         </el-form-item>
+        <template v-if="dialogMode === 'create'">
+          <el-form-item label="问卷来源" prop="templateKey"><el-select v-model="projectForm.templateKey" :loading="templatesLoading" style="width: 100%"><el-option label="空白问卷 · 自行设计" value="" /><el-option v-for="item in templates" :key="item.templateKey" :value="item.templateKey" :label="item.name" /></el-select></el-form-item>
+          <el-alert v-if="templatesError" :title="templatesError" type="error" :closable="false"><el-button link @click="loadTemplates">重试加载模板</el-button></el-alert>
+          <section v-if="selectedTemplate" class="template-preview">
+            <p class="template-summary">{{ selectedTemplate.description }}</p>
+            <p>1–5分评分 · 补充建议不计分</p>
+            <el-collapse><el-collapse-item title="查看题目、指标与评分说明" name="preview"><p>{{ selectedTemplate.scale.join(' / ') }}</p><div v-for="item in selectedTemplate.indicators" :key="item.name" class="template-indicator"><strong>{{ item.name }} · 权重 {{ item.weight }}%</strong><ol><li v-for="question in item.questions" :key="question">{{ question }}</li></ol></div><p>可选问答：请描述值得肯定的表现，以及建议改进的具体事项。</p></el-collapse-item></el-collapse>
+            <p>创建后可独立修改题目和权重。参评人员及评价关系权重需在发布前配置。</p>
+          </section>
+        </template>
       </el-form>
       <template #footer>
         <el-button :disabled="mutating" @click="dialogVisible = false">取消</el-button>
@@ -305,7 +344,10 @@ onMounted(loadProjects)
 <style scoped>
 .project-page {
   display: grid;
-  gap: 20px;
+  gap: 16px;
+  max-width: 1440px;
+  margin: auto;
+  padding-top: 4px;
 }
 
 .page-header {
@@ -313,7 +355,30 @@ onMounted(loadProjects)
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+  padding: 8px 0;
 }
+
+.project-heading-group { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.project-heading-icon { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 12px; background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 26px; }
+.page-header .page-heading { margin: 0 0 4px; font-size: 22px; }
+.page-header .page-description { margin: 0; line-height: 1.7; }
+.page-header > .el-button { min-height: 40px; border-radius: 8px; padding-inline: 20px; }
+.project-filter-card, .project-list-card { border-radius: 12px; }
+.project-filter-card .filter-form { margin: 0; padding: 0; border: 0; }
+.project-filter-card:deep(.el-form-item) { margin-bottom: 0; }
+.list-caption { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.list-caption h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.list-caption > span { color: var(--fb-text-muted, #64748b); font-size: 13px; }
+.project-table:deep(th.el-table__cell) { padding: 10px 0; font-weight: 500; }
+.project-table:deep(td.el-table__cell) { padding: 12px 0; }
+.project-table:deep(.date-column) { color: var(--fb-text-muted, #64748b); font-size: 13px; }
+.project-times { display: grid; gap: 4px; font-variant-numeric: tabular-nums; }
+.project-name-cell { display: flex; align-items: center; gap: 10px; }
+.project-name-cell > svg { color: var(--el-color-primary); }
+.project-name-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
+.project-row-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
+.project-row-actions .el-button + .el-button { margin-left: 0; }
+.project-row-actions .el-button { border-radius: 6px; }
 
 .filter-form {
   margin-bottom: 8px;
@@ -322,13 +387,28 @@ onMounted(loadProjects)
 .pagination-row {
   display: flex;
   justify-content: flex-end;
-  margin-top: 20px;
+  margin-top: 12px;
 }
 
 @media (max-width: 760px) {
+  .project-page { gap: 18px; padding-top: 0; }
+  .project-heading-group { align-items: flex-start; gap: 12px; }
+  .page-header .page-heading { font-size: 23px; }
+  .project-filter-card:deep(.el-form-item) { margin-bottom: 14px; }
+  .project-filter-card:deep(.el-form-item:last-child) { margin-bottom: 0; }
   .page-header {
     align-items: flex-start;
     flex-direction: column;
   }
 }
+.template-preview { padding: 10px 12px; background: var(--el-fill-color-light); border-radius: 8px; line-height: 1.5; font-size: 13px; }
+.template-preview p { margin: 4px 0; color: var(--fb-text-muted, #64748b); }
+.template-indicator { margin-bottom: 10px; }
+.template-indicator ol { margin: 4px 0; padding-left: 20px; }
+.template-preview :deep(.el-collapse-item__header) { height: 36px; line-height: 1.5; background: transparent; }
+.template-preview :deep(.el-collapse-item__wrap) { background: transparent; }
+.template-preview :deep(.el-collapse-item__content) { padding-bottom: 8px; }
+.project-create-form :deep(.el-form-item) { margin-bottom: 14px; }
+.project-create-form :deep(.el-form-item__label) { margin-bottom: 4px; line-height: 22px; }
+.project-filter-card :deep(.el-card__body), .project-list-card :deep(.el-card__body) { padding: 16px; }
 </style>

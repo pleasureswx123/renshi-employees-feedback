@@ -6,20 +6,22 @@ const scoreText = score => score ?? '数据不足'
 
 <template>
   <div class="personal-report">
-    <h2>{{ report.targetName }} · 个人报告</h2>
+    <h2>{{ report.targetName }} · 得分详情</h2>
     <p>{{ report.targetDeptName || '未设置部门' }} · 完成 {{ report.submittedCount }}/{{ report.expectedCount }} 份（{{ report.completionRate }}%）</p>
     <el-alert v-if="report.hasMissingData" title="存在未完成任务或漏答，请结合数据覆盖情况阅读得分。" type="warning" :closable="false" />
+    <el-alert :title="report.onlySelfEvaluation ? '仅自评：发布时仅配置本人评价，最终得分按自评及指标权重计算。' : '最终得分来自他评加权，自评仅供对照，不计入最终得分。'" type="info" :closable="false" show-icon />
     <el-descriptions :column="2" border>
-      <el-descriptions-item label="综合分">{{ scoreText(report.score) }}</el-descriptions-item>
-      <el-descriptions-item label="计分方式">{{ report.onlySelfEvaluation ? '发布时仅配置自评' : '按他评关系权重合成' }}</el-descriptions-item>
-      <el-descriptions-item label="自评分">{{ scoreText(report.selfScore) }}</el-descriptions-item>
-      <el-descriptions-item label="他评分">{{ scoreText(report.otherScore) }}</el-descriptions-item>
+      <el-descriptions-item label="最终得分">{{ scoreText(report.score) }}</el-descriptions-item>
+      <el-descriptions-item label="计分方式">{{ report.onlySelfEvaluation ? '自评按指标权重合成' : '按发布时的关系、指标权重合成' }}</el-descriptions-item>
+      <el-descriptions-item label="自评参考分">{{ scoreText(report.selfScore) }}</el-descriptions-item>
+      <el-descriptions-item label="他评加权分">{{ scoreText(report.otherScore) }}</el-descriptions-item>
     </el-descriptions>
     <h3>指标得分</h3>
+    <p class="muted">最终得分由各项指标最终得分按指标权重加权汇总。他评先在同一关系内取平均，再按有效关系权重合成；缺失关系及实际使用的权重见下表。</p>
     <el-table :data="report.indicators" border>
       <el-table-column prop="indicatorName" label="指标" min-width="150" />
       <el-table-column prop="weight" label="权重（%）" width="110" />
-      <el-table-column v-for="col in [{ key: 'score', label: '综合分' }, { key: 'selfScore', label: '自评分' }, { key: 'otherScore', label: '他评分' }]" :key="col.key" :label="col.label" min-width="100">
+      <el-table-column v-for="col in [{ key: 'score', label: '指标最终得分' }, { key: 'selfScore', label: '自评参考分' }, { key: 'otherScore', label: '他评加权分' }]" :key="col.key" :label="col.label" min-width="100">
         <template #default="{ row }">{{ scoreText(row[col.key]) }}</template>
       </el-table-column>
     </el-table>

@@ -33,7 +33,9 @@ class FeedbackReportDao:
         return count == SCORING_PRECISION_COLUMN_COUNT
 
     @staticmethod
-    async def list_projects(db: Any, query: Any, project_scope: Any, target_scope: Any) -> tuple:
+    async def list_projects(
+        db: Any, query: Any, project_scope: Any, target_scope: Any, *, for_answers: bool = False
+    ) -> tuple:
         visible = (
             select(FbProjectTarget.target_id)
             .where(
@@ -45,11 +47,13 @@ class FeedbackReportDao:
         )
         stmt = select(FbProject).where(
             FbProject.del_flag == '0',
-            FbProject.status == 'COMPLETED',
+            FbProject.status.in_(['ACTIVE', 'COMPLETED']) if for_answers else FbProject.status == 'COMPLETED',
             project_scope,
             visible,
             FbProject.project_name.icontains(query.keyword.strip(), autoescape=True),
         )
+        if for_answers and query.project_id:
+            stmt = stmt.where(FbProject.project_id == query.project_id)
         total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
         rows = await db.scalars(
             stmt.order_by(FbProject.completed_time.desc(), FbProject.project_id.desc())
@@ -223,6 +227,7 @@ class FeedbackReportDao:
             stmt.options(
                 selectinload(FbAssignment.target_snapshot),
                 selectinload(FbAssignment.relation),
+                selectinload(FbAssignment.answer_sheet),
             )
             .order_by(FbAssignment.target_user_id, FbAssignment.relation_id, FbAssignment.assignment_id)
             .offset((query.page_num - 1) * query.page_size)

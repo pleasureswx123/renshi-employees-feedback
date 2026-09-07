@@ -21,6 +21,7 @@ const router = useRouter()
 const draftStore = useQuestionnaireDraftStore()
 const permissionStore = usePermissionStore()
 const questionnaireFormRef = ref()
+const questionnaireInfoOpen = ref(['info'])
 const questionCards = new Map()
 const savePending = ref(false)
 const advancing = ref(false)
@@ -33,6 +34,17 @@ const draft = computed(() => draftStore.draft)
 const selectedPage = computed(() => draftStore.selectedPage)
 const selectedQuestion = computed(() => draftStore.selectedQuestion)
 const rawMaxScore = computed(() => calculateRawMaxScore(draft.value))
+const rawMaxScoreLabel = computed(() => String(rawMaxScore.value).replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1'))
+const selectedQuestionNumber = computed(() => (draft.value?.pages.flatMap(page => page.questions)
+  .findIndex(question => question.questionCode === draftStore.selectedQuestionCode) ?? -1) + 1)
+
+async function validateQuestionnaireInfo() {
+  if (!draft.value?.title?.trim()) {
+    questionnaireInfoOpen.value = ['info']
+    await nextTick()
+  }
+  await questionnaireFormRef.value?.validate()
+}
 const selectedPageIndex = computed(() =>
   draft.value?.pages.findIndex(page => page.pageCode === draftStore.selectedPageCode) ?? -1
 )
@@ -140,7 +152,7 @@ async function saveDraft() {
   savePending.value = true
   let invalidQuestionCode = ''
   try {
-    await questionnaireFormRef.value?.validate()
+    await validateQuestionnaireInfo()
     const invalidQuestion = draft.value.pages.flatMap(page => page.questions)
       .find(question => getQuestionTypeDefinition(question.questionType)?.validate(question).length)
     if (invalidQuestion) {
@@ -179,7 +191,7 @@ async function nextStep() {
     activeRightTab.value = 'question'
     ElMessage.warning(workflow.value.questionIssues[0])
     try {
-      await questionnaireFormRef.value?.validate()
+      await validateQuestionnaireInfo()
       const code = workflow.value.invalidQuestionCode
       if (code) {
         draftStore.selectQuestion(code)
@@ -257,6 +269,7 @@ onBeforeUnmount(() => draftStore.reset())
       <div class="editor-actions">
         <span v-if="draftStore.dirty" class="dirty-state">有未保存修改</span>
         <span v-else-if="draftStore.lastSavedAt" class="saved-state">草稿已保存</span>
+        <span v-else class="saved-state">未修改</span>
         <el-button
           :disabled="!draft || isSaving || advancing"
           @click="saveDraft"
@@ -277,8 +290,8 @@ onBeforeUnmount(() => draftStore.reset())
 
     <div class="editor-workflow" aria-label="评价准备流程">
       <el-steps :active="workflow.questionReady && activeRightTab === 'indicator' ? 1 : 0" simple finish-status="success">
-        <el-step title="1 编辑问卷" :status="workflow.questionReady ? 'success' : 'process'" />
-        <el-step title="2 配置指标" :status="!workflow.questionReady ? 'wait' : workflow.indicatorReady ? 'success' : activeRightTab === 'indicator' ? 'process' : 'wait'" />
+        <el-step :title="workflow.questionReady && activeRightTab === 'indicator' ? '1 编辑问卷 · 已检查' : '1 编辑问卷 · 当前'" :status="workflow.questionReady && activeRightTab === 'indicator' ? 'success' : 'process'" />
+        <el-step :title="workflow.questionReady && activeRightTab === 'indicator' ? '2 配置指标 · 当前' : '2 配置指标'" :status="workflow.questionReady && activeRightTab === 'indicator' ? 'process' : 'wait'" />
         <el-step title="3 人员与发布" />
       </el-steps>
       <p class="workflow-hint" role="status" aria-live="polite" :title="workflowHint">{{ workflowHint }}</p>
@@ -303,6 +316,9 @@ onBeforeUnmount(() => draftStore.reset())
       </aside>
 
       <main class="canvas-panel editor-panel">
+        <el-collapse v-model="questionnaireInfoOpen" class="questionnaire-info">
+        <el-collapse-item name="info">
+          <template #title><span class="info-title">问卷信息</span><span class="info-summary">{{ draft.title || '填写问卷标题与说明' }}</span></template>
         <el-form ref="questionnaireFormRef" :model="draft" :disabled="isSaving" label-position="top" class="questionnaire-form" scroll-to-error>
           <el-form-item
             label="问卷标题"
@@ -324,10 +340,12 @@ onBeforeUnmount(() => draftStore.reset())
             />
           </el-form-item>
         </el-form>
+        </el-collapse-item>
+        </el-collapse>
 
         <div class="canvas-summary">
           <span>{{ selectedPage?.pageTitle }} · {{ selectedPageIndex + 1 }} / {{ draft.pages.length }} 页 · {{ selectedPage?.questions.length || 0 }} 题</span>
-          <span>原始满分预览：{{ rawMaxScore }}</span>
+          <span>原始满分预览：{{ rawMaxScoreLabel }}</span>
         </div>
         <el-empty
           v-if="selectedPage && !selectedPage.questions.length"
@@ -385,6 +403,7 @@ onBeforeUnmount(() => draftStore.reset())
           </el-tab-pane>
           <el-tab-pane label="题目属性" name="question">
             <QuestionPropertiesPanel
+              :question-number="selectedQuestionNumber"
               v-if="selectedQuestion && selectedPage"
               :question="selectedQuestion"
               :pages="draft.pages"
@@ -451,7 +470,7 @@ onBeforeUnmount(() => draftStore.reset())
 .editor-actions:deep(.el-button + .el-button) { margin-left: 0; }
 .dirty-state { color: #e6a23c; font-size: 13px; }
 .saved-state { color: #67c23a; font-size: 13px; }
-.editor-grid { display: grid; grid-template-columns: 210px minmax(360px, 1fr) 390px; gap: 14px; min-height: 0; align-items: stretch; }
+.editor-grid { display: grid; grid-template-columns: 220px minmax(360px, 1fr) 330px; gap: 16px; min-height: 0; align-items: stretch; }
 .editor-grid.preview-expanded { grid-template-columns: 210px minmax(360px, 1fr) clamp(390px, 40%, 760px); }
 .editor-panel { min-width: 0; padding: 18px; border: 1px solid var(--fb-border, #e5e7eb); border-radius: 10px; background: var(--fb-surface, #fff); }
 .left-panel, .right-panel, .canvas-panel { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
@@ -469,18 +488,24 @@ onBeforeUnmount(() => draftStore.reset())
 .live-preview-pagination { flex: 1; min-width: 0; margin: 0; }
 .live-preview-toolbar:deep(.el-pagination) { justify-content: center; }
 .live-preview-pagination:deep(.number), .live-preview-pagination :deep(.btn-prev), .live-preview-pagination :deep(.btn-next), .live-preview-pagination :deep(.more) { min-width: 22px; margin-inline: 0; }
-.questionnaire-form { padding-bottom: 4px; border-bottom: 1px solid var(--fb-border, #e5e7eb); }
+.questionnaire-form { padding: 12px 0 0; }
+.questionnaire-info { border-top: 0; }
+.questionnaire-info:deep(.el-collapse-item__header) { gap: 12px; background: transparent; }
+.questionnaire-info:deep(.el-collapse-item__content) { padding-bottom: 0; }
+.info-title { flex: none; margin-right: 12px; font-size: 14px; font-weight: 600; }
+.info-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fb-text-muted, #73767a); font-size: 13px; }
+.dirty-state, .saved-state { width: 100px; text-align: right; }
 .page-heading { margin-bottom: 14px; color: var(--fb-text-muted, #64748b); font-size: 13px; }
 .canvas-summary { flex-wrap: wrap; gap: 8px 12px; margin: 10px 0; color: var(--fb-text-muted, #64748b); font-size: 13px; }
 .canvas-summary > span:first-child { min-width: 0; overflow-wrap: anywhere; }
-.canvas-summary > span:last-child { flex: none; margin-left: auto; padding: 5px 10px; border: 1px solid var(--el-color-primary-light-7); border-radius: 6px; color: var(--el-color-primary-dark-2); background: var(--el-color-primary-light-9); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 22px; white-space: nowrap; }
+.canvas-summary > span:last-child { flex: none; margin-left: auto; padding: 5px 0; color: var(--fb-text-muted, #64748b); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 22px; white-space: nowrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); }
 .validation-issues { margin-top: 16px; padding: 10px 12px; border: 1px solid var(--fb-warning-border, #fae4c5); border-radius: 6px; color: var(--fb-warning-text, #a65c16); background: var(--fb-warning-bg, #fffbf5); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .validation-issues strong { font-weight: 600; }
 .validation-issues ul { margin: 6px 0 0; padding-left: 16px; }
 .validation-issues li + li { margin-top: 4px; }
 @media (max-width: 1500px) {
-  .editor-grid { grid-template-columns: 190px minmax(340px, 1fr) 330px; gap: 12px; }
+  .editor-grid { grid-template-columns: 200px minmax(340px, 1fr) 300px; gap: 12px; }
   .editor-grid.preview-expanded { grid-template-columns: 190px minmax(340px, 1fr) clamp(330px, 40%, calc(100% - 554px)); }
   .editor-panel { padding: 14px; }
   .right-panel { padding: 0; }

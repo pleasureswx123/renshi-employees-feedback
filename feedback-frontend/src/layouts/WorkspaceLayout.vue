@@ -140,7 +140,7 @@ async function handleLogout() {
 .workspace-brand small { color: #a9b8cd; font-size: 11px; font-weight: 400; }
 .workspace-category { margin: 18px 24px 10px; color: #8592a8; font-size: 12px; white-space: nowrap; }
 .sidebar-company { flex-shrink: 0; margin: auto 16px 18px; padding: 18px 0 0; border-top: 1px solid #34455e; }
-.sidebar-company img { display: block; width: 100%; height: auto; }
+.sidebar-company img { display: block; width: 100%; height: auto; opacity: .46; }
 .workspace-body { min-width: 0; margin-left: var(--workspace-sidebar-width); transition: margin-left .18s ease; }
 .workspace-header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; padding: 8px 20px 8px 12px; background: #243247; border-bottom: 1px solid #34455e; color: #d6e1ef; }
 .header-navigation, .header-actions { display: flex; align-items: center; gap: 14px; min-width: 0; }

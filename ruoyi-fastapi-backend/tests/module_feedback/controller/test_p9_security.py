@@ -83,10 +83,13 @@ def test_all_feedback_routes_have_explicit_security_contract() -> None:
         ('POST', '/feedback/employee/tasks/{assignment_id}/submit'): ['feedback:task:submit'],
         ('GET', '/feedback/employee/history'): ['feedback:history:view'],
         ('GET', '/feedback/employee/history/{assignment_id}'): ['feedback:history:view'],
+        ('GET', '/feedback/answers/projects'): ['feedback:answer:view'],
         ('GET', '/feedback/reports/projects'): ['feedback:report:view'],
         ('POST', '/feedback/projects/{project_id}/reports/calculate'): ['feedback:report:view'],
         ('GET', '/feedback/projects/{project_id}/reports'): ['feedback:report:view'],
         ('GET', '/feedback/projects/{project_id}/reports/{target_user_id}'): ['feedback:report:view'],
+        ('GET', '/feedback/projects/{project_id}/reports/{target_user_id}/source'): ['feedback:report:view'],
+        ('GET', '/feedback/projects/{project_id}/reports/{target_user_id}/source/sheets'): ['feedback:report:view', 'feedback:answer:view'],
         ('GET', '/feedback/projects/{project_id}/answers'): ['feedback:answer:view'],
         ('GET', '/feedback/projects/{project_id}/answers/{assignment_id}'): ['feedback:answer:view'],
     }
@@ -94,7 +97,7 @@ def test_all_feedback_routes_have_explicit_security_contract() -> None:
     for row in rows:
         if (
             row['currentEmployee']
-            or row['path'] == '/feedback/health'
+            or row['path'] in {'/feedback/health', '/feedback/projects/system-templates'}
             or (row['method'], row['path']) == ('POST', '/feedback/projects')
         ):
             continue

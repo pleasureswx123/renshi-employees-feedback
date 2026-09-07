@@ -287,3 +287,7 @@ docs/feedback/
 - 每个实现阶段只创建能形成完整垂直功能或明确公共能力的文件。
 - 创建后及时把本清单中的“计划”更新为实际路径和状态。
 - 不为未来能力预建模板、强制分布或复杂图表目录。
+
+## 2026-09-07 系统问卷模板扩展
+- 内置目录与草稿构建：ruoyi-fastapi-backend/module_feedback/service/system_templates.py。
+- 复用项目创建服务、问卷 DAO 和项目列表创建弹窗；具体契约见 [系统问卷模板](./20-system-questionnaire-templates.md)。

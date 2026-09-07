@@ -20,6 +20,9 @@ class FeedbackVoModel(BaseModel):
 class ProjectCreateModel(FeedbackVoModel):
     """创建准备阶段评价项目。"""
 
+    template_key: str | None = Field(
+        default=None, max_length=100, description='系统问卷模板版本标识；为空时创建空白问卷'
+    )
     project_name: str = Field(min_length=1, max_length=200, description='评价项目名称')
     description: str | None = Field(default=None, max_length=5000, description='评价项目说明')
     questionnaire_title: str | None = Field(default=None, max_length=200, description='初始问卷标题')

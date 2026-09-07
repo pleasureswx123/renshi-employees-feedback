@@ -116,6 +116,7 @@ class ReportCalculationModel(QuestionnaireVoModel):
 
 
 class SubmittedAnswerRowModel(QuestionnaireVoModel):
+    raw_total_score: str | None = None
     assignment_id: int
     target_user_id: int
     target_name: str
@@ -132,3 +133,37 @@ class SubmittedAnswerDetailModel(SubmittedAnswerRowModel):
     questionnaire: EmployeeQuestionnaireModel
     answers: list[AnswerValueModel]
     editable: Literal[False] = False
+
+
+class ScoreSourceRowModel(QuestionnaireVoModel):
+    key: str
+    parent_key: str | None = None
+    earned_formula: str | None = None
+    maximum_formula: str | None = None
+    raw_score: str | None = None
+    max_score: str | None = None
+    level: str
+    label: str
+    formula: str
+    result: str | None = None
+    exact_result: str | None = None
+    note: str = ''
+    indicator_id: int | None = None
+    relation_id: int | None = None
+
+
+class ScoreSourceModel(QuestionnaireVoModel):
+    target_name: str
+    calculation_version: str
+    calculated_time: datetime
+    rows: list[ScoreSourceRowModel]
+
+
+class AnswerProjectQueryModel(ReportQueryModel):
+    project_id: int | None = Field(default=None, gt=0)
+
+
+class AnswerProjectModel(QuestionnaireVoModel):
+    project_id: int
+    project_name: str
+    status: str

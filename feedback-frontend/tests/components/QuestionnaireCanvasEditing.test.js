@@ -82,6 +82,30 @@ describe('问卷画布直接编辑', () => {
 
   afterEach(() => { wrapper?.unmount(); ElMessage.closeAll(); document.body.innerHTML = '' })
 
+  it('收起问卷信息保留内容，缺失标题时保存自动展开并阻止请求', async () => {
+    const collapse = wrapper.findComponent({ name: 'ElCollapse' })
+    collapse.vm.$emit('update:modelValue', [])
+    await flushPromises()
+    expect(collapse.props('modelValue')).toEqual([])
+    expect(store.draft.title).toBe('评价问卷')
+    store.draft.title = ''
+    await button('保存草稿').trigger('click')
+    await flushPromises()
+    expect(collapse.props('modelValue')).toEqual(['info'])
+    expect(wrapper.text()).toContain('请填写问卷标题')
+    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+  })
+
+  it('属性显示连续题号，步骤区分当前编辑和已检查', async () => {
+    await selectQuestion('Q4')
+    expect(wrapper.get('.property-context').text()).toBe('正在编辑 · 第 4 题')
+    expect(wrapper.get('.editor-workflow').text()).toContain('1 编辑问卷 · 当前')
+    await button('下一步：配置指标').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.editor-workflow').text()).toContain('1 编辑问卷 · 已检查')
+    expect(wrapper.get('.editor-workflow').text()).toContain('2 配置指标 · 当前')
+  })
+
   it('顺序进入指标步骤，未绑定题目时留在当前页且不发送保存', async () => {
     useAuthStore().permissions.push('feedback:participant:manage')
     expect(wrapper.get('.editor-workflow').text()).toContain('1 编辑问卷')
@@ -329,7 +353,8 @@ describe('问卷画布直接编辑', () => {
     await button('删除选项 3').trigger('click')
     expect(button('删除选项 1').element.disabled).toBe(true)
     expect(wrapper.get('.properties-panel').findAll('textarea')).toHaveLength(0)
-    expect(wrapper.get('.canvas-summary').text()).toContain('120.0000')
+    expect(wrapper.get('.canvas-summary').text()).toContain('原始满分预览：120')
+    expect(wrapper.get('.canvas-summary').text()).not.toContain('120.0000')
     expect(button('1. 协作是否顺畅？')).toBeDefined()
     await button('保存草稿').trigger('click')
     await flushPromises()

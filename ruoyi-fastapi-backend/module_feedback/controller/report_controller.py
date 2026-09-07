@@ -14,10 +14,13 @@ from common.router import APIRouterPro
 from common.vo import DataResponseModel, PageResponseModel
 from module_feedback.entity.do import FbProject, FbProjectTarget
 from module_feedback.entity.vo.report_vo import (
+    AnswerProjectModel,
+    AnswerProjectQueryModel,
     PersonalReportModel,
     ReportCalculationModel,
     ReportProjectModel,
     ReportQueryModel,
+    ScoreSourceModel,
     SubmittedAnswerDetailModel,
     SubmittedAnswerQueryModel,
     SubmittedAnswerRowModel,
@@ -180,3 +183,62 @@ async def submitted_answer(
     target_scope: TargetScope,
 ) -> Response:
     return _response(await FeedbackReportService.answer(db, project_id, assignment_id, project_scope, target_scope))
+
+
+@report_controller.get(
+    '/projects/{project_id}/reports/{target_user_id}/source',
+    response_model=DataResponseModel[ScoreSourceModel],
+    dependencies=[UserInterfaceAuthDependency('feedback:report:view')],
+)
+@Log(title='评价得分来源', business_type=BusinessType.OTHER, request_log_mode='none', response_log_mode='none')
+async def score_source(
+    request: Request,
+    project_id: ProjectId,
+    target_user_id: Annotated[int, Path(ge=1)],
+    db: Db,
+    project_scope: ProjectScope,
+    target_scope: TargetScope,
+) -> Response:
+    return _response(await FeedbackReportService.source(db, project_id, target_user_id, project_scope, target_scope))
+
+
+@report_controller.get(
+    '/projects/{project_id}/reports/{target_user_id}/source/sheets',
+    response_model=DataResponseModel[ScoreSourceModel],
+    dependencies=[
+        UserInterfaceAuthDependency('feedback:report:view'),
+        UserInterfaceAuthDependency('feedback:answer:view'),
+    ],
+)
+@Log(title='评价得分答卷依据', business_type=BusinessType.OTHER, request_log_mode='none', response_log_mode='none')
+async def score_source_sheets(
+    request: Request,
+    project_id: ProjectId,
+    target_user_id: Annotated[int, Path(ge=1)],
+    indicator_id: Annotated[int, Query(alias='indicatorId', ge=1)],
+    relation_id: Annotated[int, Query(alias='relationId', ge=1)],
+    db: Db,
+    project_scope: ProjectScope,
+    target_scope: TargetScope,
+) -> Response:
+    return _response(
+        await FeedbackReportService.source(
+            db, project_id, target_user_id, project_scope, target_scope, detail=(indicator_id, relation_id)
+        )
+    )
+
+
+@report_controller.get(
+    '/answers/projects',
+    response_model=PageResponseModel[AnswerProjectModel],
+    dependencies=[UserInterfaceAuthDependency('feedback:answer:view')],
+)
+@Log(title='已提交答卷项目选择', business_type=BusinessType.OTHER, request_log_mode='none', response_log_mode='none')
+async def answer_projects(
+    request: Request,
+    query: Annotated[AnswerProjectQueryModel, Query()],
+    db: Db,
+    project_scope: ProjectScope,
+    target_scope: TargetScope,
+) -> Response:
+    return _response(await FeedbackReportService.answer_projects(db, query, project_scope, target_scope), paged=True)

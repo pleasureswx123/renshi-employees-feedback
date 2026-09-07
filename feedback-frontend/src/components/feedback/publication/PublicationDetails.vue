@@ -165,11 +165,15 @@ async function locateQuestion(code) {
 <style scoped>
 .publication-details { min-width: 0; }
 .published-banner, .published-banner > div, .section-title, .page-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.published-banner { margin-bottom: 14px; padding: 12px 16px; background: var(--fb-success-bg, #f0f9eb); border-radius: 6px; font-size: 13px; }
+.published-banner { margin-bottom: 24px; padding: 18px 22px; background: var(--fb-surface, #fff); border: 1px solid var(--fb-border, #e5e7eb); border-radius: 12px; font-size: 13px; }
 .published-banner > div { justify-content: flex-start; flex-wrap: wrap; }
-.detail-tabs { padding: 8px 20px 20px; background: var(--fb-surface, #fff); border: 1px solid var(--fb-border, #e4e7ed); border-radius: 8px; }
+.detail-tabs { padding: 10px 24px 24px; background: var(--fb-surface, #fff); border: 1px solid var(--fb-border, #e4e7ed); border-radius: 12px; }
 .detail-tabs:deep(.el-tabs__content) { overflow: hidden; }
 .overview-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 16px 0 20px; }
+.overview-counts > * { min-width: 0; padding: 20px; border-radius: 12px; background: var(--el-fill-color-light); }
+.overview-counts:deep(.el-statistic__number) { font-size: 28px; font-weight: 600; }
+.detail-tabs:deep(.el-table__cell) { padding-block: 15px; }
+.publication-metadata:deep(.el-descriptions__cell) { padding: 12px 16px; }
 .publication-metadata { margin-bottom: 24px; }
 .section-title { margin: 12px 0; }
 h2 { margin: 12px 0; font-size: 17px; }

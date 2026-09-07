@@ -1,5 +1,7 @@
 # ruff: noqa: PLR2004
 
+from datetime import datetime
+from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock
@@ -17,7 +19,7 @@ from common.vo import PageModel
 from exceptions.handle import handle_exception
 from module_admin.service.log_service import LogQueueService
 from module_feedback.controller.report_controller import report_controller
-from module_feedback.entity.vo.report_vo import ReportCalculationModel
+from module_feedback.entity.vo.report_vo import ReportCalculationModel, ScoreSourceModel
 from module_feedback.service.report_service import FeedbackReportService
 
 
@@ -154,3 +156,53 @@ async def test_pagination_and_target_id_reject_invalid_values(monkeypatch: pytes
             '/feedback/projects/0/reports',
         ]:
             assert (await client.get(path)).status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'permissions,path,allowed',
+    [
+        (['feedback:report:view'], '/feedback/projects/1/reports/2/source', True),
+        (['feedback:report:view'], '/feedback/projects/1/reports/2/source/sheets?indicatorId=1&relationId=1', False),
+        (['feedback:answer:view'], '/feedback/projects/1/reports/2/source/sheets?indicatorId=1&relationId=1', False),
+        (
+            ['feedback:report:view', 'feedback:answer:view'],
+            '/feedback/projects/1/reports/2/source/sheets?indicatorId=1&relationId=1',
+            True,
+        ),
+    ],
+)
+async def test_score_source_permission_boundary(
+    monkeypatch: pytest.MonkeyPatch, permissions: list[str], path: str, allowed: bool
+) -> None:
+    handler = AsyncMock(
+        return_value=ScoreSourceModel(
+            targetName='甲', calculationVersion='feedback-score-v1', calculatedTime=datetime(2026, 9, 7), rows=[]
+        )
+    )
+    monkeypatch.setattr(FeedbackReportService, 'source', handler)
+    app = app_for(monkeypatch, permissions)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.get(path)
+    assert response.json()['code'] == (200 if allowed else 403)
+    assert handler.called == allowed
+    if allowed:
+        assert response.headers['Cache-Control'] == 'no-store'
+
+
+@pytest.mark.asyncio
+async def test_answer_project_options_use_independent_permission(monkeypatch: pytest.MonkeyPatch) -> None:
+    handler = AsyncMock(return_value=PageModel(rows=[], total=0, pageNum=1, pageSize=20, hasNext=False))
+    monkeypatch.setattr(FeedbackReportService, 'answer_projects', handler)
+    for permissions, expected in [(['feedback:answer:view'], 200), (['feedback:report:view'], 403)]:
+        app = app_for(monkeypatch, permissions)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            response = await client.get('/feedback/answers/projects?keyword=年度')
+        assert response.json()['code'] == expected
+    assert handler.call_count == 1
+
+
+@pytest.mark.parametrize('score,expected', [(Decimal('0.0000'), '0.0000'), (Decimal('82.5000'), '82.5000'), (None, None)])
+def test_submitted_answer_raw_score_preserves_precision(score: Decimal | None, expected: str | None) -> None:
+    task = SimpleNamespace(assignment_id=1, target_user_id=2, target_snapshot=SimpleNamespace(target_user_name='甲', target_dept_name='研发'), evaluator_user_name='乙', evaluator_dept_name='研发', relation=SimpleNamespace(relation_name='同级'), submitted_time=datetime(2026, 9, 7), answer_sheet=SimpleNamespace(raw_total_score=score))
+    assert FeedbackReportService._answer_row(task).raw_total_score == expected

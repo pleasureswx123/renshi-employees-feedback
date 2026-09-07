@@ -19,6 +19,7 @@ const button = label => wrapper.findAll('button').find(item => item.text() === l
 async function open(history = false) {
   const router = createRouter({ history: createMemoryHistory(), routes: [
     { path: '/tasks/:assignmentId', component: AnswerSheetView, props: { history } },
+    { path: '/employee/todos', component: { template: '<div>我的待办列表</div>' } },
     { path: '/other', component: { template: '<div>其他页面</div>' } }
   ] })
   await router.push('/tasks/1')
@@ -105,8 +106,8 @@ describe('真实Element Plus答题表单', () => {
     expect(ElMessageBox.confirm).not.toHaveBeenCalled()
   })
 
-  it('只有确认后提交，确认等待期间禁用重复操作，成功转为只读', async () => {
-    const { store } = await open()
+  it('只有确认后提交，确认等待期间禁用重复操作，成功返回我的待办且不触发未暂存提示', async () => {
+    const { store, router } = await open()
     Object.entries(completeAnswers()).forEach(([code, answer]) => store.setAnswer(code, answer))
     let confirm
     ElMessageBox.confirm.mockImplementation(() => new Promise(resolve => { confirm = resolve }))
@@ -121,9 +122,27 @@ describe('真实Element Plus答题表单', () => {
     confirm('confirm')
     await flushPromises()
     expect(api.submitMyAnswer).toHaveBeenCalledOnce()
-    expect(wrapper.text()).toContain('这份评价已提交，答案不可修改。')
+    expect(router.currentRoute.value.path).toBe('/employee/todos')
+    expect(wrapper.text()).toContain('我的待办列表')
+    expect(ElMessageBox.confirm).toHaveBeenCalledOnce()
+    expect(store.answers).toEqual({})
     expect(button('暂存答卷')).toBeUndefined()
     expect(button('提交本份评价')).toBeUndefined()
+  })
+
+  it.each(['cancel', 'failure'])('取消确认或提交失败时保留答案并停留在答题页：%s', async outcome => {
+    const { store, router } = await open()
+    Object.entries(completeAnswers()).forEach(([code, answer]) => store.setAnswer(code, answer))
+    if (outcome === 'cancel') ElMessageBox.confirm.mockRejectedValue('cancel')
+    else api.submitMyAnswer.mockRejectedValue(new Error('提交失败，请重试'))
+    await button('提交本份评价').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/tasks/1')
+    expect(store.answers).toEqual(completeAnswers())
+    expect(store.dirty).toBe(true)
+    expect(button('提交本份评价').element.disabled).toBe(false)
+    if (outcome === 'cancel') expect(api.submitMyAnswer).not.toHaveBeenCalled()
+    else expect(wrapper.text()).toContain('提交失败，请重试')
   })
 
   it('未暂存离开可取消，历史模式永远不显示写入按钮', async () => {

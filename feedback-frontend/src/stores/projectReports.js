@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 
-import { generateReports, getPersonalReport, getSubmittedAnswer, getTeamReport, listReportProjects, listSubmittedAnswers } from '@/api/feedback/reports'
+import { getScoreSource, getScoreSourceSheets, generateReports, getPersonalReport, getSubmittedAnswer, getTeamReport, listReportProjects, listSubmittedAnswers } from '@/api/feedback/reports'
 
 let sequence = 0
-const channels = ['projects', 'team', 'person', 'answers', 'answer', 'generate']
+const channels = ['projects', 'team', 'person', 'answers', 'answer', 'generate', 'source', 'sourceSheets']
 
 export const useProjectReportsStore = defineStore('projectReports', {
   state: () => ({
@@ -11,6 +11,8 @@ export const useProjectReportsStore = defineStore('projectReports', {
     projects: null,
     team: null,
     person: null,
+    source: null,
+    sourceSheets: null,
     answers: null,
     answer: null,
     loading: {},
@@ -56,7 +58,16 @@ export const useProjectReportsStore = defineStore('projectReports', {
     loadTeam(id, params = {}) {
       this.selectProject(id)
       this.clear('person')
+      this.clear('source')
+      this.clear('sourceSheets')
       return this.read('team', () => getTeamReport(id, params))
+    },
+    loadSource(targetId) {
+      this.clear('sourceSheets')
+      return this.read('source', () => getScoreSource(this.projectId, targetId))
+    },
+    loadSourceSheets(targetId, params) {
+      return this.read('sourceSheets', () => getScoreSourceSheets(this.projectId, targetId, params))
     },
     loadPerson(targetId) {
       return this.read('person', () => getPersonalReport(this.projectId, targetId))

@@ -93,3 +93,5 @@ export function completeProject(projectId, data) {
     suppressErrorMessage: true
   })
 }
+
+export const listSystemTemplates = () => request({ url: '/feedback/projects/system-templates', method: 'get' })

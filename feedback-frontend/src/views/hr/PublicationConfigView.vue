@@ -335,8 +335,9 @@ onBeforeUnmount(() => publicationStore.reset())
 </template>
 
 <style scoped>
-.publication-page { display: flex; flex-direction: column; gap: 14px; min-height: calc(100dvh - 110px); }
-.publication-page > .workspace-page-header { padding: 14px 20px; }
+.publication-page { display: flex; flex-direction: column; gap: 24px; max-width: 1440px; margin: auto; padding-top: 12px; min-height: calc(100dvh - 110px); }
+.publication-page > .workspace-page-header { padding: 8px 0; border: 0; background: transparent; box-shadow: none; }
+.publication-page .workspace-detail-title h1 { font-size: 26px; }
 .publication-steps { position: sticky; top: 56px; z-index: 9; padding: 16px 12px 12px; background: var(--fb-surface, #fff); border: 1px solid var(--fb-border, #e4e7ed); border-radius: 8px; }
 .publication-steps:deep(.el-step__title .el-button) { height: 30px; font-weight: 600; color: inherit; }
 .publication-steps:deep(.el-step__description) { margin-top: 4px; font-size: 12px; }

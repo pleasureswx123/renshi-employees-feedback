@@ -6,6 +6,7 @@ from common.aspect.pre_auth import PreAuth
 from module_feedback.controller.project_controller import project_controller
 
 EXPECTED_ROUTES = {
+    ('GET', '/feedback/projects/system-templates'): 'feedback:project:add',
     ('GET', '/feedback/projects'): 'feedback:project:list',
     ('POST', '/feedback/projects'): 'feedback:project:add',
     ('GET', '/feedback/projects/{project_id}'): 'feedback:project:list',
@@ -38,7 +39,7 @@ def test_project_routes_use_fixed_permissions_and_data_scope() -> None:
         dependencies = [item.call for item in route.dependant.dependencies]
         assert any(isinstance(item, PreAuth) for item in dependencies)
         assert any(isinstance(item, CheckUserInterfaceAuth) and item.perm == permission for item in dependencies)
-        if route_key != ('POST', '/feedback/projects'):
+        if route_key not in {('POST', '/feedback/projects'), ('GET', '/feedback/projects/system-templates')}:
             assert any(isinstance(item, GetDataScope) for item in dependencies)
 
 

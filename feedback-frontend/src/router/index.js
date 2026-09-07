@@ -36,12 +36,12 @@ const routes = [
       {
         path: 'answers', name: 'hr-answers-entry',
         component: () => import('@/views/hr/SubmittedAnswersView.vue'),
-        meta: { title: '原始答案', workspace: 'hr', permissions: ['feedback:answer:view'] }
+        meta: { title: '已提交答卷', workspace: 'hr', permissions: ['feedback:answer:view'] }
       },
       {
         path: 'projects/:projectId/answers', name: 'hr-project-answers',
         component: () => import('@/views/hr/SubmittedAnswersView.vue'),
-        meta: { title: '原始答案', workspace: 'hr', permissions: ['feedback:answer:view'], activeMenu: '/hr/answers' }
+        meta: { title: '已提交答卷', workspace: 'hr', permissions: ['feedback:answer:view'], activeMenu: '/hr/answers' }
       },
       {
         path: 'progress',

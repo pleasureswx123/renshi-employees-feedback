@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from common.vo import PageModel
 from exceptions.exception import ServiceException
 from module_feedback.constants import DEFAULT_RELATION_DEFINITIONS
-from module_feedback.dao import FeedbackProjectDao
+from module_feedback.dao import FeedbackProjectDao, FeedbackQuestionnaireDao
 from module_feedback.entity.do import FbProject, FbQuestionnairePage, FbQuestionnaireVersion, FbRelation
 from module_feedback.entity.vo import (
     ProjectCreateModel,
@@ -18,6 +18,8 @@ from module_feedback.entity.vo import (
     ProjectUpdateModel,
 )
 from module_feedback.enums import ProjectStatus, QuestionnaireVersionStatus
+from module_feedback.service.questionnaire_service import FeedbackQuestionnaireService
+from module_feedback.service.system_templates import build_template
 
 
 class FeedbackProjectService:
@@ -129,8 +131,13 @@ class FeedbackProjectService:
         owner_dept_id: int | None,
         operator_name: str,
     ) -> ProjectDetailModel:
-        """在同一事务中创建项目、草稿版本、第一页和固定评价关系。"""
+        """在同一事务中创建项目、空白或模板草稿和固定评价关系。"""
         try:
+            template = (
+                build_template(page_object.template_key, 0, page_object.questionnaire_title or page_object.project_name)
+                if page_object.template_key
+                else None
+            )
             project = await FeedbackProjectDao.add_project(
                 query_db,
                 FbProject(
@@ -153,19 +160,29 @@ class FeedbackProjectService:
                     update_by=operator_name,
                 ),
             )
-            query_db.add_all(
-                [
-                    FbQuestionnairePage(
-                        version_id=version.version_id,
-                        page_code=cls._stable_code('P'),
-                        page_title='第1页',
-                        sort_order=1,
-                        create_by=operator_name,
-                        update_by=operator_name,
-                    ),
-                    *cls._build_default_relations(project.project_id, version.version_id, operator_name),
-                ]
-            )
+            query_db.add_all(cls._build_default_relations(project.project_id, version.version_id, operator_name))
+            if template:
+                template.version_id = version.version_id
+                version.settings = {'systemTemplateKey': page_object.template_key}
+                version.description = page_object.questionnaire_description or template.description
+                pages = FeedbackQuestionnaireService._build_pages(template, operator_name)
+                indicators, bindings = FeedbackQuestionnaireService._build_indicators(template, operator_name)
+                await FeedbackQuestionnaireDao.replace_draft_document(
+                    query_db, version.version_id, pages, indicators, bindings
+                )
+            else:
+                query_db.add_all(
+                    [
+                        FbQuestionnairePage(
+                            version_id=version.version_id,
+                            page_code=cls._stable_code('P'),
+                            page_title='第1页',
+                            sort_order=1,
+                            create_by=operator_name,
+                            update_by=operator_name,
+                        )
+                    ]
+                )
             await query_db.commit()
             loaded = await FeedbackProjectDao.get_project_by_id_scoped(query_db, project.project_id, True)
             if loaded is None:

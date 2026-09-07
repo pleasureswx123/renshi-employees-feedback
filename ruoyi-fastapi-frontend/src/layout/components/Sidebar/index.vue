@@ -81,7 +81,7 @@ const activeMenu = computed(() => {
   :deep(.sidebar-logo-container) { flex-shrink: 0; }
   .sidebar-menu-scroll { flex: 1 1 0%; min-height: 0; }
   .sidebar-company { flex-shrink: 0; margin: 12px 12px 16px; padding: 10px 6px; border: 1px solid #34455e; border-radius: 8px; background: #243247; }
-  .sidebar-company img { display: block; width: 100%; height: auto; }
+  .sidebar-company img { display: block; width: 100%; height: auto; opacity: .46; }
   
   .scrollbar-wrapper {
     background-color: v-bind(getMenuBackground);

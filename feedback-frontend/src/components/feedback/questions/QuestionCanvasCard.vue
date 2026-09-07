@@ -171,7 +171,7 @@ defineExpose({ validate, focusTitle, focusCard })
 </template>
 
 <style scoped>
-.question-card { container-type: inline-size; margin-top: 10px; min-width: 0; padding: 10px 12px; border: 1px solid var(--fb-border-strong, #dcdfe6); border-radius: 8px; background: var(--fb-surface, #fff); outline: none; scroll-margin-block: 90px; transition: border-color .15s, box-shadow .15s; }
+.question-card { container-type: inline-size; margin-top: 14px; min-width: 0; padding: 16px; border: 1px solid var(--fb-border, #e5e7eb); border-radius: 12px; background: var(--fb-surface, #fff); outline: none; scroll-margin-block: 90px; transition: border-color .15s, box-shadow .15s; }
 .question-card:hover { border-color: var(--fb-primary-border, #a0cfff); }
 .question-card.active, .question-card:focus-visible { border-color: #409eff; box-shadow: 0 0 0 2px rgb(64 158 255 / 12%); }
 .card-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; margin-bottom: 4px; }

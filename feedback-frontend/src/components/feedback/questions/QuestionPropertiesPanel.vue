@@ -5,6 +5,7 @@ import { getQuestionTypeDefinition } from './questionTypeRegistry'
 
 const props = defineProps({
   question: { type: Object, required: true },
+  questionNumber: { type: Number, default: 0 },
   pages: { type: Array, required: true },
   currentPageCode: { type: String, required: true },
   disabled: { type: Boolean, default: false }
@@ -19,6 +20,7 @@ function changeQuestion(patch) {
 
 <template>
   <div class="properties-panel">
+    <p v-if="questionNumber" class="property-context">正在编辑 · 第 {{ questionNumber }} 题</p>
     <div class="panel-heading">
       <el-tag size="small" effect="plain">{{ definition?.label }}</el-tag>
       <strong :title="question.title">{{ question.title.trim() || '待填写题目内容' }}</strong>
@@ -58,6 +60,7 @@ function changeQuestion(patch) {
 
 <style scoped>
 .properties-panel { display: grid; gap: 14px; }
+.property-context { margin: 0; font-size: 13px; font-weight: 600; color: var(--el-color-primary); }
 .panel-heading { display: flex; align-items: flex-start; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--fb-border, #ebeef5); }
 .switch-row { display: grid; gap: 2px; padding: 4px 10px; margin-bottom: 14px; background: var(--fb-surface-muted, #f6f8fa); border-radius: 6px; }
 .panel-heading strong { min-width: 0; overflow-wrap: anywhere; font-size: 14px; line-height: 1.6; }

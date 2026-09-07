@@ -44,9 +44,9 @@ onBeforeUnmount(() => { requestId++ })
 
 <template>
   <section class="employee-page">
-    <header class="workspace-page-header"><div>
+    <header class="todo-heading"><div class="todo-heading-icon"><WorkspaceIcon name="todos" /></div><div>
       <h1 class="page-heading">我的待办</h1>
-      <p class="page-description">选择项目，按被评价人分别填写和提交评价。</p>
+      <p class="page-description">选择项目，逐人完成评价；未完成的答案可暂存。</p>
     </div></header>
     <el-card shadow="never" class="employee-filter-card">
     <el-form ref="form" :model="filters" inline class="employee-filter workspace-filter" @keydown.enter.prevent="search">
@@ -62,12 +62,17 @@ onBeforeUnmount(() => { requestId++ })
         <el-empty description="暂无待处理的评价任务" :image-size="110"><p class="page-description">收到参评安排后，评价任务会显示在这里。</p></el-empty>
       </el-card>
       <el-card v-for="project in rows" :key="project.projectId" shadow="never" class="project-card">
-        <h2>{{ project.projectName }}</h2>
-        <p>开始时间：{{ formatDateTime(project.publishedTime) }}</p>
-        <el-progress :percentage="Math.round(project.submittedCount / project.totalCount * 100)" />
+        <div class="project-info">
+          <div class="project-title"><span class="project-symbol"><WorkspaceIcon name="project" /></span><h2>{{ project.projectName }}</h2></div>
+          <p class="project-date">开始时间：{{ formatDateTime(project.publishedTime) }}</p>
+        </div>
+        <div class="project-progress">
+          <div class="progress-caption"><span>评价进度</span><span>已提交 <strong>{{ project.submittedCount }}</strong> / {{ project.totalCount }} 份</span></div>
+          <el-progress :percentage="project.totalCount ? Math.round(project.submittedCount / project.totalCount * 100) : 0" :stroke-width="6" :show-text="false" />
+          <p class="progress-detail">还需完成 {{ Math.max(0, project.totalCount - project.submittedCount) }} 份<span v-if="project.draftCount"> · 其中 {{ project.draftCount }} 份已暂存</span></p>
+        </div>
         <div class="project-footer">
-          <span>已提交 {{ project.submittedCount }}/{{ project.totalCount }} 份 · 已暂存 {{ project.draftCount }} 份</span>
-          <el-button type="primary" @click="router.push(`/employee/todos/${project.projectId}`)">进入项目</el-button>
+          <el-button type="primary" @click="router.push(`/employee/todos/${project.projectId}`)">{{ project.draftCount || project.submittedCount ? '继续评价' : '开始评价' }}<span class="action-arrow" aria-hidden="true">→</span></el-button>
         </div>
       </el-card>
     </div>
@@ -76,14 +81,35 @@ onBeforeUnmount(() => { requestId++ })
 </template>
 
 <style scoped>
-.employee-page { display: grid; gap: 18px; max-width: 1200px; margin: auto; }
+.employee-page { display: grid; gap: 24px; max-width: 1200px; margin: auto; padding-top: 12px; }
+.todo-heading { display: flex; align-items: center; gap: 16px; padding: 8px 0; }
+.todo-heading-icon { display: grid; place-items: center; flex: none; width: 52px; height: 52px; border-radius: 16px; background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 26px; }
+.todo-heading .page-heading { margin: 0 0 8px; font-size: 26px; }
+.todo-heading .page-description { margin: 0; line-height: 1.7; }
+.employee-filter-card { border-radius: 12px; }
 .employee-filter-card .employee-filter { margin: 0; padding: 0; border: 0; }
 .employee-filter-card:deep(.el-form-item) { margin-bottom: 0; }
-.employee-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-height: 120px; }
+.employee-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-height: 120px; }
 .empty-projects { grid-column: 1 / -1; }
-.project-card h2 { margin: 0; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
-.project-card p, .project-footer span { color: var(--fb-text-muted, #64748b); line-height: 1.6; }
-.project-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-top: 18px; }
-@media (max-width: 1000px) { .employee-list { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 760px) { .employee-filter-card:deep(.el-form-item:first-child) { margin-bottom: 14px; } }
+.project-card { border-radius: 14px; }
+.project-card:deep(.el-card__body) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .8fr) auto; align-items: center; gap: 36px; padding: 28px; }
+.project-title { display: flex; align-items: center; gap: 12px; }
+.project-symbol { display: grid; place-items: center; flex: none; width: 36px; height: 36px; background: var(--el-fill-color-light); color: var(--el-color-primary); border-radius: 10px; font-size: 20px; }
+.project-card h2 { margin: 0; font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.project-card p, .progress-caption { color: var(--fb-text-muted, #64748b); line-height: 1.6; font-size: 13px; }
+.project-date { margin: 12px 0 0; }
+.progress-caption { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.progress-caption strong { color: var(--el-text-color-primary); font-size: 17px; font-weight: 600; }
+.progress-detail { margin: 10px 0 0; }
+.project-footer .el-button { min-height: 40px; border-radius: 8px; padding-inline: 20px; }
+.action-arrow { margin-left: 14px; }
+@media (max-width: 1100px) { .project-card:deep(.el-card__body) { grid-template-columns: minmax(0, 1fr) auto; gap: 22px; } .project-info { grid-column: 1 / -1; } }
+@media (max-width: 760px) {
+  .employee-page { gap: 18px; padding-top: 0; }
+  .todo-heading { align-items: flex-start; gap: 12px; }
+  .todo-heading .page-heading { font-size: 23px; }
+  .employee-filter-card:deep(.el-form-item:first-child) { margin-bottom: 14px; }
+  .project-card:deep(.el-card__body) { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 20px; }
+  .project-footer .el-button { width: 100%; }
+}
 </style>

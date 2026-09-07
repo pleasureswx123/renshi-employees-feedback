@@ -109,7 +109,10 @@ async function submit() {
     )
     if (epoch !== store.contextEpoch) return
     const result = await store.submit()
-    if (result) ElMessage.success('评价已提交')
+    if (result) {
+      ElMessage.success('评价已提交')
+      await router.replace('/employee/todos')
+    }
     else if (store.issues.length) await focusIssue(store.issues[0])
   } catch (failure) {
     if (!['cancel', 'close'].includes(failure)) ElMessage.error(failure.message || '提交失败')
@@ -169,10 +172,11 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
       @click="router.push(`/employee/reviews/${route.params.assignmentId}`)"
     >查看已提交答案</el-button>
     <template v-if="store.detail">
-      <header class="answer-header workspace-page-header">
-        <div>
-        <p>{{ store.detail.task.projectName }}</p>
-        <h1 class="page-heading answer-heading"><UserRoundIcon width="22" height="22" class="heading-icon" aria-hidden="true" /><span>{{ history ? '已提交的评价' : '评价' }}：{{ store.detail.task.targetName }}</span></h1>
+      <header class="answer-header">
+        <div class="answer-person-icon"><UserRoundIcon width="28" height="28" aria-hidden="true" /></div>
+        <div class="answer-person-copy">
+        <p class="answer-project-name">{{ store.detail.task.projectName }}</p>
+        <h1 class="page-heading answer-heading">{{ history ? '已提交的评价' : '评价' }}：{{ store.detail.task.targetName }}</h1>
         <p>{{ store.detail.task.targetDeptName || '未配置部门' }} · {{ store.detail.task.relationName }}评价</p>
         </div>
         <el-tag :type="store.detail.task.status === 'SUBMITTED' ? 'success' : 'warning'">{{ TASK_STATUS_LABELS[store.detail.task.status] }}</el-tag>
@@ -185,7 +189,7 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
       <el-alert v-else-if="!canEdit" title="当前账号仅有查看权限，不能填写或提交答案。" type="info" :closable="false" class="answer-notice" />
       <section class="answer-progress" aria-label="答题进度">
           <span class="progress-label"><ListChecksIcon width="16" height="16" aria-hidden="true" />已作答 {{ store.answeredCount }}/{{ store.questions.length }} 题</span>
-          <el-progress :percentage="store.questions.length ? Math.round(store.answeredCount / store.questions.length * 100) : 0" />
+          <el-progress :percentage="store.questions.length ? Math.round(store.answeredCount / store.questions.length * 100) : 0" :stroke-width="6" />
       </section>
       <el-card shadow="never" class="answer-document">
         <h2>{{ store.detail.questionnaire.title }}</h2>
@@ -247,39 +251,52 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
 </template>
 
 <style scoped>
-.answer-workspace { max-width: 900px; min-height: 240px; margin: auto; }
-.answer-header { margin: 18px 0; overflow-wrap: anywhere; }
+.answer-workspace { max-width: 1000px; min-height: 240px; margin: auto; padding-top: 12px; }
+.answer-header { display: flex; align-items: center; gap: 16px; margin: 24px 0; padding: 8px 0; overflow-wrap: anywhere; }
+.answer-person-icon { display: grid; place-items: center; flex: none; width: 52px; height: 52px; border-radius: 16px; background: var(--el-color-primary-light-9); color: var(--el-color-primary); }
+.answer-person-copy { flex: 1; min-width: 0; }
+.answer-header > .el-tag { flex-shrink: 0; }
 .answer-header p { margin: 0; font-size: 13px; }
-.answer-top-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-.answer-top-actions .el-button { margin-left: 0; }
-.answer-header h1 { font-size: 24px; margin: 8px 0; }
-.answer-heading { display: flex; align-items: center; gap: 8px; }
-.heading-icon { flex-shrink: 0; color: var(--el-color-primary); }
+.answer-top-actions { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.answer-top-actions .el-button { margin-left: 0; border-radius: 8px; }
+.answer-header h1 { font-size: 26px; margin: 6px 0 8px; }
 .answer-header p, .description { color: var(--fb-text-muted, #64748b); white-space: pre-wrap; line-height: 1.7; }
 .answer-notice { margin: 16px 0; }
-.answer-document h2 { overflow-wrap: anywhere; }
-.answer-document h2 { font-size: 20px; font-weight: 600; text-align: center; }
-.answer-progress { display: grid; gap: 8px; margin: 0 0 18px; padding: 14px 20px; border: 1px solid var(--fb-primary-border, #d9e8f8); border-radius: 6px; background: var(--fb-primary-bg, #f0f7ff); color: var(--fb-text-regular, #475569); font-size: 13px; }
-.progress-label { display: flex; align-items: center; gap: 6px; }
-.answer-page { margin-top: 8px; }
-.answer-question { padding: 20px 0; border-bottom: 1px solid var(--fb-border, #e5e7eb); }
-.answer-question-heading { margin-bottom: 12px; color: var(--fb-text-primary, #111827); line-height: 1.7; }
+.answer-document { border-radius: 16px; }
+.answer-document:deep(.el-card__body) { padding: 32px 40px; }
+.answer-document h2 { margin: 4px 0 24px; overflow-wrap: anywhere; font-size: 23px; font-weight: 600; text-align: center; line-height: 1.6; }
+.answer-progress { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 28px; margin: 0 0 24px; padding: 20px 24px; border: 1px solid var(--fb-border, #e2e8f0); border-radius: 12px; background: var(--fb-surface, #fff); color: var(--fb-text-regular, #475569); font-size: 13px; }
+.progress-label { display: flex; align-items: center; gap: 8px; }
+.progress-label svg { flex-shrink: 0; }
+.answer-page { margin-top: 16px; }
+.answer-question { margin-bottom: 0; padding: 28px 0; border-bottom: 1px solid var(--fb-border, #e5e7eb); }
+.answer-question-heading { margin-bottom: 16px; font-size: 16px; color: var(--fb-text-primary, #111827); line-height: 1.7; }
 .required-mark { margin-right: 4px; color: #f56c6c; }
 .question-description { margin: 0 0 12px; color: var(--fb-text-muted, #64748b); white-space: pre-wrap; line-height: 1.7; }
 .answer-question:deep(.el-form-item__content) { display: block; min-width: 0; overflow-wrap: anywhere; }
 .answer-question:deep(.el-form-item__error) { position: static; padding-top: 8px; }
 .issue-link { height: auto; white-space: normal; text-align: left; line-height: 1.7; }
-.page-navigation { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
+.page-navigation { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; color: var(--fb-text-muted, #64748b); font-size: 14px; }
+.page-navigation .el-button { min-height: 36px; border-radius: 8px; }
 .next-page-icon { margin-left: 6px; }
-.answer-footer { position: sticky; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; margin: 20px 12px 0; background: var(--fb-surface, #fff); border: 1px solid var(--fb-border, #e2e8f0); border-radius: 12px; box-shadow: 0 4px 20px rgb(15 23 42 / 8%), 0 1px 3px rgb(15 23 42 / 4%); z-index: 5; }
+.answer-footer { position: sticky; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; margin: 20px 0 0; background: var(--fb-surface, #fff); border: 1px solid var(--fb-border, #e2e8f0); border-radius: 12px; box-shadow: 0 4px 20px rgb(15 23 42 / 8%), 0 1px 3px rgb(15 23 42 / 4%); z-index: 5; }
 .save-state { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--fb-text-muted, #64748b); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .state-icon { flex-shrink: 0; }
 .save-state.is-unsaved { color: var(--fb-warning-text, #925b12); }
 .save-state.is-saved .state-icon { color: #67c23a; }
 .write-actions { display: flex; gap: 10px; flex-shrink: 0; }
-.answer-footer .el-button { height: 36px; padding: 0 18px; border-radius: 8px; font-weight: 500; }
+.answer-footer .el-button { height: 40px; padding: 0 20px; border-radius: 8px; font-weight: 500; }
 .write-actions .el-button + .el-button { margin-left: 0; }
 @media (max-width: 600px) {
+  .answer-workspace { padding-top: 0; }
+  .answer-header { flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+  .answer-person-icon { width: 44px; height: 44px; border-radius: 12px; }
+  .answer-person-copy { flex-basis: calc(100% - 56px); }
+  .answer-header > .el-tag { margin-left: 56px; }
+  .answer-progress { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 18px 20px; margin-bottom: 18px; }
+  .answer-document:deep(.el-card__body) { padding: 24px 20px; }
+  .answer-document h2 { font-size: 20px; }
+  .answer-question { padding: 24px 0; }
   .answer-footer { bottom: calc(10px + env(safe-area-inset-bottom)); flex-direction: column; align-items: stretch; gap: 10px; margin: 16px 0 0; padding: 12px; }
   .write-actions .el-button { flex: 1; min-width: 0; padding: 0 10px; }
   .answer-header h1 { font-size: 21px; }

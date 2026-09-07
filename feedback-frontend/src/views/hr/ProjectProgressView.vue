@@ -203,6 +203,18 @@ onBeforeUnmount(() => { drawerVisible.value = false })
       </div>
     </header>
     <p class="progress-hint">查看评价任务的填写与提交情况。筛选只影响下方任务明细，不改变顶部统计。</p>
+    <el-alert
+      v-if="store.project?.projectStatus === 'ACTIVE' && allSubmitted && store.dataScopeComplete"
+      title="答卷已收齐，下一步完成项目并生成报告"
+      description="本页展示任务进度，不展示正式得分。HR 确认完成项目后，进入「查看报告」将自动生成并展示团队和个人得分。"
+      type="info" :closable="false" show-icon
+    />
+    <el-alert
+      v-else-if="store.project?.projectStatus === 'COMPLETED'"
+      title="项目已完成，正式得分请在评价报告中查看"
+      description="进入「查看报告」即可自动生成并查看得分；已有报告直接展示。报告按冻结配置计算，仅使用已提交答卷。"
+      type="info" :closable="false" show-icon
+    />
 
     <el-alert
       v-if="!store.dataScopeComplete && store.scopeMessage"
@@ -240,6 +252,7 @@ onBeforeUnmount(() => { drawerVisible.value = false })
       />
 
       <el-card shadow="never" class="detail-card">
+        <div class="task-detail-heading"><h2>评价任务明细</h2><span>按姓名、关系或任务状态筛选</span></div>
         <el-form ref="filterFormRef" :model="filters" :rules="filterRules" label-position="top" class="filter-form">
           <el-form-item label="评价人姓名">
             <el-input v-model="filters.evaluatorKeyword" maxlength="100" clearable placeholder="输入评价人姓名" @keyup.enter="search" />
@@ -293,7 +306,16 @@ onBeforeUnmount(() => { drawerVisible.value = false })
 </template>
 
 <style scoped>
-.progress-page { display: grid; gap: 20px; min-width: 0; }
+.progress-page { display: grid; gap: 24px; min-width: 0; max-width: 1440px; margin: auto; padding-top: 12px; }
+.progress-page > .workspace-page-header { background: transparent; border: 0; box-shadow: none; padding: 8px 0; }
+.progress-page .workspace-detail-title h1 { font-size: 26px; }
+.progress-page > .el-alert { border-radius: 12px; padding: 16px 20px; }
+.task-detail-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; margin-bottom: 22px; }
+.task-detail-heading h2 { font-size: 17px; margin: 0; }
+.task-detail-heading span { font-size: 13px; color: var(--fb-text-muted, #64748b); }
+.detail-card { border-radius: 12px; }
+.detail-card:deep(.el-card__body) { padding: 24px; }
+.filter-form { padding-bottom: 8px; margin-bottom: 18px; border-bottom: 1px solid var(--fb-border, #e5e7eb); }
 .project-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .completion-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .completion-actions .el-button + .el-button { margin-left: 0; }

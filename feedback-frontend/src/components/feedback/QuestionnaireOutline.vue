@@ -131,12 +131,15 @@ async function renamePage() {
 .page-actions { display: flex; align-items: center; gap: 2px; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid var(--fb-border, #f0f2f5); }
 .page-actions .el-button { width: 24px; height: 26px; padding: 0; margin-left: 0; }
 .page-actions .rename-page { margin-right: auto; }
+.page-actions { opacity: .45; transition: opacity .15s; }
+.outline-page-group:hover .page-actions, .outline-page-group:focus-within .page-actions { opacity: 1; }
+@media (hover: none) { .page-actions { opacity: 1; } }
 .outline-question { display: flex; width: 100%; min-height: 28px; margin: 2px 0 0; justify-content: flex-start; padding: 5px 6px; color: var(--fb-text-regular, #606266); border-radius: 5px; }
 .outline-question:deep(> span) { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
 .outline-question svg { flex: none; color: var(--fb-text-muted, #909399); }
 .question-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 18px; }
 .outline-question:hover, .outline-question:focus-visible { background: var(--fb-surface-muted, #f5f7fa); }
-.outline-question.active { color: #409eff; background: var(--fb-primary-bg, #ecf5ff); box-shadow: inset 3px 0 #409eff; }
+.outline-question.active { color: var(--el-color-primary); font-weight: 600; background: var(--fb-primary-bg, #ecf5ff); box-shadow: inset 3px 0 var(--el-color-primary); }
 .outline-question.active svg { color: #409eff; }
 .outline-empty { margin: 10px 4px; font-size: 12px; color: var(--fb-text-disabled, #a8abb2); }
 </style>

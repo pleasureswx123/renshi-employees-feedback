@@ -43,6 +43,7 @@ from module_feedback.service import (
     FeedbackQuestionnaireService,
     ProjectCompletionExecutionError,
 )
+from module_feedback.service.system_templates import list_system_templates
 from utils.log_util import logger
 from utils.response_util import ResponseUtil
 
@@ -52,6 +53,13 @@ project_controller = APIRouterPro(
     tags=['员工反馈-评价项目'],
     dependencies=[PreAuthDependency()],
 )
+
+
+@project_controller.get(
+    '/system-templates', summary='查看系统问卷模板', dependencies=[UserInterfaceAuthDependency('feedback:project:add')]
+)
+async def system_templates(request: Request) -> Response:
+    return ResponseUtil.success(data=list_system_templates())
 
 
 @project_controller.get(

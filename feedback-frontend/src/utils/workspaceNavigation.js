@@ -7,7 +7,7 @@ export function workspaceMenuItems(workspace, hasPermission) {
           ? { path: '/hr/progress', label: '评价进度', icon: 'report' }
           : null,
       hasPermission('feedback:report:view') ? { path: '/hr/reports', label: '评价报告', icon: 'report' } : null,
-      hasPermission('feedback:answer:view') ? { path: '/hr/answers', label: '原始答案', icon: 'answers' } : null
+      hasPermission('feedback:answer:view') ? { path: '/hr/answers', label: '已提交答卷', icon: 'answers' } : null
     ].filter(Boolean)
   }
   return [

@@ -74,6 +74,7 @@ function displayTime(row) {
 .desktop-table strong,
 .desktop-table small { display: block; }
 .desktop-table small { margin-top: 4px; color: var(--fb-text-muted, #64748b); }
+.desktop-table:deep(.el-table__cell) { padding-block: 16px; }
 .mobile-cards { display: none; }
 .assignment-card { min-width: 0; padding: 16px; border: 1px solid var(--fb-border, #e2e8f0); border-radius: 10px; background: var(--fb-surface, #fff); }
 .assignment-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

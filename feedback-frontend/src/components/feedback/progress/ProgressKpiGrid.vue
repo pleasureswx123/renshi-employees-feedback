@@ -44,7 +44,7 @@ const cards = [
   min-width: 0;
   padding: 18px;
   border: 1px solid var(--fb-border, #e2e8f0);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--fb-surface, #fff);
   color: var(--fb-text-muted, #64748b);
   text-align: left;

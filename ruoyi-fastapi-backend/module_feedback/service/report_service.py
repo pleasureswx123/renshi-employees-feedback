@@ -7,16 +7,19 @@ from fastapi import HTTPException
 
 from common.vo import PageModel
 from module_feedback.calculators.report_score import CALCULATION_VERSION, calculate_report, display_decimal
+from module_feedback.calculators.score_source import source_rows
 from module_feedback.dao.progress_dao import FeedbackProgressDao
 from module_feedback.dao.publication_dao import FeedbackPublicationDao
 from module_feedback.dao.report_dao import FeedbackReportDao
 from module_feedback.entity.do import FbScoreResult
 from module_feedback.entity.vo.employee_vo import AnswerValueModel, EmployeeQuestionnaireModel
 from module_feedback.entity.vo.report_vo import (
+    AnswerProjectModel,
     PersonalReportModel,
     ReportCalculationModel,
     ReportProjectModel,
     ReportRowModel,
+    ScoreSourceModel,
     SubmittedAnswerDetailModel,
     SubmittedAnswerRowModel,
     TeamReportModel,
@@ -64,6 +67,21 @@ class FeedbackReportService:
             target_scope,
         )
         return project, targets, len(targets) == all_count
+
+    @staticmethod
+    async def answer_projects(
+        db: Any, query: Any, project_scope: Any, target_scope: Any
+    ) -> PageModel[AnswerProjectModel]:
+        projects, total = await FeedbackReportDao.list_projects(
+            db, query, project_scope, target_scope, for_answers=True
+        )
+        return PageModel[AnswerProjectModel](
+            rows=[AnswerProjectModel.model_validate(project) for project in projects],
+            total=total,
+            pageNum=query.page_num,
+            pageSize=query.page_size,
+            hasNext=query.page_num * query.page_size < total,
+        )
 
     @staticmethod
     async def list_projects(
@@ -237,9 +255,45 @@ class FeedbackReportService:
             }
         )
 
+    @classmethod
+    async def source(
+        cls,
+        db: Any,
+        project_id: int,
+        target_user_id: int,
+        project_scope: Any,
+        target_scope: Any,
+        *,
+        detail: tuple[int, int] | None = None,
+    ) -> ScoreSourceModel:
+        person = await cls.person(db, project_id, target_user_id, project_scope, target_scope)
+        _, targets, _ = await cls.context(db, project_id, project_scope, target_scope)
+        target = next((t for t in targets if t.target_user_id == target_user_id), None)
+        if target is None:
+            raise cls.problem(404, 'REPORT_TARGET_NOT_FOUND', '被评价人不存在')
+        result = await FeedbackReportDao.personal_result(db, project_id, person.version_id, target.target_id)
+        if result is None:
+            raise cls.problem(409, 'REPORT_NOT_READY', '请先生成完整报告')
+        try:
+            if result.calculation_version != CALCULATION_VERSION:
+                raise ValueError('未知计分版本')
+            rows = source_rows(result.calculation_basis, result.score, detail=detail)
+        except (ValueError, KeyError, TypeError, ArithmeticError) as exc:
+            raise cls.problem(
+                409, 'REPORT_SOURCE_UNAVAILABLE', '计算依据缺失或与正式结果不一致，暂不能展示公式，请联系管理员核对'
+            ) from exc
+        return ScoreSourceModel(
+            targetName=person.target_name,
+            calculationVersion=person.calculation_version,
+            calculatedTime=person.calculated_time,
+            rows=rows,
+        )
+
     @staticmethod
     def _answer_row(task: Any) -> SubmittedAnswerRowModel:
+        score = getattr(getattr(task, 'answer_sheet', None), 'raw_total_score', None)
         return SubmittedAnswerRowModel(
+            rawTotalScore=str(score) if score is not None else None,
             assignmentId=task.assignment_id,
             targetUserId=task.target_user_id,
             targetName=task.target_snapshot.target_user_name,

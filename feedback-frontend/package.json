@@ -20,6 +20,7 @@
     "@tiptap/starter-kit": "3.30.2",
     "@tiptap/vue-3": "3.30.2",
     "axios": "1.19.0",
+    "echarts": "6.1.0",
     "element-plus": "2.14.3",
     "js-cookie": "3.0.8",
     "pinia": "3.0.4",
