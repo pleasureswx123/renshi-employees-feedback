@@ -106,6 +106,7 @@ class CompletionDispatcher:
             return
 
         click_command = typer.main.get_command(cli)
+        ensure_custom_completion_classes_registered()
         if self.support.is_click_style_instruction(instruction):
             raise SystemExit(
                 click_shell_complete(click_command, {}, 'ruoyi', self.support.complete_env_var, instruction)

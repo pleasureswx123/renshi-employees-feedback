@@ -162,3 +162,6 @@ cython_debug/
 
 # P9备份、执行计划与测试回执，仅保留脱敏后的文档证据
 /.tmp/
+/.env.deploy
+/deploy/secrets/
+/backups/

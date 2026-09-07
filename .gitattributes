@@ -1,0 +1,2 @@
+# Linux 容器启动脚本在 Windows 检出时也保持 LF。
+deploy/*.sh text eol=lf

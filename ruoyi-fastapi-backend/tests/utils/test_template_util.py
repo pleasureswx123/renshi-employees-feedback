@@ -187,7 +187,14 @@ def test_secondary_source_templates_use_named_dependency_and_isolated_metadata(
     compile(controller, '<generated-controller>', 'exec')
 
 
-def test_python_templates_handle_audit_timestamps_by_exact_column_name() -> None:
+@pytest.mark.parametrize(('dialect', 'time_type'), [('mysql', 'datetime'), ('postgresql', 'timestamp')])
+def test_python_templates_handle_audit_timestamps_by_exact_column_name(
+    monkeypatch: pytest.MonkeyPatch, dialect: str, time_type: str
+) -> None:
+    # 按所测方言构造时间列，不依赖运行机器的默认数据源。
+    monkeypatch.setattr(
+        type(database.DataBaseConfig), 'get_source', lambda _self, _name=None: SimpleNamespace(db_type=dialect)
+    )
     columns = [
         GenTableColumnModel(
             columnName='item_id',
@@ -246,6 +253,9 @@ def test_python_templates_handle_audit_timestamps_by_exact_column_name() -> None
     ]
     gen_table = _gen_table(gen_view=False)
     gen_table.columns = columns
+    for column in columns:
+        if column.column_type == 'datetime':
+            column.column_type = time_type
     gen_table.pk_column = columns[0]
 
     context = TemplateUtils.prepare_context(gen_table)

@@ -291,3 +291,11 @@ docs/feedback/
 ## 2026-09-07 系统问卷模板扩展
 - 内置目录与草稿构建：ruoyi-fastapi-backend/module_feedback/service/system_templates.py。
 - 复用项目创建服务、问卷 DAO 和项目列表创建弹窗；具体契约见 [系统问卷模板](./20-system-questionnaire-templates.md)。
+
+## 2026-09-07 生产部署补齐
+
+- `docker-compose.pg.yml`：两个前端、后端、独立迁移任务、PostgreSQL及Redis。
+- `.env.deploy.example`、`deploy/redis-start.sh`、各工程Dockerfile和`.dockerignore`：部署参数、Redis认证、镜像与构建边界。
+- `ruoyi-fastapi-backend/scripts/feedback_container.py`、`feedback_deploy_init.py`：文件密钥、生产数据源、迁移和启动核验、独立密钥生成。
+- `ruoyi-fastapi-backend/tests/scripts/test_feedback_container.py`、`test_feedback_container_postgresql.py`：部署保护边界和真实新库迁移回归。
+- 部署与回退流程见[生产部署手册](./22-production-docker-deployment.md)，本次不改变业务数据模型或计分规则。

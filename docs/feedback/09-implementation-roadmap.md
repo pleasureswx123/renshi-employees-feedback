@@ -1194,3 +1194,10 @@ ruoyi-fastapi-backend/module_feedback/controller/feedback_controller.py
 - 已实现两套系统模板、创建前预览、独立草稿复制及空白创建兼容。
 - 定向验证：后端模板与接口权限 65 项、前端创建来源 2 项通过。尚未执行真实 PostgreSQL 和浏览器创建验收。
 - 范围与后续验收见 [系统问卷模板](./20-system-questionnaire-templates.md)。
+
+## 2026-09-07 部署前修复
+
+- 已实现PostgreSQL生产配置、双前端Docker交付、独立迁移及结构核验、文件密钥与持久数据卷，操作步骤见[生产部署](./22-production-docker-deployment.md)。
+- 已修复指标权重提示溢出、旧浏览器定位和跨用例审计依赖；窄屏断言等待真实过渡结束，保留原有业务验证。
+- 已修复Windows补全脚本生成和PowerShell协议注册；生成器审计测试分别使用MySQL/PostgreSQL合法时间类型，不改变生成器的方言契约。
+- 本轮后端非AI全仓库1489项通过、45项跳过；前端275项、模拟浏览器28项、真实浏览器2项通过；生产入口另行独立PostgreSQL验证通过。Docker实际验证结果追加于[部署检查](./21-deployment-readiness-review.md)，不声明已部署到目标服务器。

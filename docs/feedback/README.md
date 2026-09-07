@@ -23,6 +23,8 @@
 19. [同见：名称与标识](./19-brand-identity.md)
 
 20. [系统问卷模板](./20-system-questionnaire-templates.md)
+21. [2026-09-07部署前检查](./21-deployment-readiness-review.md)
+22. [PostgreSQL生产Docker部署](./22-production-docker-deployment.md)
 
 ## 文档维护规则
 

@@ -1,12 +1,22 @@
 import os
 
 from click.shell_completion import (
+    BashComplete,
     CompletionItem,
     ShellComplete,
     add_completion_class,
-    get_completion_class,
     split_arg_string,
 )
+
+
+class PortableBashComplete(BashComplete):
+    """Windows 生成目标 Bash 的脚本时，不执行可能是 WSL 占位程序的 bash.exe。"""
+
+    def source(self) -> str:
+        if os.name == 'nt':
+            return ShellComplete.source(self)
+        return super().source()
+
 
 _SOURCE_POWERSHELL = """\
 $%(complete_func)s = {
@@ -109,5 +119,6 @@ def ensure_custom_completion_classes_registered() -> None:
 
     :return: None
     """
-    if get_completion_class(PowerShellComplete.name) is None:
-        add_completion_class(PowerShellComplete)
+    # Typer 构建命令会注册同名类，构建后恢复本项目的协议实现。
+    add_completion_class(PowerShellComplete)
+    add_completion_class(PortableBashComplete)

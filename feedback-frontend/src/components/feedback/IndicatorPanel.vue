@@ -193,7 +193,7 @@ const weightState = computed(() => {
 .indicator-help .indicator-help-rule { margin: 0; color: var(--fb-text-muted, #909399); font-size: 12px; }
 .weight-summary { padding: 7px 10px; }
 .weight-summary:deep(.el-alert__content) { min-width: 0; }
-.weight-summary:deep(.el-alert__title) { display: flex; min-width: 0; align-items: baseline; flex-wrap: nowrap; gap: 4px; font-size: 12px; white-space: nowrap; }
+.weight-summary:deep(.el-alert__title) { display: flex; min-width: 0; align-items: baseline; flex-wrap: wrap; gap: 4px; font-size: 12px; overflow-wrap: anywhere; }
 .weight-summary strong { font-size: 15px; font-variant-numeric: tabular-nums; }
 .weight-target { color: var(--fb-text-muted, #909399); }
 .weight-status { margin-left: 2px; font-weight: 500; }

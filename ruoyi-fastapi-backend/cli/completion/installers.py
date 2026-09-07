@@ -8,10 +8,10 @@ from typing import Any
 import click
 import typer
 import typer.main
-from click.shell_completion import BashComplete, FishComplete, ZshComplete
+from click.shell_completion import FishComplete, ZshComplete
 
 from cli.completion.providers import COMPLETION_PROVIDER_GATEWAY, CompletionProviderGateway
-from cli.completion.shells import PowerShellComplete, ensure_custom_completion_classes_registered
+from cli.completion.shells import PortableBashComplete, PowerShellComplete, ensure_custom_completion_classes_registered
 from cli.exit_codes import ARGUMENT_ERROR, RUNTIME_ERROR
 from cli.metadata import COMPLETION_SHELL_SPEC_REGISTRY, CompletionShellSpec, CompletionShellSpecRegistry
 from cli.utils import format_cli_path
@@ -161,7 +161,7 @@ DEFAULT_COMPLETION_SHELL_RUNTIME_POLICIES = CompletionShellRuntimePolicyRegistry
     policies={
         'bash': CompletionShellRuntimePolicy(
             name='bash',
-            click_completion_class=BashComplete,
+            click_completion_class=PortableBashComplete,
             script_transformer=CompletionInstallerShellSupport.make_bash_completion_script_compatible,
             source_command_builder=CompletionInstallerShellSupport.build_posix_source_command,
         ),

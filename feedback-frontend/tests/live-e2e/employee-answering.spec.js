@@ -183,7 +183,7 @@ test('真实HR发布、员工答题、HR完成关闭未交任务并保持已提�
   expect(draftedDatabase.tasks.filter(task => task.status === 'DRAFT')).toHaveLength(1)
   expect(draftedDatabase.tasks.filter(task => task.status === 'PENDING')).toHaveLength(1)
   await page.goto(`/hr/projects/${state.project_id}/progress`)
-  await expect(page.getByRole('heading', { name: 'P5闭环', exact: false })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '评价进度', exact: true })).toBeVisible()
   await expect(page.locator('.kpi-card').filter({ hasText: '应完成' })).toContainText('2')
   await expect(page.getByRole('button', { name: '完成项目', exact: true })).toHaveCount(0)
   const partialCompletion = await page.evaluate(async projectId => {
@@ -218,7 +218,7 @@ test('真实HR发布、员工答题、HR完成关闭未交任务并保持已提�
   await login(page, state.hr)
   await expect(page).toHaveURL(/\/hr\/projects$/)
   await page.goto(`/hr/projects/${state.project_id}/progress`)
-  await expect(page.getByRole('heading', { name: 'P5闭环', exact: false })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '评价进度', exact: true })).toBeVisible()
   await expect(page.locator('.kpi-card').filter({ hasText: '应完成' })).toContainText('4')
   await expect(page.locator('.kpi-card').filter({ hasText: '已提交' })).toContainText('2')
   await expect(page.locator('.kpi-card').filter({ hasText: '已暂存' })).toContainText('1')
@@ -335,7 +335,8 @@ test('真实HR发布、员工答题、HR完成关闭未交任务并保持已提�
   await expect(page.getByRole('button', { name: '生成报告', exact: true })).toHaveCount(0)
   await page.screenshot({ path: '../output/playwright/p8-team-report.png', fullPage: true, animations: 'disabled' })
   await page.setViewportSize({ width: 390, height: 844 })
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  // 等待响应式侧栏的 margin-left 过渡完成后再核验宽度。
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: '../output/playwright/p8-team-report-mobile.png', fullPage: true, animations: 'disabled' })
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.getByRole('button', { name: '查看得分详情', exact: true }).first().click()
@@ -509,6 +510,11 @@ test('P9真实创建项目、跨用户拒绝及下级不适用和缺失关系报
   await expect(missingRelation.getByRole('cell', { name: '50.00', exact: true })).toBeVisible()
   await expect(missingRelation.getByRole('cell', { name: '0.00', exact: true })).toBeVisible()
   await page.screenshot({ path: '../output/playwright/p9-missing-relation-report.png', fullPage: true, animations: 'disabled' })
+  // 本用例独立触发原始答案读取，不能依赖上一条用例产生审计记录。
+  const submittedTask = progress.rows.find(row => row.evaluatorUserId === state.user_ids[1] && row.targetUserId === state.user_ids[0])
+  const rawAnswer = await realApi(page, 'GET', `${base}/answers/${submittedTask.assignmentId}`)
+  expect(rawAnswer.body.code).toBe(200)
+  expect(JSON.stringify(rawAnswer.body)).toContain('P9仅原始答案权限可见的建议')
   await expect.poll(() => {
     const audit = JSON.parse(fixture('inspect').split(/\r?\n/).find(line => line.startsWith('{"projectId"'))).operationAudit
     expect(audit.sensitiveDataAbsent).toBe(true)

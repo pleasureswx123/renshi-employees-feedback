@@ -363,7 +363,12 @@ class GetConfig:
         """
         获取Jwt配置
         """
-        # 实例化Jwt配置模型
+        # 生产必须使用持久密钥，避免重启或多进程生成不同随机密钥。
+        if (
+            os.environ.get('APP_ENV', '').lower() in {'prod', 'production'}
+            and len(os.environ.get('JWT_SECRET_KEY', '').strip()) < 32  # noqa: PLR2004
+        ):
+            raise ValueError('生产环境必须显式配置至少32个字符的JWT_SECRET_KEY')
         return JwtSettings()
 
     def get_database_config(self) -> DataBaseSettings:
@@ -429,7 +434,7 @@ class GetConfig:
             ini_config.read('alembic.ini', encoding='utf-8')
             if 'settings' in ini_config:
                 # 获取env选项
-                run_env = ini_config['settings'].get('env') or run_env
+                run_env = run_env or ini_config['settings'].get('env')
         elif 'uvicorn' in sys.argv[0]:
             # 使用uvicorn启动时，命令行参数需要按照uvicorn的文档进行配置，无法自定义参数
             pass

@@ -211,7 +211,7 @@ test('HR完成P4五题型、多页、指标、保存重载和PC分页实时预�
     const rect = element.getBoundingClientRect()
     return { top: rect.top, bottom: rect.bottom, right: rect.right }
   }))
-  expect(Math.max(...summaryParts.map(part => part.top)) - Math.min(...summaryParts.map(part => part.top))).toBeLessThan(2)
+  // 长精度提示允许折行，但不得溢出或裁掉任何数值。
   expect(Math.max(...summaryParts.map(part => part.right))).toBeLessThanOrEqual(summaryBox.x + summaryBox.width)
   await page.getByRole('button', { name: '删除指标 2', exact: true }).click()
   await expect(page.locator('.weight-summary')).toHaveClass(/el-alert--success/)

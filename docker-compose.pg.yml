@@ -1,77 +1,153 @@
+name: tongjian
+
+x-backend: &backend
+  image: tongjian-backend:${RELEASE_TAG:-local}
+  build:
+    context: ./ruoyi-fastapi-backend
+    dockerfile: Dockerfile.pg
+  environment:
+    APP_ENV: prod
+    APP_ROOT_PATH: /prod-api
+    APP_RELOAD: "false"
+    APP_WORKERS: ${APP_WORKERS:-1}
+    APP_DEFAULT_ENABLED_PLUGINS: ""
+    APP_IP_LOCATION_QUERY: "false"
+    TZ: Asia/Shanghai
+    FEEDBACK_DB_HOST: ruoyi-pg
+    FEEDBACK_DB_PORT: "5432"
+    FEEDBACK_DB_NAME: ${POSTGRES_DB:-ruoyi_feedback_prod}
+    FEEDBACK_DB_USER: postgres
+    FEEDBACK_DB_PASSWORD_FILE: /run/secrets/db_password
+    REDIS_HOST: ruoyi-redis
+    REDIS_PORT: "6379"
+    REDIS_DATABASE: "2"
+    REDIS_PASSWORD_FILE: /run/secrets/redis_password
+    JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret
+    TRANSPORT_CRYPTO_PUBLIC_KEY_FILE: /run/secrets/transport_public_key
+    TRANSPORT_CRYPTO_PRIVATE_KEY_FILE: /run/secrets/transport_private_key
+  secrets: [db_password, redis_password, jwt_secret, transport_public_key, transport_private_key]
+  networks: [ruoyi-network]
+  logging: &logging
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
 services:
-  # 前端服务
+  # 默认仅监听本机，由宿主机 TLS 反向代理提供外部访问。
   ruoyi-frontend:
     build:
       context: ./ruoyi-fastapi-frontend
-      dockerfile: Dockerfile
-    image: ruoyi-frontend:latest
-    container_name: ruoyi-frontend
-    ports:
-      - "12580:80"
+      args:
+        VITE_FEEDBACK_APP_URL: ${FEEDBACK_APP_URL:?请在.env.deploy填写评价平台完整访问地址}
+        VITE_APP_BASE_API: /prod-api
+    image: tongjian-admin:${RELEASE_TAG:-local}
+    restart: unless-stopped
+    ports: ["${WEB_BIND_ADDRESS:-127.0.0.1}:${ADMIN_PORT:-12580}:80"]
     volumes:
-      - ./ruoyi-fastapi-frontend/bin/nginx.dockerpg.conf:/etc/nginx/conf.d/default.conf
+      - ./ruoyi-fastapi-frontend/bin/nginx.dockerpg.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - ruoyi-backend-pg
-    networks:
-      - ruoyi-network
+      ruoyi-backend-pg:
+        condition: service_healthy
+    networks: [ruoyi-network]
+    logging: *logging
 
-  # 后端服务（PostgreSQL版本）
-  ruoyi-backend-pg:
+  feedback-frontend:
     build:
-      context: ./ruoyi-fastapi-backend
-      dockerfile: Dockerfile.pg
-    image: ruoyi-backend-pg:latest
-    container_name: ruoyi-backend-pg
-    ports:
-      - "19099:9099"
-    environment:
-      DB_DEFAULT_SOURCE: primary
-      DB_SOURCES: >-
-        {"primary":{"db_type":"postgresql","db_host":"ruoyi-pg","db_port":5432,"db_username":"postgres","db_password":"root","db_database":"ruoyi_feedback_dev","db_required":true}}
+      context: ./feedback-frontend
+    image: tongjian-feedback:${RELEASE_TAG:-local}
+    restart: unless-stopped
+    ports: ["${WEB_BIND_ADDRESS:-127.0.0.1}:${FEEDBACK_PORT:-12581}:80"]
+    depends_on:
+      ruoyi-backend-pg:
+        condition: service_healthy
+    networks: [ruoyi-network]
+    logging: *logging
+
+  # 独立迁移成功后才允许后端启动。
+  feedback-migrate:
+    <<: *backend
+    command: ["migrate"]
+    restart: "no"
     depends_on:
       ruoyi-pg:
         condition: service_healthy
       ruoyi-redis:
         condition: service_healthy
-    networks:
-      - ruoyi-network
 
-  # PostgreSQL服务
-  ruoyi-pg:
-    image: postgres:14
-    container_name: ruoyi-pg
-    environment:
-      POSTGRES_PASSWORD: root
-      POSTGRES_DB: ruoyi_feedback_dev
-      POSTGRES_INITDB_ARGS: --encoding=UTF8 --lc-collate=C --lc-ctype=C
-    ports:
-      - "15432:5432"
+  ruoyi-backend-pg:
+    <<: *backend
+    command: ["serve"]
+    restart: unless-stopped
     volumes:
-      - ./ruoyi-fastapi-backend/sql/ruoyi-fastapi-pg.sql:/docker-entrypoint-initdb.d/ruoyi-fastapi-pg.sql
-    networks:
-      - ruoyi-network
+      - backend_files:/app/vf_admin
+      - backend_logs:/app/logs
+    depends_on:
+      feedback-migrate:
+        condition: service_completed_successfully
+      ruoyi-redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "ruoyi_feedback_dev"]
-      interval: 5s
+      test: ["CMD", "python", "scripts/feedback_container.py", "health"]
+      interval: 30s
       timeout: 10s
-      retries: 30
+      start_period: 90s
+      retries: 3
 
-  # Redis服务
+  ruoyi-pg:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: ${POSTGRES_DB:-ruoyi_feedback_prod}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --lc-collate=C --lc-ctype=C
+      TZ: Asia/Shanghai
+    secrets: [db_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # 官方镜像只在全新数据目录执行此系统基线，禁止对已有库手动重放。
+      - ./ruoyi-fastapi-backend/sql/ruoyi-fastapi-pg.sql:/docker-entrypoint-initdb.d/01-system.sql:ro
+    networks: [ruoyi-network]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    logging: *logging
+
   ruoyi-redis:
-    image: redis:latest
-    container_name: ruoyi-redis
-    ports:
-      - "16379:6379"
-    networks:
-      - ruoyi-network
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["sh", "/opt/redis-start.sh"]
+    secrets: [redis_password]
+    volumes:
+      - redis_data:/data
+      - ./deploy/redis-start.sh:/opt/redis-start.sh:ro
+    networks: [ruoyi-network]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/secrets/redis_password)\" redis-cli ping | grep -qx PONG"]
       interval: 5s
-      timeout: 10s
+      timeout: 5s
       retries: 30
+    logging: *logging
 
-# 网络配置
 networks:
   ruoyi-network:
-    name: ruoyi-network
     driver: bridge
+volumes:
+  postgres_data:
+  redis_data:
+  backend_files:
+  backend_logs:
+secrets:
+  db_password:
+    file: ${FEEDBACK_SECRETS_DIR:-./deploy/secrets}/db_password
+  redis_password:
+    file: ${FEEDBACK_SECRETS_DIR:-./deploy/secrets}/redis_password
+  jwt_secret:
+    file: ${FEEDBACK_SECRETS_DIR:-./deploy/secrets}/jwt_secret
+  transport_public_key:
+    file: ${FEEDBACK_SECRETS_DIR:-./deploy/secrets}/transport_public_key.pem
+  transport_private_key:
+    file: ${FEEDBACK_SECRETS_DIR:-./deploy/secrets}/transport_private_key.pem
