@@ -70,7 +70,6 @@
           <li><span class="step-number">2</span><div><h3>分配参评权限</h3><p>员工分配参评角色；需要参评的 HR 同时具有 HR 和员工角色。</p></div></li>
           <li><span class="step-number">3</span><div><h3>进入评价平台</h3><p>由 HR 配置问卷与评价关系、发布项目，再由员工登录填写。</p></div></li>
         </ol>
-        <div class="guide-note"><el-icon><InfoFilled /></el-icon><span>原始答案为独立权限，请按实际需要授权。</span></div>
       </el-card>
     </div>
   </main>
@@ -79,7 +78,7 @@
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onDeactivated, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Briefcase, Connection, Document, InfoFilled, Lock, Refresh, Right, User, UserFilled } from '@element-plus/icons-vue'
+import { ArrowRight, Briefcase, Connection, Document, Lock, Refresh, Right, User, UserFilled } from '@element-plus/icons-vue'
 import { listUser } from '@/api/system/user'
 import { listDept } from '@/api/system/dept'
 import { listRole } from '@/api/system/role'
@@ -222,8 +221,6 @@ onBeforeUnmount(() => {
 .step-number { display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; color: var(--el-color-primary); background: var(--el-color-primary-light-9); font-size: 13px; font-weight: 600; }
 .preparation-list h3 { margin: 3px 0 6px; font-size: 14px; }
 .preparation-list p { color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.7; }
-.guide-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--el-border-color-lighter); font-size: 12px; line-height: 1.7; color: var(--el-text-color-secondary); }
-.guide-note .el-icon { margin-top: 3px; flex-shrink: 0; color: var(--el-color-primary); }
 @media (max-width: 1200px) {
   .home-columns { grid-template-columns: 1fr; }
 }

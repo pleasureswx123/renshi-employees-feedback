@@ -1,10 +1,11 @@
 from fastapi import Depends, Request, params
-from sqlalchemy import ColumnElement, false, func, or_, select, true
+from sqlalchemy import ColumnElement, and_, false, func, or_, select, true
 
 from common.context import RequestContext
 from config.database import Base
 from module_admin.entity.do.dept_do import SysDept
 from module_admin.entity.do.role_do import SysRoleDept
+from module_admin.entity.do.user_do import SysUser
 from utils.dependency_util import DependencyUtil
 
 
@@ -95,6 +96,11 @@ class GetDataScope:
         param_sql_list = list(dict.fromkeys(param_sql_list))
         # 无角色或无有效范围必须拒绝，空or_()会生成没有限制的WHERE条件。
         param_sql = or_(*param_sql_list) if param_sql_list else false()
+
+        # 内置超级管理员仅本人可见；全部数据权限也不能放开该账号。
+        # 限定用户表，避免影响部门等其他实体及业务历史记录。
+        if self.query_alias is SysUser:
+            param_sql = and_(param_sql, SysUser.user_id != 1)
 
         return param_sql
 
