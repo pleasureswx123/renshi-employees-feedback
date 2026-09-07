@@ -180,14 +180,16 @@ ln -sfn "$PWD" /opt/tongjian/current
 
 ## 本地开发
 
-以下命令从仓库根目录开始，三个服务分别在独立 PowerShell 终端运行。推荐与生产构建一致的 Python 3.11、Node.js 22；开发数据库使用 PostgreSQL，Redis 使用兼容版本，建议与部署的 Redis 7.4 对齐。不要把开发配置指向正式库。
+日常开发需要打开 **三个独立的 PowerShell 终端**，分别运行后端、管理端和评价平台，启动后保持终端打开。下面使用本机项目的绝对路径，可以直接复制命令；项目移动后替换对应路径。停止服务时在对应终端按 `Ctrl+C`。
+
+推荐与生产构建一致的 Python 3.11、Node.js 22；开发数据库使用 PostgreSQL，Redis 使用兼容版本，建议与部署的 Redis 7.4 对齐。不要把开发配置指向正式库。
 
 ### 后端
 
 首次安装使用项目自己的虚拟环境，已有 `.venv` 时不要重复创建。创建前确认 `python` 来自独立 Python 安装，不要复用其他应用的虚拟环境。
 
 ```powershell
-cd .\ruoyi-fastapi-backend
+cd D:\work\renshi-employees-feedback\ruoyi-fastapi-backend
 python --version
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-pg.txt
@@ -195,34 +197,39 @@ python -m venv .venv
 
 在后端 `.env.dev` 配置开发数据库、Redis 和应用参数。新库先初始化 PostgreSQL 系统基线，再执行 Alembic；已有库不得重放含删表语句的初始化 SQL。具体新库、旧库接管和结构核验步骤见[启动与迁移手册](./docs/feedback/17-operations-runbook.md#3-数据库升级与接管)。
 
-配置和迁移就绪后，在后端目录启动：
+配置和迁移就绪后，**终端一：启动后端**。已有虚拟环境和依赖时，日常只需执行：
 
 ```powershell
-.\.venv\Scripts\ruoyi.exe app doctor --env=dev
-.\.venv\Scripts\ruoyi.exe app run --env=dev
+cd D:\work\renshi-employees-feedback\ruoyi-fastapi-backend
+.\.venv\Scripts\Activate.ps1
+ruoyi app run --env=dev
 ```
 
 后端本地端口为 `9099`。配置需要排查时参阅 [CLI 使用说明](./ruoyi-fastapi-backend/docs/cli_usage.md)。`.env.prod` 是生产模板；服务器实际数据源和密钥由容器入口根据 Compose 参数及文件密钥注入，不使用本地 `.env.dev`。
 
-### 评价前端
+需要检查开发配置时，可在激活虚拟环境后执行 `ruoyi app doctor --env=dev`。
+
+### 管理端（终端二）
 
 ```powershell
-cd .\feedback-frontend
-npm ci
-npm run dev -- --host 127.0.0.1 --port 5174 --strictPort
+cd D:\work\renshi-employees-feedback\ruoyi-fastapi-frontend
+npm run dev
 ```
 
-访问 `http://localhost:5174/`，开发 API 通过 `/dev-api` 代理到本地后端。使用 `localhost` 进行开发，不能把开发服务器直接当作内网生产入口。
+当前 Vite 配置默认使用 **80** 端口，访问 [管理端首页](http://localhost/index)。如需改用 5173，可执行 `npm run dev -- --port 5173 --strictPort`，然后访问 `http://localhost:5173/`。实际启动地址以终端输出为准。
 
-### 管理前端
+开发时在该工程的开发环境配置中将 `VITE_FEEDBACK_APP_URL` 指向 `http://localhost:5174/`；服务器地址由部署脚本在构建时注入。账号和密码以各自数据库实际配置为准，不使用外部演示系统凭据。
+
+### 评价平台（终端三）
 
 ```powershell
-cd .\ruoyi-fastapi-frontend
-npm ci
-npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
+cd D:\work\renshi-employees-feedback\feedback-frontend
+npm run dev
 ```
 
-访问 `http://localhost:5173/`。这里显式指定 5173，避免沿用上游 Vite 配置的 80 端口。开发时在该工程的开发环境配置中将 `VITE_FEEDBACK_APP_URL` 指向 `http://localhost:5174/`；服务器地址由部署脚本在构建时注入。账号和密码以各自数据库实际配置为准，不使用外部演示系统凭据。
+默认访问 [评价平台](http://localhost:5174/)，开发 API 通过 `/dev-api` 代理到本地后端。使用 `localhost` 进行开发，不能把开发服务器直接当作内网生产入口。
+
+两个前端首次安装或锁文件更新后，先在各自目录执行 `npm ci`，再执行 `npm run dev`；日常启动无需重复安装依赖。
 
 ### 修改与验证
 
