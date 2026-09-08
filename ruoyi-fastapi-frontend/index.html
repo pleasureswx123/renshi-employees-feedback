@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 
 <head>
   <meta charset="utf-8">
@@ -16,199 +16,98 @@
     body,
     #app {
       height: 100%;
-      margin: 0px;
-      padding: 0px;
+      margin: 0;
+      padding: 0;
     }
 
-    .chromeframe {
-      margin: 0.2em 0;
-      background: #ccc;
-      color: #000;
-      padding: 0.2em 0;
-    }
-
-    #loader-wrapper {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 999999;
-    }
-
-    #loader {
-      display: block;
-      position: relative;
-      left: 50%;
-      top: 50%;
-      width: 150px;
-      height: 150px;
-      margin: -75px 0 0 -75px;
-      border-radius: 50%;
-      border: 3px solid transparent;
-      border-top-color: #FFF;
-      -webkit-animation: spin 2s linear infinite;
-      -ms-animation: spin 2s linear infinite;
-      -moz-animation: spin 2s linear infinite;
-      -o-animation: spin 2s linear infinite;
-      animation: spin 2s linear infinite;
-      z-index: 1001;
-    }
-
-    #loader:before {
-      content: "";
-      position: absolute;
-      top: 5px;
-      left: 5px;
-      right: 5px;
-      bottom: 5px;
-      border-radius: 50%;
-      border: 3px solid transparent;
-      border-top-color: #FFF;
-      -webkit-animation: spin 3s linear infinite;
-      -moz-animation: spin 3s linear infinite;
-      -o-animation: spin 3s linear infinite;
-      -ms-animation: spin 3s linear infinite;
-      animation: spin 3s linear infinite;
-    }
-
-    #loader:after {
-      content: "";
-      position: absolute;
-      top: 15px;
-      left: 15px;
-      right: 15px;
-      bottom: 15px;
-      border-radius: 50%;
-      border: 3px solid transparent;
-      border-top-color: #FFF;
-      -moz-animation: spin 1.5s linear infinite;
-      -o-animation: spin 1.5s linear infinite;
-      -ms-animation: spin 1.5s linear infinite;
-      -webkit-animation: spin 1.5s linear infinite;
-      animation: spin 1.5s linear infinite;
-    }
-
-
-    @-webkit-keyframes spin {
-      0% {
-        -webkit-transform: rotate(0deg);
-        -ms-transform: rotate(0deg);
-        transform: rotate(0deg);
-      }
-
-      100% {
-        -webkit-transform: rotate(360deg);
-        -ms-transform: rotate(360deg);
-        transform: rotate(360deg);
-      }
-    }
-
-    @keyframes spin {
-      0% {
-        -webkit-transform: rotate(0deg);
-        -ms-transform: rotate(0deg);
-        transform: rotate(0deg);
-      }
-
-      100% {
-        -webkit-transform: rotate(360deg);
-        -ms-transform: rotate(360deg);
-        transform: rotate(360deg);
-      }
-    }
-
-
-    #loader-wrapper .loader-section {
-      position: fixed;
-      top: 0;
-      width: 51%;
-      height: 100%;
-      background: #7171C6;
-      z-index: 1000;
-      -webkit-transform: translateX(0);
-      -ms-transform: translateX(0);
-      transform: translateX(0);
-    }
-
-    #loader-wrapper .loader-section.section-left {
-      left: 0;
-    }
-
-    #loader-wrapper .loader-section.section-right {
-      right: 0;
-    }
-
-
-    .loaded #loader-wrapper .loader-section.section-left {
-      -webkit-transform: translateX(-100%);
-      -ms-transform: translateX(-100%);
-      transform: translateX(-100%);
-      -webkit-transition: all 0.7s 0.3s cubic-bezier(0.645, 0.045, 0.355, 1.000);
-      transition: all 0.7s 0.3s cubic-bezier(0.645, 0.045, 0.355, 1.000);
-    }
-
-    .loaded #loader-wrapper .loader-section.section-right {
-      -webkit-transform: translateX(100%);
-      -ms-transform: translateX(100%);
-      transform: translateX(100%);
-      -webkit-transition: all 0.7s 0.3s cubic-bezier(0.645, 0.045, 0.355, 1.000);
-      transition: all 0.7s 0.3s cubic-bezier(0.645, 0.045, 0.355, 1.000);
-    }
-
-    .loaded #loader {
-      opacity: 0;
-      -webkit-transition: all 0.3s ease-out;
-      transition: all 0.3s ease-out;
-    }
-
-    .loaded #loader-wrapper {
-      visibility: hidden;
-      -webkit-transform: translateY(-100%);
-      -ms-transform: translateY(-100%);
-      transform: translateY(-100%);
-      -webkit-transition: all 0.3s 1s ease-out;
-      transition: all 0.3s 1s ease-out;
-    }
-
-    .no-js #loader-wrapper {
-      display: none;
-    }
-
-    .no-js h1 {
-      color: #222222;
-    }
-
-    #loader-wrapper .load_title {
-      font-family: 'Open Sans';
-      color: #FFF;
-      font-size: 19px;
-      width: 100%;
+    /* 应用挂载前直接显示，避免依赖尚未加载的组件和样式。 */
+    .startup-screen {
+      box-sizing: border-box;
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 32px 24px;
+      background: radial-gradient(ellipse at 50% 40%, #192e4b 0%, #070f22 65%);
+      color: #f0f5ff;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
       text-align: center;
-      z-index: 9999999999999;
-      position: absolute;
-      top: 60%;
-      opacity: 1;
-      line-height: 30px;
     }
 
-    #loader-wrapper .load_title span {
-      font-weight: normal;
-      font-style: italic;
+    .startup-brand {
+      display: block;
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 24px;
+      border-radius: 16px;
+      box-shadow: 0 12px 40px rgb(0 0 0 / 20%);
+    }
+
+    .startup-title {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+      line-height: 1.5;
+      letter-spacing: 2px;
+    }
+
+    .startup-description {
+      margin: 10px 0 32px;
+      color: #b0bfd4;
       font-size: 13px;
-      color: #FFF;
-      opacity: 0.5;
+      line-height: 1.8;
+      letter-spacing: 1px;
+    }
+
+    .startup-track {
+      width: 180px;
+      height: 3px;
+      margin: 0 auto;
+      overflow: hidden;
+      border-radius: 3px;
+      background: #263a55;
+    }
+
+    .startup-track::after {
+      content: "";
+      display: block;
+      width: 40%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #69a5ff, #94dff0);
+      animation: startup-loading 1.6s ease-in-out infinite alternate;
+    }
+
+    .startup-status {
+      margin: 18px 0 0;
+      color: #b0bfd4;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+
+    @keyframes startup-loading {
+      from { transform: translateX(0); }
+      to { transform: translateX(150%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .startup-track::after {
+        animation: none;
+        margin-inline: auto;
+      }
     }
   </style>
 </head>
 
 <body>
   <div id="app">
-    <div id="loader-wrapper">
-      <div id="loader"></div>
-      <div class="loader-section section-left"></div>
-      <div class="loader-section section-right"></div>
-      <div class="load_title">正在加载系统资源，请耐心等待</div>
+    <div class="startup-screen" role="status" aria-live="polite" aria-busy="true">
+      <div>
+        <img class="startup-brand" src="/brand-mark.svg" alt="" width="64" height="64">
+        <h1 class="startup-title">同见 · 管理中心</h1>
+        <p class="startup-description">组织、账号与权限管理</p>
+        <div class="startup-track" aria-hidden="true"></div>
+        <p class="startup-status">正在加载管理中心，请稍候…</p>
+      </div>
     </div>
   </div>
   <script type="module" src="/src/main.js"></script>
