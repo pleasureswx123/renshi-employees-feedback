@@ -8,7 +8,7 @@ const store = useProjectReportsStore()
 const permissions = usePermissionStore()
 const selectedKey = ref('total')
 const selection = ref(null)
-const levels = { total: '最终得分', indicator: '指标加权', relation: '关系平均', sheet: '答卷换算', question: '题目得分' }
+const levels = { total: '最终得分', indicator: '指标加权', relation: '关系平均', relation_average: '各指标算术平均', sheet: '答卷换算', question: '题目得分' }
 const rows = computed(() => {
   const all = store.source?.rows || []
   const keys = new Set([selectedKey.value])
@@ -37,7 +37,7 @@ onBeforeUnmount(() => { store.clear('source'); store.clear('sourceSheets') })
 <template>
   <section class="source-panel">
     <h2>{{ target.row.targetName }} · 得分来源</h2>
-    <p>最终得分 → 指标加权 → 关系平均 → 答卷换算 → 题目得分</p>
+    <p>{{ currentSource?.level === 'relation_average' ? '各指标算术平均 → 各指标关系得分 → 答卷换算 → 题目得分' : '最终得分 → 指标加权 → 关系平均 → 答卷换算 → 题目得分' }}</p>
     <el-alert title="公式默认最多显示两位小数，仅供阅读；后台仍按完整精度计算，直接使用显示值复算可能有尾差。可展开“完整精度”核对原始公式。题目得分为原始题分，其余为百分制。" type="info" :closable="false" />
     <el-skeleton v-if="store.loading.source" :rows="6" animated />
     <el-alert v-else-if="store.errors.source" :title="store.errors.source" type="error" :closable="false"><el-button @click="store.loadSource(target.row.targetUserId)">重试</el-button></el-alert>

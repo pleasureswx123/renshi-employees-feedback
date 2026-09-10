@@ -11,6 +11,9 @@ class ReportQueryModel(QuestionnaireVoModel):
     page_num: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
     keyword: str = Field(default='', max_length=200)
+    department: str | None = Field(default=None, max_length=200)
+    sort_relation_id: int | None = Field(default=None, gt=0)
+    sort_order: Literal['asc', 'desc'] = 'desc'
 
 
 class SubmittedAnswerQueryModel(ReportQueryModel):
@@ -79,6 +82,7 @@ class ReportRowModel(QuestionnaireVoModel):
     has_missing_data: bool
     insufficient_data: bool
     relations: list[RelationCoverageModel]
+    relation_scores: dict[int, str | None] = Field(default_factory=dict)
     indicators: list[ReportIndicatorModel]
 
 
@@ -92,6 +96,9 @@ class PersonalReportModel(ReportRowModel):
 
 
 class TeamReportModel(QuestionnaireVoModel):
+    department_options: list[str] = Field(default_factory=list)
+    indicator_options: list[dict] = Field(default_factory=list)
+    relation_options: list[dict] = Field(default_factory=list)
     project_id: int
     project_name: str
     version_id: int

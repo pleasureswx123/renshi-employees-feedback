@@ -8,7 +8,10 @@ from module_feedback.calculators.report_score import CALCULATION_VERSION, PRECIS
 def source_rows(basis: dict, persisted_score: Decimal | None, *, detail: tuple[int, int] | None = None) -> list[dict]:
     with localcontext() as ctx:
         ctx.prec = PRECISION
-        return _source_rows(basis, persisted_score, detail=detail)
+        rows = _source_rows(basis, persisted_score, detail=detail)
+        if detail is None:
+            rows.extend(_relation_average_rows(basis['inputs'], rows))
+        return rows
 
 
 def _source_rows(basis: dict, persisted_score: Decimal | None, *, detail: tuple[int, int] | None) -> list[dict]:
@@ -158,6 +161,37 @@ def _source_rows(basis: dict, persisted_score: Decimal | None, *, detail: tuple[
                     rows[-1].update(rawScore=raw, maxScore=q['maxScore'])
     if detail and not rows:
         raise ValueError('指标或关系不存在')
+    return rows
+
+
+def _relation_average_rows(inputs: dict, sources: list[dict]) -> list[dict]:
+    """复用已核对的精确关系分，补充独立的跨指标平均来源分支。"""
+    indexed = {row['key']: row for row in sources}
+    rows = []
+    for rel in inputs['relations']:
+        rid = rel['relationId']
+        key = f'r-{rid}-average'
+        children = [indexed[f'i-{ind["indicatorId"]}-r-{rid}'] for ind in inputs['indicators']]
+        values = [Decimal(row['exactResult']) if row['exactResult'] is not None else None for row in children]
+        complete = bool(values) and all(value is not None for value in values)
+        value = sum(values, Decimal(0)) / len(values) if complete else None
+        rows.append(
+            {
+                'key': key,
+                'parentKey': None,
+                'level': 'relation_average',
+                'label': f'{rel["relationName"]} · 各指标平均分',
+                'formula': f'({" + ".join(str(item) for item in values)}) ÷ {len(values)}'
+                if complete
+                else '存在指标缺分，不能计算各指标平均分',
+                'result': display_decimal(value),
+                'exactResult': str(value) if value is not None else None,
+                'note': '全部指标对应关系得分之和 ÷ 指标数；不按指标权重加权，不参与总得分计算。',
+                'relationId': rid,
+                'indicatorId': None,
+            }
+        )
+        rows.extend({**row, 'key': f'{key}-i-{row["indicatorId"]}', 'parentKey': key} for row in children)
     return rows
 
 

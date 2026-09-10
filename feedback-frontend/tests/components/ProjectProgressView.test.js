@@ -272,20 +272,17 @@ describe('HR项目评价进度页', () => {
     expect(api.completeProject).toHaveBeenCalledTimes(1)
   })
 
-  it('精确ID筛选使用step-strictly且ElForm正整数规则阻止小数请求', async () => {
+  it('姓名筛选正常查询，重置后恢复全部任务', async () => {
     await open(['feedback:progress:view'])
-    const numberInputs = wrapper.findAllComponents({ name: 'ElInputNumber' })
-    expect(numberInputs).toHaveLength(2)
-    expect(numberInputs.every(input => input.props('stepStrictly') === true)).toBe(true)
-    const form = wrapper.findComponent({ name: 'ElForm' })
-    expect(form.props('rules').evaluatorUserId).toHaveLength(1)
-    expect(form.props('rules').targetUserId).toHaveLength(1)
-
-    useProjectProgressStore().filters.evaluatorUserId = 1.5
+    await wrapper.find('input[placeholder="输入评价人姓名"]').setValue('张三')
+    await wrapper.find('input[placeholder="输入被评价人姓名"]').setValue('李四')
     await button('查询').trigger('click')
     await flushPromises()
-
-    expect(api.getProjectProgress).toHaveBeenCalledTimes(1)
-    await vi.waitFor(() => expect(wrapper.text()).toContain('用户ID必须为正整数'))
+    expect(api.getProjectProgress).toHaveBeenLastCalledWith(12, {
+      evaluatorKeyword: '张三', targetKeyword: '李四', pageNum: 1, pageSize: 20
+    })
+    await button('重置').trigger('click')
+    await flushPromises()
+    expect(api.getProjectProgress).toHaveBeenLastCalledWith(12, { pageNum: 1, pageSize: 20 })
   })
 })

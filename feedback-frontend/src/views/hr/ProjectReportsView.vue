@@ -13,7 +13,9 @@ const ReportScoreChart = defineAsyncComponent(() => import('@/components/feedbac
 const route = useRoute()
 const store = useProjectReportsStore()
 const permissions = usePermissionStore()
-const filters = reactive({ keyword: '', pageNum: 1, pageSize: 20 })
+const filters = reactive({ keyword: '', department: '', sortRelationId: 'total', sortOrder: 'desc', pageNum: 1, pageSize: 20 })
+const selectedIndicator = ref('all')
+let lastPageSize = 20
 const form = ref()
 const personVisible = ref(false)
 const sourceVisible = ref(false)
@@ -29,7 +31,7 @@ async function load() {
   personVisible.value = false
   sourceVisible.value = false
   const projectId = Number(route.params.projectId)
-  const report = await store.loadTeam(projectId, { ...filters })
+  const report = await store.loadTeam(projectId, { ...filters, department: filters.department || undefined, sortRelationId: filters.sortRelationId === 'total' ? undefined : filters.sortRelationId })
   if (active && Number(route.params.projectId) === projectId && store.projectId === projectId &&
       report && !report.ready && !store.errors.generate && permissions.hasPermission('feedback:report:view')) {
     await generate()
@@ -51,8 +53,8 @@ async function showPerson(row) {
   personVisible.value = true
   await store.loadPerson(row.targetUserId)
 }
-function pageChanged(pageNum) { filters.pageNum = pageNum; load() }
-watch(() => route.params.projectId, () => { filters.keyword = ''; filters.pageNum = 1; reportTab.value = 'ranking'; rulesVisible.value = false; load() }, { immediate: true })
+function paginationChanged(pageNum, pageSize) { filters.pageNum = pageSize === lastPageSize ? pageNum : 1; filters.pageSize = pageSize; lastPageSize = pageSize; load() }
+watch(() => route.params.projectId, () => { Object.assign(filters, { keyword: '', department: '', sortRelationId: 'total', sortOrder: 'desc', pageNum: 1 }); selectedIndicator.value = 'all'; reportTab.value = 'ranking'; rulesVisible.value = false; load() }, { immediate: true })
 onBeforeUnmount(() => { active = false; store.reset() })
 </script>
 
@@ -86,13 +88,17 @@ onBeforeUnmount(() => { active = false; store.reset() })
         <div class="report-section-heading"><h2>团队排名与明细</h2><el-button link type="primary" @click="rulesVisible = true">计分说明</el-button></div>
         <el-tabs v-model="reportTab" aria-label="报告视图"><el-tab-pane label="团队排名" name="ranking" /><el-tab-pane label="指标对比" name="indicators" /><el-tab-pane label="得分图表" name="charts" /></el-tabs>
         <div class="score-guide"><strong>排名看最终得分</strong><p>最终得分由他人的评价按发布时的关系、指标权重计算，不与自评取平均。自评通常仅供对照；标注“仅自评”的人员，以自评计入最终得分。</p></div>
-        <el-form ref="form" :model="filters" inline class="workspace-filter">
+        <el-form ref="form" :model="filters" inline size="small" class="workspace-filter report-filters">
           <el-form-item label="被评价人" prop="keyword" :rules="[{ max: 200, message: '最多200字' }]">
             <el-input v-model="filters.keyword" maxlength="200" clearable @keyup.enter="search" />
           </el-form-item>
+          <el-form-item v-if="reportTab === 'indicators'" label="查看维度"><el-select v-model="selectedIndicator" aria-label="查看维度" style="width: 145px"><el-option label="全部指标" value="all" /><el-option v-for="item in store.team.indicatorOptions || []" :key="item.indicatorId" :label="item.indicatorName" :value="item.indicatorId" /></el-select></el-form-item>
+          <el-form-item label="部门"><el-select v-model="filters.department" aria-label="部门" clearable filterable placeholder="全部部门" style="width: 145px"><el-option v-for="name in store.team.departmentOptions || []" :key="name" :label="name" :value="name" /></el-select></el-form-item>
+          <el-form-item label="排序"><el-select v-model="filters.sortRelationId" aria-label="排序字段" style="width: 100px"><el-option label="总得分" value="total" /><el-option v-for="item in store.team.relationOptions || []" :key="item.relationId" :label="item.relationType === 'SELF' ? '自己' : item.relationName" :value="item.relationId" /></el-select></el-form-item>
+          <el-form-item><el-select v-model="filters.sortOrder" aria-label="排序方向" style="width: 105px"><el-option label="高到低" value="desc" /><el-option label="低到高" value="asc" /></el-select></el-form-item>
           <el-form-item><el-button type="primary" :disabled="store.loading.team" @click="search">查询</el-button></el-form-item>
         </el-form>
-        <IndicatorComparison v-if="reportTab === 'indicators'" :rows="store.team.rows" @detail="showPerson" @source="showSource" />
+        <IndicatorComparison v-if="reportTab === 'indicators'" :rows="store.team.rows" :selected-indicator="selectedIndicator" :show-toolbar="false" @detail="showPerson" @source="showSource" />
         <ReportScoreChart v-else-if="reportTab === 'charts'" :rows="store.team.rows" @source="showSource" />
         <el-table v-else :data="store.team.rows" empty-text="没有匹配的被评价人" class="report-table">
           <el-table-column label="排名" width="70"><template #default="{ row }"><span class="rank-label">{{ row.rank ?? '—' }}</span></template></el-table-column>
@@ -103,7 +109,7 @@ onBeforeUnmount(() => { active = false; store.reset() })
           <el-table-column label="操作" width="145" fixed="right"><template #default="{ row }"><el-button link type="primary" @click="showPerson(row)">查看得分详情</el-button></template></el-table-column>
         </el-table>
         <p class="page-description">得分为百分制。同分并列，排名按未舍入的最终得分计算；数据不足者不参与排名，未提交任务不按零分计入。</p>
-        <el-pagination layout="total, prev, pager, next" :total="store.team.total" :current-page="filters.pageNum" :page-size="filters.pageSize" @current-change="pageChanged" />
+        <el-pagination layout="total, sizes, prev, pager, next" :page-sizes="[10, 20, 30, 50, 100]" :total="store.team.total" v-model:current-page="filters.pageNum" v-model:page-size="filters.pageSize" @change="paginationChanged" />
       </el-card>
     </template>
     <el-drawer v-model="sourceVisible" title="得分来源" size="min(1150px, 96vw)" destroy-on-close><ScoreSourcePanel v-if="sourceVisible && sourceTarget" :target="sourceTarget" /></el-drawer>
@@ -121,6 +127,9 @@ onBeforeUnmount(() => { active = false; store.reset() })
 </template>
 
 <style scoped>
+.report-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.report-filters :deep(.el-form-item) { margin: 0; }
+.report-filters :deep(.el-input) { width: 145px; }
 .reports-page { display: grid; gap: 24px; min-width: 0; max-width: 1440px; margin: auto; padding-top: 12px; }
 .report-navigation .el-button { border-radius: 8px; }
 .report-header { display: flex; gap: 20px; justify-content: space-between; align-items: flex-start; }

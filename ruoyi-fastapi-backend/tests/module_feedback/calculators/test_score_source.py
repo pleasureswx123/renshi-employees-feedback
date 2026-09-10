@@ -60,3 +60,20 @@ def test_missing_question_keeps_denominator() -> None:
     assert rows[-1]['maxScore'] == '100'
     assert rows[-1]['result'] is None
     assert '漏答' in rows[-1]['note']
+
+
+def test_relation_average_source_lists_all_indicators_without_weights() -> None:
+    inputs = sample()
+    inputs['indicators'][0]['weight'] = '20'
+    second = deepcopy(inputs['indicators'][0])
+    second.update(indicatorId=2, indicatorName='指标二', weight='80')
+    inputs['indicators'].append(second)
+    basis, score = basis_for(inputs)
+    rows = source_rows(basis, score)
+    average = next(row for row in rows if row['key'] == 'r-1-average')
+    assert average['result'] == '90.00'
+    assert average['formula'] == '(90.0 + 90.0) ÷ 2'
+    children = [row for row in rows if row['parentKey'] == average['key']]
+    assert [row['indicatorId'] for row in children] == [1, 2]
+    assert all(row['level'] == 'relation' and row['relationId'] == 1 for row in children)
+    assert len({row['key'] for row in rows}) == len(rows)

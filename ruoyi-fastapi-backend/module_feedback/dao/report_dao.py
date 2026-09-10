@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import and_, func, select, text
+from sqlalchemy import and_, case, func, select, text
 from sqlalchemy.orm import selectinload
 
 from module_feedback.dao.progress_dao import FeedbackProgressDao
@@ -157,6 +157,7 @@ class FeedbackReportDao:
         ranked = (
             select(
                 FbScoreResult.score,
+                FbScoreResult.target_id,
                 FbScoreResult.calculation_basis['report'].op('-')('questions').label('report'),
                 FbProjectTarget.target_user_id,
                 FbProjectTarget.target_user_name,
@@ -173,13 +174,63 @@ class FeedbackReportDao:
             .subquery()
         )
         stmt = select(ranked).where(ranked.c.target_user_name.icontains(query.keyword.strip(), autoescape=True))
+        if query.department is not None:
+            stmt = stmt.where(ranked.c.target_dept_name == query.department)
+        sort_score = ranked.c.score
+        if query.sort_relation_id is not None:
+            averages = (
+                select(
+                    FbScoreResult.target_id,
+                    case(
+                        (func.count(FbScoreResult.score) == func.count(), func.avg(FbScoreResult.score)), else_=None
+                    ).label('average'),
+                )
+                .where(
+                    FbScoreResult.project_id == project_id,
+                    FbScoreResult.version_id == version_id,
+                    FbScoreResult.result_type == 'INDICATOR_RELATION',
+                    FbScoreResult.relation_id == query.sort_relation_id,
+                    cls._target_filter(FbScoreResult.target_id, target_ids),
+                )
+                .group_by(FbScoreResult.target_id)
+                .subquery()
+            )
+            stmt = stmt.outerjoin(averages, averages.c.target_id == ranked.c.target_id)
+            sort_score = averages.c.average
         total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
         rows = await db.execute(
-            stmt.order_by(ranked.c.score.desc().nulls_last(), ranked.c.target_user_id)
+            stmt.order_by(
+                (sort_score.asc() if query.sort_order == 'asc' else sort_score.desc()).nulls_last(),
+                ranked.c.target_user_id,
+            )
             .offset((query.page_num - 1) * query.page_size)
             .limit(query.page_size)
         )
         return list(rows.mappings()), total or 0
+
+    @staticmethod
+    async def comparison_results(db: Any, project_id: int, version_id: int, user_ids: set[int]) -> list:
+        """只读取已通过数据范围筛选的当前页人员，批量取得精确分项结果。"""
+        if not user_ids:
+            return []
+        stmt = (
+            select(
+                FbProjectTarget.target_user_id,
+                FbScoreResult.result_type,
+                FbScoreResult.indicator_id,
+                FbScoreResult.relation_id,
+                FbScoreResult.score,
+                FbScoreResult.original_weight,
+            )
+            .join(FbProjectTarget, FbProjectTarget.target_id == FbScoreResult.target_id)
+            .where(
+                FbScoreResult.project_id == project_id,
+                FbScoreResult.version_id == version_id,
+                FbProjectTarget.target_user_id.in_(user_ids),
+                FbScoreResult.result_type.in_(['INDICATOR_COMPOSITE', 'INDICATOR_RELATION']),
+            )
+        )
+        return list((await db.execute(stmt)).mappings())
 
     @staticmethod
     async def personal_result(db: Any, project_id: int, version_id: int, target_id: int) -> FbScoreResult | None:

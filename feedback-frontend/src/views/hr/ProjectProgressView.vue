@@ -37,17 +37,6 @@ const allSubmitted = computed(() => store.summary?.totalCount > 0 && store.summa
 const canStartCompletion = computed(() => showCompletionAction.value && store.summary?.totalCount > 0 &&
   !store.completionResultUnknown && !store.loading && !store.prechecking && !store.completing)
 
-function validatePositiveInteger(_rule, value, callback) {
-  if (value === null || value === undefined || value === '') return callback()
-  if (!Number.isInteger(value) || value < 1) return callback(new Error('用户ID必须为正整数'))
-  callback()
-}
-
-const filterRules = {
-  evaluatorUserId: [{ validator: validatePositiveInteger, trigger: 'change' }],
-  targetUserId: [{ validator: validatePositiveInteger, trigger: 'change' }]
-}
-
 async function load(projectId, options) {
   errorMessage.value = ''
   try {
@@ -73,8 +62,6 @@ async function search() {
 
 function resetFilters() {
   Object.assign(filters.value, {
-    evaluatorUserId: null,
-    targetUserId: null,
     relationId: null,
     status: '',
     evaluatorKeyword: '',
@@ -253,18 +240,12 @@ onBeforeUnmount(() => { drawerVisible.value = false })
 
       <el-card shadow="never" class="detail-card">
         <div class="task-detail-heading"><h2>评价任务明细</h2><span>按姓名、关系或任务状态筛选</span></div>
-        <el-form ref="filterFormRef" :model="filters" :rules="filterRules" label-position="top" class="filter-form">
+        <el-form ref="filterFormRef" :model="filters" label-position="top" class="filter-form">
           <el-form-item label="评价人姓名">
             <el-input v-model="filters.evaluatorKeyword" maxlength="100" clearable placeholder="输入评价人姓名" @keyup.enter="search" />
           </el-form-item>
           <el-form-item label="被评价人姓名">
             <el-input v-model="filters.targetKeyword" maxlength="100" clearable placeholder="输入被评价人姓名" @keyup.enter="search" />
-          </el-form-item>
-          <el-form-item label="评价人用户ID" prop="evaluatorUserId">
-            <el-input-number v-model="filters.evaluatorUserId" :min="1" :step="1" step-strictly :controls="false" placeholder="精确ID" />
-          </el-form-item>
-          <el-form-item label="被评价人用户ID" prop="targetUserId">
-            <el-input-number v-model="filters.targetUserId" :min="1" :step="1" step-strictly :controls="false" placeholder="精确ID" />
           </el-form-item>
           <el-form-item label="评价关系">
             <el-select v-model="filters.relationId" clearable placeholder="全部关系">
@@ -325,8 +306,7 @@ onBeforeUnmount(() => { drawerVisible.value = false })
 .completion-issue { display: flex; align-items: center; gap: 12px; }
 .completion-issue:deep(.el-alert) { flex: 1; min-width: 0; }
 .filter-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 16px; }
-.filter-form:deep(.el-select),
-.filter-form :deep(.el-input-number) { width: 100%; }
+.filter-form:deep(.el-select) { width: 100%; }
 .filter-actions { align-self: end; }
 .pagination-row { display: flex; justify-content: flex-end; max-width: 100%; margin-top: 20px; overflow-x: auto; }
 @media (max-width: 900px) { .filter-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

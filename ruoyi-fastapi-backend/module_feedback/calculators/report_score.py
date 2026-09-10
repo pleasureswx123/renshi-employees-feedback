@@ -46,6 +46,27 @@ def _group_status(expected: int, submitted: int) -> str:
     return 'COMPLETE' if submitted == expected else 'PARTIAL'
 
 
+def relation_totals(results: list[dict]) -> dict[int, str | None]:
+    """按全部指标的精确关系分计算算术平均，不改写正式结果。"""
+    indicator_ids = {
+        row['indicator_id']
+        for row in results
+        if row['result_type'] == 'INDICATOR_COMPOSITE'
+    }
+    groups = {}
+    for row in results:
+        if row['result_type'] == 'INDICATOR_RELATION':
+            groups.setdefault(row['relation_id'], {})[row['indicator_id']] = row['score']
+    with localcontext() as ctx:
+        ctx.prec = PRECISION
+        return {
+            relation_id: display_decimal(sum((scores[key] for key in indicator_ids), ZERO) / len(indicator_ids))
+            if indicator_ids and all(scores.get(key) is not None for key in indicator_ids)
+            else None
+            for relation_id, scores in groups.items()
+        }
+
+
 def _question_rows(questions: list[dict], groups: list[dict]) -> list[dict]:
     rows = []
     for question in questions:

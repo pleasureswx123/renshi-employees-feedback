@@ -17,8 +17,6 @@ const summaryKeys = [
 let requestSequence = 0
 
 const defaultFilters = () => ({
-  evaluatorUserId: null,
-  targetUserId: null,
   relationId: null,
   status: '',
   evaluatorKeyword: '',

@@ -6,7 +6,12 @@ from typing import Any
 from fastapi import HTTPException
 
 from common.vo import PageModel
-from module_feedback.calculators.report_score import CALCULATION_VERSION, calculate_report, display_decimal
+from module_feedback.calculators.report_score import (
+    CALCULATION_VERSION,
+    calculate_report,
+    display_decimal,
+    relation_totals,
+)
 from module_feedback.calculators.score_source import source_rows
 from module_feedback.dao.progress_dao import FeedbackProgressDao
 from module_feedback.dao.publication_dao import FeedbackPublicationDao
@@ -194,11 +199,30 @@ class FeedbackReportService:
         ids = {target.target_id for target in targets}
         version = await FeedbackPublicationDao.get_version_document(db, project_id, version_id)
         keys = cls._keys_by_target(await FeedbackReportDao.result_keys(db, project_id, version_id, ids))
+        if query.sort_relation_id is not None and not any(
+            rel.relation_id == query.sort_relation_id and rel.is_enabled for rel in version.relations
+        ):
+            raise cls.problem(422, 'REPORT_SORT_RELATION_INVALID', '排序关系不属于当前项目')
         ready = all(cls._complete_keys(version, keys.get(target.target_id, [])) for target in targets)
         tasks = await FeedbackReportDao.tasks(db, project_id, version_id, ids)
         submitted = sum(task.status == 'SUBMITTED' for task in tasks)
         rows, total = await FeedbackReportDao.team_rows(db, project_id, version_id, ids, query) if ready else ([], 0)
+        comparison = defaultdict(list)
+        if rows:
+            for item in await FeedbackReportDao.comparison_results(
+                db, project_id, version_id, {row['target_user_id'] for row in rows}
+            ):
+                comparison[item['target_user_id']].append(item)
         return TeamReportModel(
+            departmentOptions=sorted({target.target_dept_name for target in targets if target.target_dept_name}),
+            indicatorOptions=[
+                {'indicatorId': item.indicator_id, 'indicatorName': item.indicator_name} for item in version.indicators
+            ],
+            relationOptions=[
+                {'relationId': rel.relation_id, 'relationName': rel.relation_name, 'relationType': rel.relation_type}
+                for rel in version.relations
+                if rel.is_enabled
+            ],
             projectId=project_id,
             projectName=project.project_name,
             versionId=version_id,
@@ -213,6 +237,7 @@ class FeedbackReportService:
                 ReportRowModel.model_validate(
                     {
                         **row['report'],
+                        'relationScores': relation_totals(comparison[row['target_user_id']]),
                         'targetName': row['target_user_name'],
                         'targetDeptName': row['target_dept_name'],
                         'rank': row['rank'] if row['score'] is not None else None,

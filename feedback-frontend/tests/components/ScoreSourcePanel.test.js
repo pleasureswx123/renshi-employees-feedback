@@ -19,6 +19,21 @@ function open(permissions = ['feedback:report:view']) {
   useProjectReportsStore().selectProject(1)
   return mount(ScoreSourcePanel, { props: { target: { row: { targetName: '甲', targetUserId: 2 }, key: 'i-1' } }, global: { plugins: [pinia, ElementPlus] } })
 }
+it('关系总览定位算术平均公式并展开对应指标来源', async () => {
+  api.getScoreSource.mockResolvedValue({ data: { ...source, rows: [...source.rows,
+    { key: 'r-1-average', level: 'relation_average', label: '上级 · 各指标平均分', formula: '(90 + 70) ÷ 2', result: '80.00' },
+    { key: 'r-1-average-i-1', parentKey: 'r-1-average', level: 'relation', label: '团队合作 · 上级', formula: '90 ÷ 1', result: '90.00', indicatorId: 1, relationId: 1 },
+    { key: 'r-1-average-i-2', parentKey: 'r-1-average', level: 'relation', label: '工作能力 · 上级', formula: '70 ÷ 1', result: '70.00', indicatorId: 2, relationId: 1 }
+  ] } })
+  const wrapper = open()
+  await wrapper.setProps({ target: { row: { targetName: '甲', targetUserId: 2 }, key: 'r-1-average' } })
+  await flushPromises()
+  expect(wrapper.text()).toContain('(90 + 70) ÷ 2')
+  expect(wrapper.text()).toContain('工作能力 · 上级')
+  expect(wrapper.text()).not.toContain('83 × 100%')
+  expect(api.getScoreSourceSheets).not.toHaveBeenCalled()
+  wrapper.unmount()
+})
 it('定位指标公式，报告权限不预取答卷明细', async () => {
   api.getScoreSource.mockResolvedValue({ data: source })
   const wrapper = open(); await flushPromises()

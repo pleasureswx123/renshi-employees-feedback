@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import { mount, flushPromises } from '@vue/test-utils'
-import ElementPlus, { ElMessage } from 'element-plus'
+import ElementPlus, { ElMessage, ElForm, ElPagination, ElSelect } from 'element-plus'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
 import ProjectReportsView from '@/views/hr/ProjectReportsView.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -25,6 +25,25 @@ async function open() {
 }
 beforeEach(() => { Object.values(api).forEach(fn => fn.mockReset()) })
 afterEach(() => { wrapper?.unmount(); ElMessage.closeAll() })
+
+it('小尺寸筛选表单提交部门与关系排序，切换每页条数回到第一页', async () => {
+  api.getTeamReport.mockResolvedValue({ data: { ...report(true), total: 120, departmentOptions: ['研发部'], relationOptions: [{ relationId: 8, relationName: '上级' }] } })
+  await open()
+  expect(wrapper.findComponent(ElForm).props('size')).toBe('small')
+  const select = label => wrapper.findAllComponents(ElSelect).find(item => item.props('ariaLabel') === label)
+  select('部门').vm.$emit('update:modelValue', '研发部')
+  select('排序字段').vm.$emit('update:modelValue', 8)
+  select('排序方向').vm.$emit('update:modelValue', 'asc')
+  await wrapper.findAll('button').find(button => button.text() === '查询').trigger('click')
+  await flushPromises()
+  expect(api.getTeamReport).toHaveBeenLastCalledWith(1, expect.objectContaining({ department: '研发部', sortRelationId: 8, sortOrder: 'asc', pageNum: 1 }))
+  expect(wrapper.findComponent(ElPagination).props('pageSizes')).toEqual([10, 20, 30, 50, 100])
+  wrapper.findComponent(ElPagination).vm.$emit('change', 3, 20)
+  await flushPromises()
+  wrapper.findComponent(ElPagination).vm.$emit('change', 2, 50)
+  await flushPromises()
+  expect(api.getTeamReport).toHaveBeenLastCalledWith(1, expect.objectContaining({ pageNum: 1, pageSize: 50, department: '研发部' }))
+})
 
 it('首次进入自动生成并展示，已有报告刷新不重复计算', async () => {
   api.getTeamReport.mockResolvedValueOnce({ data: report(false) }).mockResolvedValue({ data: report(true) })

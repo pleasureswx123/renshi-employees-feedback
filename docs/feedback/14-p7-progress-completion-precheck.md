@@ -439,6 +439,7 @@ P6固定顺序是项目`FOR SHARE` -> 单任务`FOR UPDATE` -> 答卷`FOR UPDATE
 
 ### 12.2 页面行为
 
+- 进度页仅提供评价人姓名、被评价人姓名、评价关系和任务状态筛选，不提供用户ID输入框；后端保留既有ID查询参数契约。
 - 新路由固定为`/hr/projects/:projectId/progress`，路由权限为`feedback:progress:view`；完成按钮另按`feedback:project:complete`显示。
 - 只有完成权限、项目为`ACTIVE`、数据范围完整且预检`canComplete=true`时允许进入最终确认。
 - 完成入口关联服务端全量任务统计：有任务且全部已提交时启用“完成项目”；存在`PENDING/DRAFT`任务时禁用该按钮，显示“还有 N 份未提交”，并提供次级“提前结束”入口。N为未开始与已暂存之和，筛选不改变该数量；零任务时两个入口均不可执行。
