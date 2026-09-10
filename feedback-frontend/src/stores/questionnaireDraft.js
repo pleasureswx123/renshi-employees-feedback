@@ -108,12 +108,6 @@ export const useQuestionnaireDraftStore = defineStore('questionnaireDraft', {
       this.markDirty()
       return page
     },
-    updatePage(pageCode, patch) {
-      const page = this.draft?.pages.find(item => item.pageCode === pageCode)
-      if (!page) return
-      Object.assign(page, patch)
-      this.markDirty()
-    },
     removePage(pageCode) {
       if (!this.draft || this.draft.pages.length <= 1) return
       const index = this.draft.pages.findIndex(page => page.pageCode === pageCode)

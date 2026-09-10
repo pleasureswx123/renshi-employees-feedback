@@ -1,4 +1,6 @@
 <script setup>
+import ChevronsRightIcon from '@iconify-vue/lucide/chevrons-right'
+import ChevronsLeftIcon from '@iconify-vue/lucide/chevrons-left'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
@@ -28,6 +30,19 @@ const advancing = ref(false)
 const actionMessage = ref('')
 const isSaving = computed(() => savePending.value || draftStore.saving)
 const activeRightTab = ref('question')
+const rightPanelOpen = ref(false)
+const leftPanelOpen = ref(true)
+const activeLeftTab = ref('types')
+function toggleLeftPanel(tab) {
+  const name = tab.paneName
+  leftPanelOpen.value = !leftPanelOpen.value || activeLeftTab.value !== name
+  activeLeftTab.value = name
+}
+function toggleRightPanel(tab) {
+  const name = tab.paneName
+  rightPanelOpen.value = !rightPanelOpen.value || activeRightTab.value !== name
+  activeRightTab.value = name
+}
 const livePreviewRef = ref()
 const projectId = Number(route.params.projectId)
 const draft = computed(() => draftStore.draft)
@@ -205,9 +220,11 @@ async function nextStep() {
   }
   if (activeRightTab.value !== 'indicator') {
     activeRightTab.value = 'indicator'
+    rightPanelOpen.value = true
     return
   }
   if (!workflow.value.indicatorReady) {
+    rightPanelOpen.value = true
     ElMessage.warning(workflow.value.indicatorIssues[0])
     return
   }
@@ -298,8 +315,17 @@ onBeforeUnmount(() => draftStore.reset())
     </div>
 
     <p class="sr-only" role="status" aria-live="polite">{{ actionMessage }}</p>
-    <div v-if="draft" :key="projectId" class="editor-grid" :class="{ 'preview-expanded': activeRightTab === 'preview' }" :inert="isSaving ? true : null">
-      <aside class="left-panel editor-panel">
+    <div v-if="draft" :key="projectId" class="editor-grid" :class="{ 'preview-expanded': rightPanelOpen && activeRightTab === 'preview', 'right-collapsed': !rightPanelOpen, 'left-collapsed': !leftPanelOpen }" :inert="isSaving ? true : null">
+      <aside class="left-panel editor-panel" aria-label="题型与大纲">
+        <div class="panel-toggle-bar">
+          <el-button class="collapse-panel-button" text :aria-label="leftPanelOpen ? '收起左侧面板' : '展开左侧面板'" :title="leftPanelOpen ? '收起左侧面板' : '展开左侧面板'" :aria-expanded="leftPanelOpen" @click="leftPanelOpen = !leftPanelOpen">
+            <ChevronsLeftIcon v-if="leftPanelOpen" aria-hidden="true" />
+            <ChevronsRightIcon v-else aria-hidden="true" />
+          </el-button>
+        </div>
+        <el-tabs :model-value="activeLeftTab" tab-position="left" @tab-click="toggleLeftPanel">
+          <el-tab-pane label="题型面板" name="types"><QuestionTypePanel @add="addQuestion" /></el-tab-pane>
+          <el-tab-pane label="问卷大纲" name="outline">
         <QuestionnaireOutline
           :draft="draft"
           :selected-page-code="draftStore.selectedPageCode"
@@ -310,9 +336,9 @@ onBeforeUnmount(() => draftStore.reset())
           @add-page="draftStore.addPage"
           @move-page="draftStore.movePage"
           @delete-page="removePage"
-          @update-page="draftStore.updatePage"
         />
-        <QuestionTypePanel @add="addQuestion" />
+          </el-tab-pane>
+        </el-tabs>
       </aside>
 
       <main class="canvas-panel editor-panel">
@@ -371,36 +397,13 @@ onBeforeUnmount(() => draftStore.reset())
       </main>
 
       <aside class="right-panel editor-panel" aria-label="预览与设置">
-        <el-tabs v-model="activeRightTab" stretch>
-          <el-tab-pane label="实时预览" name="preview">
-            <div class="live-preview-controls">
-              <div class="live-preview-toolbar">
-                <span class="preview-page-status">第 {{ selectedPageIndex + 1 }} / {{ draft.pages.length }} 页</span>
-              <el-pagination
-                v-if="draft.pages.length > 1"
-                class="live-preview-pagination"
-                aria-label="预览页码"
-                :current-page="selectedPageIndex + 1"
-                :page-count="draft.pages.length"
-                :pager-count="5"
-                :disabled="isSaving"
-                layout="prev, pager, next"
-                size="small"
-                @update:current-page="draftStore.selectPage(draft.pages[$event - 1]?.pageCode)"
-              />
-                <el-button link size="small" type="primary" @click="livePreviewRef?.resetAnswers()">重新试填</el-button>
-              </div>
-            </div>
-            <QuestionnairePreviewContent
-              ref="livePreviewRef"
-              v-if="selectedPage"
-              :draft="draft"
-              :page-code="selectedPage.pageCode"
-              :selected-question-code="draftStore.selectedQuestionCode"
-              :active="activeRightTab === 'preview'"
-              compact
-            />
-          </el-tab-pane>
+        <div class="panel-toggle-bar">
+          <el-button class="collapse-panel-button" text :aria-label="rightPanelOpen ? '收起右侧面板' : '展开右侧面板'" :title="rightPanelOpen ? '收起右侧面板' : '展开右侧面板'" :aria-expanded="rightPanelOpen" @click="rightPanelOpen = !rightPanelOpen">
+            <ChevronsRightIcon v-if="rightPanelOpen" aria-hidden="true" />
+            <ChevronsLeftIcon v-else aria-hidden="true" />
+          </el-button>
+        </div>
+        <el-tabs :model-value="activeRightTab" tab-position="right" @tab-click="toggleRightPanel">
           <el-tab-pane label="题目属性" name="question">
             <QuestionPropertiesPanel
               :question-number="selectedQuestionNumber"
@@ -441,6 +444,35 @@ onBeforeUnmount(() => draftStore.reset())
               @locate-question="draftStore.selectQuestion($event); focusQuestion($event)"
             />
           </el-tab-pane>
+          <el-tab-pane label="实时预览" name="preview">
+            <div class="live-preview-controls">
+              <div class="live-preview-toolbar">
+                <span class="preview-page-status">第 {{ selectedPageIndex + 1 }} / {{ draft.pages.length }} 页</span>
+              <el-pagination
+                v-if="draft.pages.length > 1"
+                class="live-preview-pagination"
+                aria-label="预览页码"
+                :current-page="selectedPageIndex + 1"
+                :page-count="draft.pages.length"
+                :pager-count="5"
+                :disabled="isSaving"
+                layout="prev, pager, next"
+                size="small"
+                @update:current-page="draftStore.selectPage(draft.pages[$event - 1]?.pageCode)"
+              />
+                <el-button link size="small" type="primary" @click="livePreviewRef?.resetAnswers()">重新试填</el-button>
+              </div>
+            </div>
+            <QuestionnairePreviewContent
+              ref="livePreviewRef"
+              v-if="selectedPage"
+              :draft="draft"
+              :page-code="selectedPage.pageCode"
+              :selected-question-code="draftStore.selectedQuestionCode"
+              :active="rightPanelOpen && activeRightTab === 'preview'"
+              compact
+            />
+          </el-tab-pane>
         </el-tabs>
       </aside>
     </div>
@@ -470,17 +502,24 @@ onBeforeUnmount(() => draftStore.reset())
 .editor-actions:deep(.el-button + .el-button) { margin-left: 0; }
 .dirty-state { color: #e6a23c; font-size: 13px; }
 .saved-state { color: #67c23a; font-size: 13px; }
-.editor-grid { display: grid; grid-template-columns: 220px minmax(360px, 1fr) 330px; gap: 16px; min-height: 0; align-items: stretch; }
-.editor-grid.preview-expanded { grid-template-columns: 210px minmax(360px, 1fr) clamp(390px, 40%, 760px); }
+.editor-grid { display: grid; grid-template-columns: var(--editor-left-width, 220px) minmax(360px, 1fr) 330px; gap: 16px; min-height: 0; align-items: stretch; }
+.editor-grid.preview-expanded { grid-template-columns: var(--editor-left-width, 210px) minmax(360px, 1fr) clamp(390px, 40%, 760px); }
 .editor-panel { min-width: 0; padding: 18px; border: 1px solid var(--fb-border, #e5e7eb); border-radius: 10px; background: var(--fb-surface, #fff); }
 .left-panel, .right-panel, .canvas-panel { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.left-panel { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+.left-panel { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .left-panel > * { min-width: 0; }
-.left-panel > .questionnaire-outline { flex: 1; }
-.right-panel { display: flex; padding: 0; overflow: hidden; }
-.right-panel:deep(.el-tabs) { display: flex; flex-direction: column; min-width: 0; width: 100%; }
-.right-panel:deep(.el-tabs__header) { flex: none; margin: 0; padding: 4px 14px 0; }
-.right-panel:deep(.el-tabs__content) { flex: 1; overflow-y: auto; min-height: 0; padding: 14px; }
+
+.right-panel { position: relative; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+:is(.left-panel, .right-panel):deep(.el-tabs) { display: flex; flex: 1; flex-direction: row; min-height: 0; min-width: 0; width: 100%; }
+:is(.left-panel, .right-panel):deep(.el-tabs__header) { order: 1; flex: 0 0 32px; width: 32px; margin: 0; padding: 0; box-sizing: border-box; float: none; }
+.panel-toggle-bar { display: flex; justify-content: flex-end; flex: 0 0 22px; height: 22px; box-sizing: border-box; border-bottom: 1px solid var(--fb-border, #e5e7eb); background: var(--el-fill-color-light); }
+.collapse-panel-button { width: 32px; height: 21px; padding: 5px; border-radius: 0; color: var(--el-text-color-secondary); }
+.collapse-panel-button:hover { color: var(--el-color-primary); }
+.collapse-panel-button svg { width: 12px; height: 12px; }
+:is(.left-panel, .right-panel):deep(.el-tabs__nav-wrap) { margin: 0; }
+:is(.left-panel, .right-panel):deep(.el-tabs__item) { width: 32px; height: 96px; padding: 12px 8px; font-size: 12px; writing-mode: vertical-rl; letter-spacing: 2px; justify-content: center; border-bottom: 1px solid var(--fb-border, #e5e7eb); }
+:is(.left-panel, .right-panel):deep(.el-tabs__item.is-active) { background: var(--fb-primary-bg, #ecf5ff); }
+:is(.left-panel, .right-panel):deep(.el-tabs__content) { flex: 1; min-width: 0; overflow-y: auto; min-height: 0; padding: 14px; }
 .editor-grid.preview-expanded .right-panel:deep(.el-tabs__content) { --preview-gutter: clamp(14px, 1vw, 22px); padding: var(--preview-gutter); background: var(--fb-surface-muted, #e7ecef); }
 .live-preview-controls { position: sticky; top: calc(-1 * var(--preview-gutter, 14px)); z-index: 2; margin: calc(-1 * var(--preview-gutter, 14px)) calc(-1 * var(--preview-gutter, 14px)) 16px; padding: 10px var(--preview-gutter, 14px); border-bottom: 1px solid var(--fb-border, #dce1e6); background: var(--fb-surface, #fff); }
 .live-preview-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; color: var(--fb-text-regular, #606266); }
@@ -505,16 +544,16 @@ onBeforeUnmount(() => draftStore.reset())
 .validation-issues ul { margin: 6px 0 0; padding-left: 16px; }
 .validation-issues li + li { margin-top: 4px; }
 @media (max-width: 1500px) {
-  .editor-grid { grid-template-columns: 200px minmax(340px, 1fr) 300px; gap: 12px; }
-  .editor-grid.preview-expanded { grid-template-columns: 190px minmax(340px, 1fr) clamp(330px, 40%, calc(100% - 554px)); }
+  .editor-grid { grid-template-columns: var(--editor-left-width, 200px) minmax(340px, 1fr) 300px; gap: 12px; }
+  .editor-grid.preview-expanded { grid-template-columns: var(--editor-left-width, 190px) minmax(340px, 1fr) clamp(330px, 40%, calc(100% - 554px)); }
   .editor-panel { padding: 14px; }
-  .right-panel { padding: 0; }
+  .left-panel, .right-panel { padding: 0; }
 }
 @media (max-width: 1100px) {
   .editor-workflow { flex-wrap: wrap; gap: 4px; }
   .editor-workflow:deep(.el-steps) { flex-basis: 100%; }
   .workflow-hint { flex-basis: 100%; }
-  .editor-grid, .editor-grid.preview-expanded { grid-template-columns: 160px minmax(260px, 1fr) 300px; gap: 10px; overflow-x: auto; }
+  .editor-grid, .editor-grid.preview-expanded { grid-template-columns: var(--editor-left-width, 160px) minmax(260px, 1fr) 300px; gap: 10px; overflow-x: auto; }
   .editor-header .workspace-detail-title { display: block; }
   .editor-header .workspace-detail-project { margin-top: 2px; }
   .editor-actions { gap: 6px; }
@@ -535,4 +574,28 @@ onBeforeUnmount(() => draftStore.reset())
   .editor-actions { width: 100%; justify-content: flex-start; }
   .editor-actions .dirty-state, .editor-actions .saved-state { flex-basis: 100%; }
 }
+.editor-grid.right-collapsed { grid-template-columns: var(--editor-left-width, 220px) minmax(360px, 1fr) 34px; }
+.right-collapsed .right-panel:deep(.el-tabs__content) { display: none; }
+.right-collapsed .right-panel:deep(.el-tabs__item.is-active) { color: var(--fb-text-regular, #606266); background: transparent; }
+:is(.left-panel, .right-panel):deep(.el-tabs__active-bar) { width: 1px; background-color: #a8b8c8; }
+:is(.left-panel, .right-panel):deep(.el-tabs__nav-wrap::after) { width: 1px; }
+.right-collapsed .right-panel:deep(.el-tabs__active-bar),
+.left-collapsed .left-panel:deep(.el-tabs__active-bar) { display: none; }
+@media (max-width: 1500px) { .editor-grid.right-collapsed { grid-template-columns: var(--editor-left-width, 200px) minmax(340px, 1fr) 34px; } }
+@media (max-width: 1100px) { .editor-grid.right-collapsed { grid-template-columns: var(--editor-left-width, 160px) minmax(260px, 1fr) 34px; } }
+@media (max-width: 760px) {
+  .editor-grid.right-collapsed { grid-template-columns: minmax(0, 1fr) 34px; }
+  .right-collapsed .left-panel { grid-column: 1 / -1; }
+  .right-collapsed .right-panel { grid-column: 2; grid-row: 2; }
+}
+.left-panel :deep(.el-tabs__header) { order: -1; }
+.left-panel .panel-toggle-bar { justify-content: flex-start; }
+.left-panel :deep(.el-tabs__content) { padding: 0; }
+.left-panel :deep(#pane-types) { padding: 10px; }
+.left-panel :deep(#pane-outline) { height: 100%; }
+.left-panel :deep(.questionnaire-outline) { height: 100%; min-height: 0; }
+.editor-grid.left-collapsed { --editor-left-width: 34px; }
+.left-collapsed .left-panel :deep(.el-tabs__content) { display: none; }
+.left-collapsed .left-panel :deep(.el-tabs__item.is-active) { color: var(--fb-text-regular, #606266); background: transparent; }
+@media (max-width: 760px) { .left-panel { min-height: 300px; } }
 </style>

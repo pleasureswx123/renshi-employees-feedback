@@ -64,6 +64,7 @@ export function normalizeQuestionnaireDraft(draft) {
 export function normalizeQuestionOrders(draft) {
   draft.pages.forEach((page, pageIndex) => {
     page.sortOrder = pageIndex + 1
+    page.pageTitle = `第${pageIndex + 1}页`
     page.questions.forEach((question, questionIndex) => {
       question.sortOrder = questionIndex + 1
       question.options.forEach((option, optionIndex) => {
