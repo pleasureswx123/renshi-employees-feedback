@@ -19,6 +19,8 @@ import { useWorkspaceUiStore } from '@/stores/workspaceUi'
 const router = useRouter()
 const permissionStore = usePermissionStore()
 const ui = useWorkspaceUiStore()
+// 测试期间保留项目数据以便排查问题；需要恢复删除入口时改为 true。
+const showProjectDelete = false
 const loading = ref(false)
 const mutating = ref(false)
 const dialogVisible = ref(false)
@@ -264,7 +266,7 @@ onMounted(loadProjects)
               编辑项目
             </el-button>
             <el-button
-              v-if="row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:project:remove')"
+              v-if="showProjectDelete && row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:project:remove')"
               type="danger"
               link
               @click="handleDelete(row)"
