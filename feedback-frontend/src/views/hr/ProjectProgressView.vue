@@ -240,7 +240,7 @@ onBeforeUnmount(() => { drawerVisible.value = false })
 
       <el-card shadow="never" class="detail-card">
         <div class="task-detail-heading"><h2>评价任务明细</h2><span>按姓名、关系或任务状态筛选</span></div>
-        <el-form ref="filterFormRef" :model="filters" label-position="top" class="filter-form">
+        <el-form ref="filterFormRef" :model="filters" size="small" label-position="left" class="filter-form">
           <el-form-item label="评价人姓名">
             <el-input v-model="filters.evaluatorKeyword" maxlength="100" clearable placeholder="输入评价人姓名" @keyup.enter="search" />
           </el-form-item>
@@ -305,7 +305,9 @@ onBeforeUnmount(() => { drawerVisible.value = false })
 .detail-card { min-width: 0; }
 .completion-issue { display: flex; align-items: center; gap: 12px; }
 .completion-issue:deep(.el-alert) { flex: 1; min-width: 0; }
-.filter-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 16px; }
+.filter-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 0 12px; }
+.filter-form:deep(.el-form-item__content) { min-width: 0; }
+.filter-form:deep(.el-form-item__label) { flex-shrink: 0; }
 .filter-form:deep(.el-select) { width: 100%; }
 .filter-actions { align-self: end; }
 .pagination-row { display: flex; justify-content: flex-end; max-width: 100%; margin-top: 20px; overflow-x: auto; }
