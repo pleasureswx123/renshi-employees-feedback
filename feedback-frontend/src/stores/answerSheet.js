@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 
 import { getMyHistory, getMyTask, saveMyDraft, submitMyAnswer } from '@/api/feedback/tasks'
 import { allQuestions, hasAnswer, restoreAnswers, serializeAnswers, validateAnswerSheet } from '@/utils/answerSheet'
+import { createUuid } from '@/utils/uuid'
 
 export const useAnswerSheetStore = defineStore('answerSheet', {
   state: () => ({
@@ -104,7 +105,7 @@ export const useAnswerSheetStore = defineStore('answerSheet', {
       const assignmentId = this.assignmentId
       const payload = this.payload()
       if (submitting) {
-        this.pendingSubmission ||= { ...payload, submissionId: crypto.randomUUID() }
+        this.pendingSubmission ||= { ...payload, submissionId: createUuid() }
       }
       this[submitting ? 'submitting' : 'saving'] = true
       try {

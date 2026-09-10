@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { completeAnswers, detailFixture } from '../fixtures/answerSheet'
 
@@ -16,6 +16,7 @@ function deferred() {
 
 describe('逐任务答卷Store', () => {
   beforeEach(() => { setActivePinia(createPinia()); Object.values(api).forEach(fn => fn.mockReset()) })
+  afterEach(() => vi.unstubAllGlobals())
 
   it('暂存后水合锁版本、答案及最近页面，重新加载可恢复', async () => {
     api.getMyTask.mockResolvedValue({ data: detailFixture() })
@@ -35,7 +36,10 @@ describe('逐任务答卷Store', () => {
     expect(store.answers.Q1.optionCode).toBe('O1')
   })
 
-  it('缺必答题不能调用提交接口；超时重试沿用同一幂等请求', async () => {
+  it.each([true, false])('缺必答题不能提交；超时重试沿用同一幂等请求（randomUUID可用：%s）', async (hasRandomUUID) => {
+    if (!hasRandomUUID) {
+      vi.stubGlobal('crypto', { getRandomValues: globalThis.crypto.getRandomValues.bind(globalThis.crypto) })
+    }
     api.getMyTask.mockResolvedValue({ data: detailFixture() })
     const store = useAnswerSheetStore()
     await store.load(1)
@@ -45,7 +49,7 @@ describe('逐任务答卷Store', () => {
     api.submitMyAnswer.mockRejectedValueOnce(new Error('超时')).mockResolvedValueOnce({ data: detailFixture(1, { editable: false }) })
     await store.submit()
     const first = api.submitMyAnswer.mock.calls[0][1]
-    expect(first.submissionId).toMatch(/^[0-9a-f-]{36}$/)
+    expect(first.submissionId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     await store.submit()
     expect(api.submitMyAnswer.mock.calls[1][1]).toEqual(first)
     expect(store.editable).toBe(false)
