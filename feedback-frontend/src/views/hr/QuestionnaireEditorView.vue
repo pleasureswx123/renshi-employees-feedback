@@ -6,6 +6,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import IndicatorPanel from '@/components/feedback/IndicatorPanel.vue'
+import ProjectPreparationSteps from '@/components/feedback/ProjectPreparationSteps.vue'
 import QuestionnaireOutline from '@/components/feedback/QuestionnaireOutline.vue'
 import QuestionnairePreviewContent from '@/components/feedback/QuestionnairePreviewContent.vue'
 import QuestionTypePanel from '@/components/feedback/QuestionTypePanel.vue'
@@ -65,12 +66,8 @@ const selectedPageIndex = computed(() =>
   draft.value?.pages.findIndex(page => page.pageCode === draftStore.selectedPageCode) ?? -1
 )
 const workflow = computed(() => getQuestionnaireWorkflow(draft.value))
-const workflowHint = computed(() => {
-  if (!workflow.value.questionReady) return workflow.value.questionIssues[0]
-  if (activeRightTab.value !== 'indicator') return '问卷已完成，下一步设置指标权重与题目绑定'
-  if (!workflow.value.indicatorReady) return workflow.value.indicatorIssues[0]
-  return '指标已完成，下一步保存并配置参评人员'
-})
+const preparationStep = computed(() => workflow.value.questionReady && activeRightTab.value === 'indicator' ? 1 : 0)
+const canConfigurePeople = computed(() => permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish']))
 
 function changeDraftField(field, value) {
   draft.value[field] = value
@@ -210,8 +207,17 @@ async function saveDraft() {
   }
 }
 
-async function nextStep() {
+function nextStep() {
+  return goPreparationStep(preparationStep.value === 0 ? 1 : 2)
+}
+
+async function goPreparationStep(step) {
   if (!draft.value || isSaving.value || advancing.value) return
+  if (step === 0) {
+    activeRightTab.value = 'question'
+    return
+  }
+  if (step >= 2 && !canConfigurePeople.value) return
   if (!workflow.value.questionReady) {
     activeRightTab.value = 'question'
     ElMessage.warning(workflow.value.questionIssues[0])
@@ -228,11 +234,9 @@ async function nextStep() {
     }
     return
   }
-  if (activeRightTab.value !== 'indicator') {
-    activeRightTab.value = 'indicator'
-    rightPanelOpen.value = true
-    return
-  }
+  activeRightTab.value = 'indicator'
+  rightPanelOpen.value = true
+  if (step === 1) return
   if (!workflow.value.indicatorReady) {
     rightPanelOpen.value = true
     ElMessage.warning(workflow.value.indicatorIssues[0])
@@ -247,7 +251,7 @@ async function nextStep() {
       ElMessage.warning(saved.validationIssues[0]?.message || '请完成问卷与指标的发布前检查')
       return
     }
-    await router.push(`/hr/projects/${projectId}/publication`)
+    await router.push({ path: `/hr/projects/${projectId}/publication`, query: { step: String(step + 1) } })
   } finally {
     advancing.value = false
   }
@@ -267,7 +271,10 @@ onBeforeRouteLeave(async () => {
   }
 })
 
-onMounted(() => draftStore.load(projectId))
+onMounted(async () => {
+  await draftStore.load(projectId)
+  if (route.query.step === '2') await goPreparationStep(1)
+})
 onBeforeUnmount(() => draftStore.reset())
 </script>
 
@@ -308,21 +315,22 @@ onBeforeUnmount(() => draftStore.reset())
           type="primary"
           :loading="advancing"
           :disabled="!draft || isSaving"
-          @click="nextStep"
+          @click="nextStep()"
         >
-          {{ !workflow.questionReady ? '完善问卷' : activeRightTab === 'indicator' ? '下一步：配置人员' : '下一步：配置指标' }}
+          {{ !workflow.questionReady ? '完善问卷' : activeRightTab === 'indicator' ? '下一步：评价谁' : '下一步：配置指标' }}
         </el-button>
       </div>
     </header>
 
-    <div class="editor-workflow" aria-label="评价准备流程">
-      <el-steps :active="workflow.questionReady && activeRightTab === 'indicator' ? 1 : 0" simple finish-status="success">
-        <el-step :title="workflow.questionReady && activeRightTab === 'indicator' ? '1 编辑问卷 · 已检查' : '1 编辑问卷 · 当前'" :status="workflow.questionReady && activeRightTab === 'indicator' ? 'success' : 'process'" />
-        <el-step :title="workflow.questionReady && activeRightTab === 'indicator' ? '2 配置指标 · 当前' : '2 配置指标'" :status="workflow.questionReady && activeRightTab === 'indicator' ? 'process' : 'wait'" />
-        <el-step title="3 人员与发布" />
-      </el-steps>
-      <p class="workflow-hint" role="status" aria-live="polite" :title="workflowHint">{{ workflowHint }}</p>
-    </div>
+    <ProjectPreparationSteps
+      class="editor-workflow"
+      :active="preparationStep"
+      :completed="workflow.questionReady ? (workflow.indicatorReady ? [0, 1] : [0]) : []"
+      :disabled="!draft || isSaving || advancing"
+      :disabled-steps="canConfigurePeople ? [] : [2, 3, 4, 5]"
+      :descriptions="['编辑题目与说明', '设置权重与绑定题目', '选择被评价员工', '设置关系与计分', '安排各人的评价人', '保存检查后发布']"
+      @select="goPreparationStep"
+    />
 
     <p class="sr-only" role="status" aria-live="polite">{{ actionMessage }}</p>
     <div v-if="draft" :key="projectId" class="editor-grid" :class="{ 'preview-expanded': rightPanelOpen && activeRightTab === 'preview', 'right-collapsed': !rightPanelOpen, 'left-collapsed': !leftPanelOpen }" :inert="isSaving ? true : null">
@@ -497,11 +505,6 @@ onBeforeUnmount(() => draftStore.reset())
 
 <style scoped>
 .editor-page { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); gap: 10px; height: 100%; min-height: 0; }
-.editor-workflow { display: flex; align-items: center; gap: 16px; min-width: 0; padding: 8px 14px; border: 1px solid var(--fb-border, #e5e7eb); border-radius: 8px; background: var(--fb-surface, #fff); }
-.editor-workflow:deep(.el-steps) { flex: 1; min-width: 0; padding: 0; background: transparent; }
-.editor-workflow:deep(.el-step__title) { font-size: 13px; white-space: nowrap; }
-.editor-workflow:deep(.el-step__arrow) { flex: 1; min-width: 22px; }
-.workflow-hint { flex: 0 1 330px; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fb-text-muted, #73767a); font-size: 12px; }
 .indicator-step-notice { margin-bottom: 12px; padding: 10px; border-radius: 6px; background: var(--fb-primary-bg, #f4f8ff); color: var(--fb-text-regular, #606266); font-size: 12px; line-height: 1.7; }
 .indicator-step-notice ul { margin: 6px 0 0; padding-left: 16px; }
 .editor-header { flex-wrap: nowrap; gap: 12px; padding: 10px 14px; }
@@ -566,9 +569,6 @@ onBeforeUnmount(() => draftStore.reset())
   .left-panel, .right-panel { padding: 0; }
 }
 @media (max-width: 1100px) {
-  .editor-workflow { flex-wrap: wrap; gap: 4px; }
-  .editor-workflow:deep(.el-steps) { flex-basis: 100%; }
-  .workflow-hint { flex-basis: 100%; }
   .editor-grid, .editor-grid.preview-expanded { grid-template-columns: var(--editor-left-width, 160px) minmax(260px, 1fr) 300px; gap: 10px; overflow-x: auto; }
   .editor-header .workspace-detail-title { display: block; }
   .editor-header .workspace-detail-project { margin-top: 2px; }
@@ -576,9 +576,6 @@ onBeforeUnmount(() => draftStore.reset())
 }
 @media (max-width: 760px) {
   .editor-page { height: auto; grid-template-rows: auto auto auto; }
-  .editor-workflow { padding: 8px; }
-  .editor-workflow:deep(.el-step__title) { font-size: 11px; }
-  .editor-workflow:deep(.el-step__head) { display: none; }
   .editor-header, .editor-actions { align-items: flex-start; flex-wrap: wrap; }
   .editor-grid, .editor-grid.preview-expanded { grid-template-columns: 1fr; }
   .left-panel, .right-panel { position: static; max-height: none; }

@@ -4,6 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import EvaluatorSelectionPanel from '@/components/feedback/publication/EvaluatorSelectionPanel.vue'
+import ProjectPreparationSteps from '@/components/feedback/ProjectPreparationSteps.vue'
 import PublicationPreviewPanel from '@/components/feedback/publication/PublicationPreviewPanel.vue'
 import PublicationDetails from '@/components/feedback/publication/PublicationDetails.vue'
 import RelationConfigPanel from '@/components/feedback/publication/RelationConfigPanel.vue'
@@ -36,6 +37,19 @@ const stepDescriptions = computed(() => [
   publicationStore.dirty ? '修改后需重新检查' : config.value?.isPublishReady ? '检查已通过' : '保存后检查发布条件'
 ])
 const canManage = computed(() => permissionStore.hasPermission('feedback:participant:manage'))
+const canEditQuestionnaire = computed(() => permissionStore.hasPermission('feedback:questionnaire:edit'))
+const questionnaireNeedsCheck = computed(() => config.value?.validationIssues.some(issue => publicationIssueDestination(issue) === 'editor'))
+const completedSteps = computed(() => [
+  ...(!questionnaireNeedsCheck.value ? [0, 1] : []),
+  ...(!workflow.value.targetIssues.length ? [2] : []),
+  ...(!workflow.value.relationIssues.length ? [3] : []),
+  ...(!workflow.value.targetIssues.length && !workflow.value.relationIssues.length && !workflow.value.assignmentIssues.length ? [4] : [])
+])
+const preparationDescriptions = computed(() => [
+  questionnaireNeedsCheck.value ? '问卷或指标需检查' : '已配置，可返回修改',
+  questionnaireNeedsCheck.value ? '问卷或指标需检查' : '已配置，可返回修改',
+  ...stepDescriptions.value
+])
 const canPublishPermission = computed(() => permissionStore.hasPermission('feedback:project:publish'))
 const participantDirectory = computed(() => Array.from(publicationStore.participantDirectory.values()))
 const canPublish = computed(
@@ -74,6 +88,7 @@ function showStep(step) {
 
 async function goStep(step) {
   if (busy.value) return
+  if (step === 2 && evaluationMode.value === 'self') step = 3
   if (!config.value?.editable || !canManage.value || step <= activeStep.value) {
     showStep(step)
     return
@@ -89,6 +104,15 @@ async function goStep(step) {
   }
   if (step === 3 && !await saveConfig()) return
   showStep(step)
+}
+
+async function goPreparationStep(step) {
+  if (busy.value) return
+  if (step < 2) {
+    if (canEditQuestionnaire.value) await router.push({ path: `/hr/projects/${projectId}/editor`, query: { step: String(step + 1) } })
+    return
+  }
+  return goStep(step - 2)
 }
 
 function nextStep() {
@@ -171,8 +195,15 @@ onBeforeRouteLeave(async () => {
 
 onMounted(async () => {
   await publicationStore.load(projectId)
+  if (!config.value) return
   evaluationMode.value = config.value.targets.length && !config.value.relations.some(item => item.isEnabled && item.relationCode !== SELF_RELATION_CODE) ? 'self' : 'others'
   if (!config.value.editable || !canManage.value || config.value.isPublishReady) activeStep.value = 3
+  const requestedStep = Number(route.query.step) - 3
+  if (config.value.editable && Number.isInteger(requestedStep) && requestedStep >= 0 && requestedStep <= 3) {
+    // 跨页请求只能指定目标步骤，仍须通过现有校验，不能绕过保存与发布检查。
+    activeStep.value = 0
+    await goStep(requestedStep)
+  }
   await loadCandidates()
 })
 onBeforeUnmount(() => publicationStore.reset())
@@ -180,20 +211,20 @@ onBeforeUnmount(() => publicationStore.reset())
 
 <template>
   <section v-loading="publicationStore.loading" class="publication-page">
-    <header class="workspace-page-header workspace-detail-header">
+    <header class="publication-header workspace-page-header workspace-detail-header">
       <div class="workspace-detail-heading">
         <el-button
           v-if="config?.editable && permissionStore.hasPermission('feedback:questionnaire:edit')"
-          class="workspace-detail-back" text aria-label="返回问卷编辑" title="返回问卷编辑"
+          class="workspace-detail-back" text size="small" aria-label="返回问卷编辑" title="返回问卷编辑"
           :disabled="busy"
           @click="router.push(`/hr/projects/${projectId}/editor`)"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m10 6-6 6 6 6M4 12h16" />
           </svg>
-          <span>返回问卷编辑</span>
+          <span>返回</span>
         </el-button>
-        <el-button v-else class="workspace-detail-back" text aria-label="返回项目列表" title="返回项目列表" :disabled="publicationStore.loading || busy" @click="router.push('/hr/projects')">
+        <el-button v-else class="workspace-detail-back" text size="small" aria-label="返回项目列表" title="返回项目列表" :disabled="publicationStore.loading || busy" @click="router.push('/hr/projects')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m10 6-6 6 6 6M4 12h16" />
           </svg>
@@ -211,7 +242,7 @@ onBeforeUnmount(() => publicationStore.reset())
       <div v-if="config" class="header-status">
         <span v-if="publicationStore.dirty" class="dirty-state">有未保存修改</span>
         <span v-else-if="publicationStore.lastSavedAt" class="saved-state">配置已保存</span>
-        <el-tag :type="config.editable ? 'warning' : 'success'">
+        <el-tag size="small" :type="config.editable ? 'warning' : 'success'">
           {{ config.editable ? '准备阶段' : '已冻结只读' }}
         </el-tag>
       </div>
@@ -219,13 +250,16 @@ onBeforeUnmount(() => publicationStore.reset())
 
     <PublicationDetails v-if="config && !config.editable" :config="config" />
     <template v-if="config?.editable">
-      <nav class="publication-steps" aria-label="人员配置步骤">
-        <el-steps :active="activeStep" finish-status="success" align-center>
-          <el-step v-for="(title, index) in PUBLICATION_STEPS" :key="title" :status="index === activeStep ? 'process' : index < activeStep && ((index === 0 && !workflow.targetIssues.length) || (index === 1 && !workflow.relationIssues.length) || (index === 2 && !workflow.assignmentIssues.length)) ? 'success' : 'wait'" :description="stepDescriptions[index]">
-            <template #title><el-button text :disabled="busy" :aria-current="activeStep === index ? 'step' : undefined" @click="goStep(index)">{{ index + 1 }}. {{ title }}</el-button></template>
-          </el-step>
-        </el-steps>
-      </nav>
+      <ProjectPreparationSteps
+        class="publication-steps"
+        :active="activeStep + 2"
+        :completed="completedSteps"
+        :skipped="evaluationMode === 'self' ? [4] : []"
+        :disabled="busy || publicationStore.loading"
+        :disabled-steps="canEditQuestionnaire ? [] : [0, 1]"
+        :descriptions="preparationDescriptions"
+        @select="goPreparationStep"
+      />
       <div ref="stepContent" class="step-content">
       <el-card v-show="activeStep === 0" shadow="never">
         <TargetSelectorPanel
@@ -305,11 +339,11 @@ onBeforeUnmount(() => publicationStore.reset())
       </div>
       <div v-if="config.editable" class="action-bar">
         <div aria-live="polite">
-          <strong>{{ activeStep === 3 ? '发布后不可修改' : `第 ${activeStep + 1} 步：${PUBLICATION_STEPS[activeStep]}` }}</strong>
+          <strong>{{ `第 ${activeStep + 3} 步：${PUBLICATION_STEPS[activeStep]}` }}</strong>
           <span>{{ activeStep === 3 ? publicationStore.dirty ? '配置已修改，请保存并重新检查。' : '发布后生成评价任务，参评人员在「我的待办」中填写。' : currentIssues[0] || '本步已完成，可以继续；返回修改会保留当前配置。' }}</span>
         </div>
         <div class="action-buttons">
-          <el-button v-if="activeStep > 0" :disabled="busy" @click="goStep(activeStep === 3 && evaluationMode === 'self' ? 1 : activeStep - 1)">上一步</el-button>
+          <el-button v-if="activeStep > 0 || canEditQuestionnaire" :disabled="busy" @click="activeStep === 0 ? goPreparationStep(1) : goStep(activeStep === 3 && evaluationMode === 'self' ? 1 : activeStep - 1)">上一步</el-button>
           <el-button
             v-if="canManage"
             :loading="publicationStore.saving"
@@ -336,11 +370,14 @@ onBeforeUnmount(() => publicationStore.reset())
 
 <style scoped>
 .publication-page { display: flex; flex-direction: column; gap: 24px; max-width: 1440px; margin: auto; padding-top: 12px; min-height: calc(100dvh - 110px); }
-.publication-page > .workspace-page-header { padding: 8px 0; border: 0; background: transparent; box-shadow: none; }
-.publication-page .workspace-detail-title h1 { font-size: 26px; }
-.publication-steps { position: sticky; top: 56px; z-index: 9; padding: 16px 12px 12px; background: var(--fb-surface, #fff); border: 1px solid var(--fb-border, #e4e7ed); border-radius: 8px; }
-.publication-steps:deep(.el-step__title .el-button) { height: 30px; font-weight: 600; color: inherit; }
-.publication-steps:deep(.el-step__description) { margin-top: 4px; font-size: 12px; }
+.publication-header { flex-wrap: nowrap; gap: 12px; min-height: 54px; padding: 10px 14px; }
+.publication-header .workspace-detail-heading { flex: 1; }
+.publication-header .workspace-detail-back { height: 30px; padding: 4px 6px; }
+.publication-header .workspace-detail-divider { height: 26px; margin-inline: 10px; }
+.publication-header .workspace-detail-title { display: flex; flex: 0 1 auto; align-items: center; gap: 14px; }
+.publication-header h1 { flex: none; font-size: 17px; }
+.publication-header .workspace-detail-project { min-width: 0; margin: 0; }
+.publication-steps { position: sticky; top: 56px; z-index: 9; }
 .step-content { flex: 1; min-width: 0; scroll-margin-top: 190px; }
 .evaluation-mode p { margin: 0 0 18px; color: var(--fb-text-muted, #64748b); font-size: 13px; }
 .evaluation-mode:deep(.el-form-item) { margin-bottom: 10px; }
@@ -353,8 +390,10 @@ onBeforeUnmount(() => publicationStore.reset())
 .action-bar > div:first-child { display: grid; gap: 3px; }
 .action-bar span { color: var(--fb-text-muted, #64748b); font-size: 12px; }
 @media (max-width: 760px) {
+  .publication-header { align-items: flex-start; flex-wrap: wrap; }
+  .publication-header .workspace-detail-title { display: block; }
+  .publication-header .workspace-detail-project { margin-top: 2px; }
   .publication-steps { position: static; overflow-x: auto; }
-  .publication-steps:deep(.el-steps) { min-width: 590px; }
   .action-bar { align-items: flex-start; flex-direction: column; }
   .action-buttons { width: 100%; }
   .action-buttons:deep(.el-button) { flex: 1; }

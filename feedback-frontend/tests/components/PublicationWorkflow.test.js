@@ -22,7 +22,7 @@ function fixture() {
   }
 }
 let wrapper, store
-async function open(config = fixture()) {
+async function open(config = fixture(), query = '') {
   vi.clearAllMocks()
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -33,10 +33,11 @@ async function open(config = fixture()) {
     { path: '/hr/projects/:projectId/publication', component: PublicationConfigView },
     { path: '/hr/projects/:projectId/editor', component: { template: '<div>问卷</div>' } }
   ] })
-  await router.push('/hr/projects/7/publication')
+  await router.push(`/hr/projects/7/publication${query}`)
   wrapper = mount(RouterView, { global: { plugins: [pinia, router, ElementPlus] } })
   await flushPromises()
   store = usePublicationConfigStore()
+  return router
 }
 async function click(text) {
   const button = wrapper.findAll('button').find(item => item.text() === text && item.isVisible())
@@ -52,7 +53,31 @@ function mockSave({ issues = [] } = {}) {
 }
 afterEach(() => { wrapper?.unmount(); vi.restoreAllMocks() })
 
-describe('人员配置四步引导', () => {
+describe('统一六步中的人员发布引导', () => {
+  it('沿用六步编号，直接进入后续步骤仍校验前置条件', async () => {
+    await open(fixture(), '?step=6')
+    const steps = wrapper.get('[aria-label="评价准备流程"]')
+    expect(steps.findAll('.el-step')).toHaveLength(6)
+    expect(steps.get('[aria-current="step"]').text()).toBe('评价谁')
+    expect(wrapper.get('.action-bar').text()).toContain('第 3 步：评价谁')
+    expect(api.savePublicationConfig).not.toHaveBeenCalled()
+    await steps.get('[aria-label="第6步：检查并发布"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.selector-panel').isVisible()).toBe(true)
+  })
+
+  it('返回指标经过未保存确认，取消保留人员配置，确认进入指标步骤', async () => {
+    const router = await open()
+    store.addTarget(person)
+    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValueOnce('cancel').mockResolvedValueOnce('confirm')
+    await wrapper.get('[aria-label="第2步：配置指标"]').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/hr/projects/7/publication')
+    expect(store.config.targets).toHaveLength(1)
+    await wrapper.get('[aria-label="第2步：配置指标"]').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/hr/projects/7/editor?step=2')
+  })
   it('未选人时阻止跳步，前三步不显示发布按钮', async () => {
     await open()
     await click('下一步：设置评价关系')
@@ -98,6 +123,9 @@ describe('人员配置四步引导', () => {
     mockSave()
     await click('保存并检查发布条件')
     expect(wrapper.get('.preview-panel').isVisible()).toBe(true)
+    expect(wrapper.get('[aria-current="step"]').text()).toBe('检查并发布')
+    expect(wrapper.get('[aria-label="第5步：谁来评价"]').element.disabled).toBe(true)
+    expect(wrapper.get('.preparation-steps').text()).toContain('无需配置')
     expect(wrapper.get('.preview-panel').text()).toContain('张三')
     expect(api.savePublicationConfig.mock.calls.at(-1)[1].evaluatorSelections).toEqual([])
     expect(wrapper.findAll('button').find(item => item.text() === '发布项目').element.disabled).toBe(false)

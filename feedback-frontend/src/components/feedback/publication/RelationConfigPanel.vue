@@ -75,7 +75,7 @@ function updateWeight(row, value) {
   <section class="relation-panel">
     <div class="section-heading">
       <div>
-        <h2>2. 设置评价关系</h2>
+        <h2>4. 设置评价关系</h2>
         <p>评价指标决定“评价哪些方面、各占多少”；这里决定“哪些人的评价计入成绩、各占多少”。</p>
       </div>
       <el-button v-if="editable" @click="emit('add')">增加自定义关系</el-button>

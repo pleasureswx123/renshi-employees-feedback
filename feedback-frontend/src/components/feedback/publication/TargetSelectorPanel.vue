@@ -30,7 +30,7 @@ function search(event) {
   <section class="selector-panel">
     <div class="section-heading">
       <div>
-        <h2>1. 评价谁</h2>
+        <h2>3. 评价谁</h2>
         <p>先选择本轮要评价哪些员工；下一步设置评价关系，再安排谁来填写问卷。</p>
       </div>
       <el-tag type="info">已选 {{ selectedTargets.length }} 人</el-tag>

@@ -51,8 +51,8 @@ for (const viewport of [{ width: 1466, height: 986 }, { width: 1236, height: 720
     const editorHeader = await page.locator('.editor-header').boundingBox()
     expect(editorHeader.height).toBeLessThanOrEqual(64)
     expect(editorHeader.x + editorHeader.width).toBeLessThanOrEqual(viewport.width)
-    await expect(page.getByLabel('评价准备流程')).toContainText('1 编辑问卷')
-    await expect(page.getByLabel('评价准备流程')).toContainText('3 人员与发布')
+    await expect(page.getByRole('button', { name: '第1步：编辑问卷', exact: true })).toHaveAttribute('aria-current', 'step')
+    await expect(page.getByLabel('评价准备流程')).toContainText('检查并发布')
     const typeTop = (await typePanel.boundingBox()).y
     const assertEditorFrameStable = async () => {
       const frame = await page.evaluate(() => {
@@ -114,7 +114,7 @@ for (const viewport of [{ width: 1466, height: 986 }, { width: 1236, height: 720
     await page.getByRole('button', { name: '下一步：配置指标', exact: true }).click()
     await expect(page.getByRole('tab', { name: '评价指标', exact: true })).toHaveAttribute('aria-selected', 'true')
     await expect(page.locator('.indicator-step-notice')).toContainText('还有1道计分题未绑定指标')
-    await page.getByRole('button', { name: '下一步：配置人员', exact: true }).click()
+    await page.getByRole('button', { name: '下一步：评价谁', exact: true }).click()
     await expect(page).toHaveURL(/\/hr\/projects\/101\/editor$/)
     expect(saves).toBe(0)
     await page.getByRole('button', { name: '增加指标', exact: true }).click()
@@ -149,7 +149,7 @@ for (const viewport of [{ width: 1466, height: 986 }, { width: 1236, height: 720
     await expect(page.getByRole('tab', { name: '题目属性', exact: true })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('button', { name: '完善问卷', exact: true })).toBeVisible()
     await page.getByRole('tab', { name: '评价指标', exact: true }).click()
-    await expect(page.getByRole('button', { name: '下一步：配置人员', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '下一步：评价谁', exact: true })).toHaveCount(0)
     await expect(page.locator('.indicator-step-notice')).toContainText('已有指标配置会保留')
     await page.getByRole('button', { name: '完善问卷', exact: true }).click()
     const addedTitle = page.locator('.question-card.active .title-field textarea')

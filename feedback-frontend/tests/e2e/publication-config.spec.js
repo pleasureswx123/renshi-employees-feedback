@@ -211,7 +211,7 @@ test('评价安排展示分组姓名，切换和增删只影响当前员工的�
   await openPublicationWithPermissions(page, userInfo.permissions, config)
   let writes = 0
   page.on('request', request => { if (request.url().includes('/feedback/') && request.method() !== 'GET') writes += 1 })
-  await page.getByRole('button', { name: '3. 谁来评价', exact: true }).click()
+  await page.getByRole('button', { name: '第5步：谁来评价', exact: true }).click()
   const panel = page.locator('.evaluator-panel')
   const group = name => panel.locator('.assignment-group').filter({ has: page.getByRole('button', { name, exact: true }) })
   const upperGroup = group('配置张三的上级评价人')
@@ -258,7 +258,7 @@ test('保存关系配置前后保持卡片宽度，窄屏仅表格内部滚动',
     await new Promise(resolve => { releaseSave = resolve })
     await route.fulfill({ json: { code: 200, data: { ...config, relations: savedPayload.relations.map(row => ({ ...row, fixed: true })) } } })
   })
-  await page.getByRole('button', { name: '2. 设置评价关系', exact: true }).click()
+  await page.getByRole('button', { name: '第4步：设置评价关系', exact: true }).click()
   const panel = page.locator('.relation-panel')
   const overflow = () => panel.evaluate(el => {
     const card = el.closest('.el-card__body')
@@ -301,7 +301,7 @@ test('计分说明可展开，实时提示占比变化，保留未保存配置',
   page.on('request', request => {
     if (request.url().includes('/feedback/') && request.method() !== 'GET') writes += 1
   })
-  await page.getByRole('button', { name: '2. 设置评价关系', exact: true }).click()
+  await page.getByRole('button', { name: '第4步：设置评价关系', exact: true }).click()
   const panel = page.locator('.relation-panel')
   const summary = panel.getByRole('region', { name: '当前计分方式' })
   await expect(summary).toContainText('上级占 60%，同级占 40%')
@@ -551,9 +551,9 @@ test('HR配置目标和评价人、保存恢复、二次确认发布并进入只
   await page.screenshot({ path: 'output/playwright/publication-wizard-review.png', fullPage: true })
   await page.reload()
   await expect(previewCard.getByText('可以发布')).toBeVisible()
-  await page.getByRole('button', { name: '2. 设置评价关系', exact: true }).click()
+  await page.getByRole('button', { name: '第4步：设置评价关系', exact: true }).click()
   await expect(page.getByRole('spinbutton', { name: '同级权重（%）', exact: true })).toHaveValue('100')
-  await page.getByRole('button', { name: '4. 检查并发布', exact: true }).click()
+  await page.getByRole('button', { name: '第6步：检查并发布', exact: true }).click()
 
   await page.getByRole('button', { name: '发布项目' }).click()
   const confirmDialog = page.getByRole('dialog', { name: '确认发布项目' })

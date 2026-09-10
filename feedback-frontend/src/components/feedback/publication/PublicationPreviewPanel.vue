@@ -28,7 +28,7 @@ function issueMessage(issue) {
   <section class="preview-panel">
     <div class="section-heading">
       <div>
-        <h2>4. 检查并发布</h2>
+        <h2>6. 检查并发布</h2>
         <p>确认谁被评价、谁来填写，以及将生成的任务。通过检查后即可发布。</p>
       </div>
       <el-tag :type="ready && !stale ? 'success' : 'warning'">

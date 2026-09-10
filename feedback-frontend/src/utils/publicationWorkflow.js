@@ -1,7 +1,9 @@
 import { DECIMAL_FACTOR, toScaledInteger } from './fixedDecimal'
 import { SELF_RELATION_CODE } from './publicationConfig'
 
-export const PUBLICATION_STEPS = ['评价谁', '设置评价关系', '谁来评价', '检查并发布']
+import { PROJECT_PREPARATION_STEPS } from '@/constants/projectPreparation'
+
+export const PUBLICATION_STEPS = PROJECT_PREPARATION_STEPS.slice(2)
 
 export function analyzePublicationWorkflow(config, mode = 'others') {
   const targets = config?.targets || []

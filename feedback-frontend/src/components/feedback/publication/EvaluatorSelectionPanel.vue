@@ -107,7 +107,7 @@ defineExpose({ locate })
   <section class="evaluator-panel">
     <div class="section-heading">
       <div>
-        <h2>3. 谁来评价</h2>
+        <h2>5. 谁来评价</h2>
         <p>下方按关系列出已选评价人，点击关系可切换配置。未分配他评的员工将仅进行自评。</p>
       </div>
     </div>
