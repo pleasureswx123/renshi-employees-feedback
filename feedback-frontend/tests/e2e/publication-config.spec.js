@@ -22,6 +22,24 @@ const candidates = [
   { userId: 11, userName: 'lisi', nickName: '李四', deptId: 100, deptName: '研发部', available: true }
 ]
 
+const candidateDepartments = [
+  { deptId: 99, parentId: 0, label: '总公司', directCount: 0 },
+  { deptId: 100, parentId: 99, label: '研发部', directCount: 2 }
+]
+
+test.beforeEach(async ({ page }) => {
+  await page.route('**/dev-api/feedback/projects/*/participant-departments', route => route.fulfill({ json: { code: 200, data: candidateDepartments } }))
+})
+
+async function addTargetFromTree(page, name = '张三') {
+  const panel = page.locator('.selector-panel')
+  await panel.locator('.department-node').filter({ hasText: '研发部' }).click()
+  const personRow = panel.locator('.el-tree-node__content').filter({ has: page.locator('.person-node').filter({ hasText: name }) })
+  await personRow.locator('.el-checkbox').click()
+  await expect(personRow.getByRole('checkbox')).toBeChecked()
+  await panel.getByRole('button', { name: '添加选中人员', exact: true }).click()
+}
+
 function relation(relationId, relationCode, relationType, relationName, sortOrder, overrides = {}) {
   return {
     relationId,
@@ -134,6 +152,9 @@ async function openPublicationWithPermissions(page, permissions, config) {
     if (path === '/feedback/projects/101/participant-options') {
       candidateRequestCount += 1
       return route.fulfill({ json: { code: 200, rows: candidates, pageNum: 1, pageSize: 10, total: 2, hasNext: false } })
+    }
+    if (path === '/feedback/projects/101/participant-departments') {
+      return route.fulfill({ json: { code: 200, data: candidateDepartments } })
     }
     return route.fulfill({ status: 404, json: { code: 404, msg: '未匹配测试接口' } })
   }
@@ -414,6 +435,9 @@ test('HR配置目标和评价人、保存恢复、二次确认发布并进入只
         json: { code: 200, rows: candidates, pageNum: 1, pageSize: 10, total: 2, hasNext: false }
       })
     }
+    if (path === '/feedback/projects/101/participant-departments') {
+      return route.fulfill({ json: { code: 200, data: candidateDepartments } })
+    }
     if (path === '/feedback/projects/101/publication-config' && request.method() === 'GET') {
       return route.fulfill({ json: { code: 200, data: persistedConfig } })
     }
@@ -499,7 +523,7 @@ test('HR配置目标和评价人、保存恢复、二次确认发布并进入只
   await expect(page.getByRole('button', { name: '发布项目', exact: true })).toHaveCount(0)
   await page.screenshot({ path: 'output/playwright/publication-wizard-targets.png', fullPage: true })
   const targetCard = page.locator('.selector-panel')
-  await targetCard.getByRole('button', { name: '添加' }).first().click()
+  await addTargetFromTree(page)
   await expect(targetCard.getByText('已选 1 人')).toBeVisible()
   await page.getByRole('button', { name: '下一步：设置评价关系' }).click()
 
@@ -570,6 +594,32 @@ test('HR配置目标和评价人、保存恢复、二次确认发布并进入只
   await expect(page.getByText('已冻结只读')).toBeVisible()
 })
 
+test('组织树默认展示部门，勾选增删和搜索保持已选人员', async ({ page }) => {
+  await page.setViewportSize({ width: 1466, height: 986 })
+  await openPublicationWithPermissions(page, userInfo.permissions, initialConfig())
+  const panel = page.locator('.selector-panel')
+  await expect(panel.locator('.department-node')).toHaveCount(2)
+  await expect(panel.locator('.person-node')).toHaveCount(0)
+  await addTargetFromTree(page)
+  const liRow = panel.locator('.el-tree-node__content').filter({ has: page.locator('.person-node').filter({ hasText: '李四' }) })
+  await liRow.locator('.el-checkbox').click()
+  await panel.getByRole('button', { name: '添加选中人员' }).click()
+  await expect(panel.getByText('已选 2 人', { exact: true })).toBeVisible()
+  await panel.locator('.selected-column .el-table__header .el-checkbox').click()
+  await panel.getByRole('button', { name: '移除选中人员' }).click()
+  await expect(panel.getByText('已选 0 人', { exact: true })).toBeVisible()
+  await panel.getByRole('textbox', { name: '人员搜索', exact: true }).fill('李四')
+  await panel.getByRole('button', { name: '查询', exact: true }).click()
+  await expect(panel.locator('.department-node')).toHaveCount(0)
+  const searched = panel.locator('.el-tree-node__content').filter({ has: page.locator('.person-node').filter({ hasText: '李四' }) })
+  await searched.locator('.el-checkbox').click()
+  await panel.getByRole('button', { name: '添加选中人员' }).click()
+  await expect(panel.locator('.selected-column')).toContainText('李四')
+  await panel.screenshot({ path: 'output/playwright/target-tree-transfer.png' })
+  const bounds = await panel.boundingBox()
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(1466)
+})
+
 test('仅自评跳过分配，保存失败可重试，返回修改后重新检查', async ({ page }) => {
   let persisted = initialConfig()
   await openPublicationWithPermissions(page, userInfo.permissions, persisted)
@@ -586,7 +636,7 @@ test('仅自评跳过分配，保存失败可重试，返回修改后重新检�
       preview: { targetCount: 1, evaluatorCount: 1, assignmentCount: 1, targetSummaries: [{ targetUserId: 10, selfCount: 1, nonSelfCount: 0, assignmentCount: 1 }] } }
     return route.fulfill({ json: { code: 200, data: persisted } })
   })
-  await page.locator('.selector-panel').getByRole('button', { name: '添加', exact: true }).first().click()
+  await addTargetFromTree(page)
   await page.getByRole('button', { name: '下一步：设置评价关系' }).click()
   await page.locator('.evaluation-mode .el-radio-button').filter({ hasText: '仅自评' }).click()
   await page.getByRole('button', { name: '保存并检查发布条件' }).click()
@@ -630,7 +680,8 @@ test('两处人员搜索回车仅查询一次，不刷新页面且保留未保�
     return route.fulfill({ json: { code: 200, rows, total: rows.length } })
   })
   const targets = page.locator('.selector-panel')
-  await targets.getByRole('button', { name: '添加', exact: true }).first().click()
+  await addTargetFromTree(page)
+  queries.length = 0
   await targets.getByRole('textbox', { name: '人员搜索' }).fill(' 李四 ')
   const targetResponse = page.waitForResponse(response => response.url().includes('participant-options') && new URL(response.url()).searchParams.get('keyword') === '李四')
   await targets.getByRole('textbox', { name: '人员搜索' }).press('Enter')
@@ -655,7 +706,7 @@ test('两处人员搜索回车仅查询一次，不刷新页面且保留未保�
   await expect(evaluators.getByText('已选同级评价人（1）')).toBeVisible()
   await expect(evaluators.locator('.selected-column').getByText('李四', { exact: true })).toBeVisible()
   await expect(page.getByText('有未保存修改')).toBeVisible()
-  expect(queries).toEqual(['李四', '张三'])
+  expect(queries).toEqual(['李四', '', '张三'])
   expect(navigations).toEqual([])
 })
 

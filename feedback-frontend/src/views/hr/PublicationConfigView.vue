@@ -2,6 +2,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { getParticipantDepartments, listParticipantOptions } from '@/api/feedback/projects'
 
 import EvaluatorSelectionPanel from '@/components/feedback/publication/EvaluatorSelectionPanel.vue'
 import ProjectPreparationSteps from '@/components/feedback/ProjectPreparationSteps.vue'
@@ -65,6 +66,16 @@ async function loadCandidates({ pageNum = 1, keyword = publicationStore.candidat
   await publicationStore.loadCandidates({ pageNum, keyword })
 }
 
+async function loadTargetDepartments() {
+  if (!canManage.value || !config.value?.editable) return []
+  return (await getParticipantDepartments(projectId)).data || []
+}
+
+async function loadTargetPeople(params) {
+  if (!canManage.value || !config.value?.editable) return { rows: [], total: 0 }
+  return listParticipantOptions(projectId, params)
+}
+
 async function saveConfig() {
   if (busy.value || !canManage.value) return null
   try {
@@ -83,6 +94,7 @@ async function saveConfig() {
 
 function showStep(step) {
   activeStep.value = step
+  if (step === 2) loadCandidates().catch(() => { /* 请求层展示加载错误，保留当前配置。 */ })
   nextTick(() => stepContent.value?.scrollIntoView?.({ block: 'start' }))
 }
 
@@ -204,7 +216,7 @@ onMounted(async () => {
     activeStep.value = 0
     await goStep(requestedStep)
   }
-  await loadCandidates()
+  if (activeStep.value === 2) await loadCandidates()
 })
 onBeforeUnmount(() => publicationStore.reset())
 </script>
@@ -263,15 +275,11 @@ onBeforeUnmount(() => publicationStore.reset())
       <div ref="stepContent" class="step-content">
       <el-card v-show="activeStep === 0" shadow="never">
         <TargetSelectorPanel
-          :rows="publicationStore.candidateRows"
-          :total="publicationStore.candidateTotal"
-          :page-num="publicationStore.candidatePageNum"
-          :page-size="publicationStore.candidatePageSize"
+          :load-departments="loadTargetDepartments"
+          :load-people="loadTargetPeople"
+          :can-browse="config.editable && canManage"
           :selected-targets="config.targets"
-          :loading="publicationStore.candidatesLoading"
           :editable="config.editable && canManage && !busy"
-          @search="loadCandidates({ pageNum: 1, keyword: $event })"
-          @page-change="loadCandidates({ pageNum: $event })"
           @add="publicationStore.addTarget"
           @remove="publicationStore.removeTarget"
         />

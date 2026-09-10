@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePublicationConfigStore } from '@/stores/publicationConfig'
 import { analyzePublicationWorkflow, publicationIssueDestination } from '@/utils/publicationWorkflow'
 
-const api = vi.hoisted(() => ({ getPublicationConfig: vi.fn(), listParticipantOptions: vi.fn(), savePublicationConfig: vi.fn(), publishProject: vi.fn() }))
+const api = vi.hoisted(() => ({ getParticipantDepartments: vi.fn().mockResolvedValue({ data: [] }), getPublicationConfig: vi.fn(), listParticipantOptions: vi.fn(), savePublicationConfig: vi.fn(), publishProject: vi.fn() }))
 vi.mock('@/api/feedback/projects', () => api)
 const person = { userId: 10, nickName: '张三', userName: 'zhangsan', available: true }
 function fixture() {

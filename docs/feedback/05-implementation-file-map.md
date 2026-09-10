@@ -1,5 +1,7 @@
 # 计划文件清单
 
+2026-09-10组织树选人增量：`TargetSelectorPanel.vue`改为树形穿梭布局；`project_controller.py`、`publication_service.py`、`publication_dao.py`增加按数据范围返回候选组织的接口；新增`feedback-frontend/tests/components/TargetTransfer.test.js`与`ruoyi-fastapi-backend/tests/module_feedback/service/test_participant_tree.py`，浏览器回归沿用`publication-config.spec.js`。
+
 本清单登记已落地文件。P9安全、迁移、性能和验收文件已落地，功能完成状态、测试遗留项与直接验证证据以实施路线图和P9验收报告为准。
 
 ## 1. 后端

@@ -16,6 +16,7 @@ class ParticipantOptionQueryModel(QuestionnaireVoModel):
     page_size: int = Field(default=20, ge=1, le=100, description='每页记录数')
     keyword: str | None = Field(default=None, max_length=100, description='账号或姓名关键词')
     dept_id: int | None = Field(default=None, ge=1, description='部门ID')
+    unassigned: bool = Field(default=False, description='仅查询未分配部门的人员')
 
     @field_validator('keyword')
     @classmethod

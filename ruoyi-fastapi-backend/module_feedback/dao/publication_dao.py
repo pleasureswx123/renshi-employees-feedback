@@ -55,6 +55,8 @@ class FeedbackPublicationDao:
             filters.append(or_(SysUser.user_name.ilike(keyword), SysUser.nick_name.ilike(keyword)))
         if query_object.dept_id:
             filters.append(SysUser.dept_id == query_object.dept_id)
+        if query_object.unassigned:
+            filters.append(SysUser.dept_id.is_(None))
 
         joined = select(SysUser.user_id).outerjoin(SysDept, SysDept.dept_id == SysUser.dept_id).where(*filters)
         total = int((await db.scalar(select(func.count()).select_from(joined.subquery()))) or 0)
@@ -67,6 +69,28 @@ class FeedbackPublicationDao:
             .limit(query_object.page_size)
         )
         return [(row[0], row[1]) for row in (await db.execute(statement)).all()], total
+
+    @classmethod
+    async def participant_department_counts(
+        cls, db: AsyncSession, user_scope_sql: ColumnElement
+    ) -> tuple[dict[int | None, int], list[SysDept]]:
+        """只汇总数据范围内有效员工；部门资料用于补齐可见分支的祖先。"""
+        rows = (
+            await db.execute(
+                select(SysUser.dept_id, func.count(SysUser.user_id))
+                .outerjoin(SysDept, SysDept.dept_id == SysUser.dept_id)
+                .where(*cls._active_participant_filters(user_scope_sql))
+                .group_by(SysUser.dept_id)
+            )
+        ).all()
+        departments = (
+            await db.scalars(
+                select(SysDept)
+                .where(SysDept.del_flag == '0', SysDept.status == '0')
+                .order_by(SysDept.order_num, SysDept.dept_id)
+            )
+        ).all()
+        return dict(rows), list(departments)
 
     @classmethod
     async def get_available_participants(

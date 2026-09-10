@@ -6,13 +6,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import PublicationPreviewPanel from '@/components/feedback/publication/PublicationPreviewPanel.vue'
 import RelationConfigPanel from '@/components/feedback/publication/RelationConfigPanel.vue'
-import TargetSelectorPanel from '@/components/feedback/publication/TargetSelectorPanel.vue'
 import EvaluatorSelectionPanel from '@/components/feedback/publication/EvaluatorSelectionPanel.vue'
 import PublicationConfigView from '@/views/hr/PublicationConfigView.vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePublicationConfigStore } from '@/stores/publicationConfig'
 
-const api = vi.hoisted(() => ({ getPublicationConfig: vi.fn(), listParticipantOptions: vi.fn(), publishProject: vi.fn(), savePublicationConfig: vi.fn() }))
+const api = vi.hoisted(() => ({ getParticipantDepartments: vi.fn().mockResolvedValue({ data: [] }), getPublicationConfig: vi.fn(), listParticipantOptions: vi.fn(), publishProject: vi.fn(), savePublicationConfig: vi.fn() }))
 vi.mock('@/api/feedback/projects', () => api)
 
 const preview = {
@@ -48,7 +47,7 @@ const relations = [
 ]
 
 describe('P5发布配置组件', () => {
-  it.each([TargetSelectorPanel, EvaluatorSelectionPanel])('人员搜索阻止回车默认提交，输入法和加载期间不重复查询：$__name', async component => {
+  it.each([EvaluatorSelectionPanel])('人员搜索阻止回车默认提交，输入法和加载期间不重复查询：$__name', async component => {
     const wrapper = mount(component, {
       global: { plugins: [ElementPlus] },
       props: { editable: true, targets: [{ userId: 10, nickName: '张三' }], relations }

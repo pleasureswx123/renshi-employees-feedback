@@ -113,6 +113,40 @@ class FeedbackPublicationService:
             hasNext=math.ceil(total / query_object.page_size) > query_object.page_num,
         )
 
+    @classmethod
+    async def list_participant_departments(
+        cls,
+        query_db: AsyncSession,
+        project_id: int,
+        project_scope_sql: ColumnElement,
+        user_scope_sql: ColumnElement,
+    ) -> list[dict[str, int | str | None]]:
+        """仅返回可选员工所在部门及必要祖先，不暴露其他部门的人员数量。"""
+        project = await FeedbackProjectDao.get_project_by_id_scoped(query_db, project_id, project_scope_sql)
+        if project is None:
+            raise ServiceException(message='项目不存在或不在当前数据范围内')
+        counts, departments = await FeedbackPublicationDao.participant_department_counts(query_db, user_scope_sql)
+        by_id = {int(dept.dept_id): dept for dept in departments}
+        visible = set()
+        for dept_id in counts:
+            current = dept_id
+            while current in by_id and current not in visible:
+                visible.add(current)
+                current = by_id[current].parent_id
+        result = [
+            {
+                'deptId': int(dept.dept_id),
+                'parentId': int(dept.parent_id) if dept.parent_id in visible else 0,
+                'label': dept.dept_name,
+                'directCount': int(counts.get(dept.dept_id, 0)),
+            }
+            for dept in departments
+            if dept.dept_id in visible
+        ]
+        if counts.get(None):
+            result.append({'deptId': 0, 'parentId': None, 'label': '未分配部门', 'directCount': int(counts[None])})
+        return result
+
     @staticmethod
     def _version_id_for_project(project: FbProject) -> int:
         if project.status == ProjectStatus.PREPARING.value:

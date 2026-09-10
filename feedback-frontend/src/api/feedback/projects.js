@@ -45,6 +45,10 @@ export function listParticipantOptions(projectId, params) {
   })
 }
 
+export function getParticipantDepartments(projectId) {
+  return request({ url: `/feedback/projects/${projectId}/participant-departments`, method: 'get' })
+}
+
 export function getPublicationConfig(projectId) {
   return request({ url: `/feedback/projects/${projectId}/publication-config`, method: 'get' })
 }

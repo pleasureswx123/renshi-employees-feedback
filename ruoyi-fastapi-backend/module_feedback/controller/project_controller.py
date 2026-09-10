@@ -194,6 +194,26 @@ async def list_feedback_participant_options(
 
 
 @project_controller.get(
+    '/{project_id}/participant-departments',
+    summary='获取项目可选人员的组织架构',
+    dependencies=[UserInterfaceAuthDependency('feedback:participant:manage')],
+)
+async def list_feedback_participant_departments(
+    request: Request,
+    project_id: Annotated[int, Path(ge=1, description='评价项目ID')],
+    query_db: Annotated[AsyncSession, DBSessionDependency()],
+    project_scope_sql: Annotated[
+        ColumnElement, DataScopeDependency(FbProject, user_alias='owner_user_id', dept_alias='owner_dept_id')
+    ],
+    user_scope_sql: Annotated[ColumnElement, DataScopeDependency(SysUser, user_alias='user_id', dept_alias='dept_id')],
+) -> Response:
+    result = await FeedbackPublicationService.list_participant_departments(
+        query_db, project_id, project_scope_sql, user_scope_sql
+    )
+    return ResponseUtil.success(data=result)
+
+
+@project_controller.get(
     '/{project_id}/publication-config',
     summary='读取发布配置或冻结视图',
     response_model=DataResponseModel[PublicationConfigModel],
