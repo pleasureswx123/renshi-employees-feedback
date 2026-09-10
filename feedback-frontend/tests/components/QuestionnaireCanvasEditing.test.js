@@ -82,6 +82,45 @@ describe('问卷画布直接编辑', () => {
 
   afterEach(() => { wrapper?.unmount(); ElMessage.closeAll(); document.body.innerHTML = '' })
 
+  it('画布多页导航同步当前页面且不修改草稿，单页不显示', async () => {
+    const canvas = wrapper.get('.canvas-panel').element
+    canvas.scrollTo = vi.fn()
+    const nav = wrapper.get('[aria-label="画布分页"]')
+    expect(nav.findAll('button')[0].attributes('disabled')).toBeDefined()
+    await nav.findAll('button')[1].trigger('click')
+    await flushPromises()
+    expect(store.selectedPageCode).toBe('P2')
+    expect(nav.text()).toContain('第 2 / 2 页')
+    expect(nav.findAll('button')[1].attributes('disabled')).toBeDefined()
+    expect(canvas.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'instant' })
+    await nav.findAll('button')[0].trigger('click')
+    await flushPromises()
+    expect(store.selectedPageCode).toBe('P1')
+    expect(store.dirty).toBe(false)
+    store.removePage('P2')
+    await flushPromises()
+    expect(wrapper.find('[aria-label="画布分页"]').exists()).toBe(false)
+  })
+
+  it('新增题目聚焦不滚动整页，只在画布内定位', async () => {
+    const canvas = wrapper.get('.canvas-panel').element
+    canvas.scrollTo = vi.fn()
+    canvas.getBoundingClientRect = () => ({ top: 100, bottom: 600, height: 500 })
+    Object.defineProperty(canvas, 'clientHeight', { configurable: true, value: 500 })
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus')
+    try {
+      const add = wrapper.findAll('button').find(item => item.text() === '单选题')
+      await add.trigger('click')
+      await flushPromises()
+      expect(focus).toHaveBeenCalledWith({ preventScroll: true })
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled()
+      expect(canvas.scrollTo).toHaveBeenCalled()
+      expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+    } finally {
+      focus.mockRestore()
+    }
+  })
+
   it('收起问卷信息保留内容，缺失标题时保存自动展开并阻止请求', async () => {
     const collapse = wrapper.findComponent({ name: 'ElCollapse' })
     collapse.vm.$emit('update:modelValue', [])

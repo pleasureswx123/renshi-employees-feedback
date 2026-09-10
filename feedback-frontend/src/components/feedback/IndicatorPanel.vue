@@ -13,6 +13,10 @@ const props = defineProps({
   pages: { type: Array, default: () => [] }
 })
 const emit = defineEmits(['add', 'change', 'delete', 'move', 'set-bindings', 'set-question-indicator', 'locate-question'])
+const questionNumbers = computed(() => new Map(
+  (props.pages.length ? props.pages.flatMap(page => page.questions) : props.questions)
+    .map((question, index) => [question.questionCode, index + 1])
+))
 const unboundQuestions = computed(() => {
   const boundCodes = new Set(props.indicators.flatMap(indicator => indicator.questionCodes))
   let number = 0
@@ -132,7 +136,7 @@ const weightState = computed(() => {
             <el-option
               v-for="question in questions"
               :key="question.questionCode"
-              :label="question.title.trim() || `${getQuestionTypeDefinition(question.questionType)?.label} · 待填写`"
+              :label="`${questionNumbers.get(question.questionCode)}. ${question.title.trim() || `${getQuestionTypeDefinition(question.questionType)?.label} · 待填写`}`"
               :value="question.questionCode"
             />
           </el-select>

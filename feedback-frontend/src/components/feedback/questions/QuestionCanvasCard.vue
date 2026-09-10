@@ -63,13 +63,28 @@ function handleKeydown(event) {
 
 async function focusTitle() {
   await nextTick()
-  cardRef.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  titleRef.value?.focus()
+  titleRef.value?.textarea?.focus({ preventScroll: true })
+  scrollWithinCanvas()
 }
 
 function focusCard() {
   cardRef.value?.focus({ preventScroll: true })
-  cardRef.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  scrollWithinCanvas()
+}
+
+function scrollWithinCanvas() {
+  const card = cardRef.value
+  const canvas = card?.closest('.canvas-panel')
+  if (!canvas) return
+  const bounds = canvas.getBoundingClientRect()
+  const target = card.getBoundingClientRect()
+  const top = bounds.top + canvas.clientTop + 16
+  const bottom = bounds.top + canvas.clientTop + canvas.clientHeight - 16
+  // 只滚动画布；较高的题目对齐顶部，保证标题可见，避免带动整页。
+  const offset = target.top < top || target.height > bottom - top
+    ? target.top - top
+    : Math.max(0, target.bottom - bottom)
+  if (offset) canvas.scrollTo?.({ top: canvas.scrollTop + offset, behavior: 'smooth' })
 }
 
 async function validate() {

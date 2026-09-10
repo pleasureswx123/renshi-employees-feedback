@@ -37,18 +37,18 @@ const questionNumbers = computed(() => new Map(props.draft.pages.flatMap(page =>
         <el-button text size="small" :disabled="disabled" class="page-select" :aria-label="`${pageIndex + 1}. ${page.pageTitle}`" :aria-current="page.pageCode === selectedPageCode ? 'page' : undefined" :title="page.pageTitle" @click="$emit('select-page', page.pageCode)">
           <FileTextIcon width="14" height="14" aria-hidden="true" /><span class="page-name">{{ page.pageTitle }}</span>
         </el-button>
-        <small>{{ page.questions.length }} 题</small>
-      </div>
       <div class="page-actions">
         <el-tooltip content="上移页面" :trigger="['hover', 'focus']" :trigger-keys="[]" :enterable="false">
-          <el-button link size="small" :disabled="disabled || pageIndex === 0" :aria-label="`上移页面：${page.pageTitle}`" @click="$emit('move-page', page.pageCode, -1)"><ArrowUpIcon width="12" height="12" aria-hidden="true" /></el-button>
+          <el-button link size="small" :disabled="disabled || pageIndex === 0" :aria-label="`上移页面：${page.pageTitle}`" @click="$emit('move-page', page.pageCode, -1)"><ArrowUpIcon width="10" height="10" aria-hidden="true" /></el-button>
         </el-tooltip>
         <el-tooltip content="下移页面" :trigger="['hover', 'focus']" :trigger-keys="[]" :enterable="false">
-          <el-button link size="small" :disabled="disabled || pageIndex === draft.pages.length - 1" :aria-label="`下移页面：${page.pageTitle}`" @click="$emit('move-page', page.pageCode, 1)"><ArrowDownIcon width="12" height="12" aria-hidden="true" /></el-button>
+          <el-button link size="small" :disabled="disabled || pageIndex === draft.pages.length - 1" :aria-label="`下移页面：${page.pageTitle}`" @click="$emit('move-page', page.pageCode, 1)"><ArrowDownIcon width="10" height="10" aria-hidden="true" /></el-button>
         </el-tooltip>
         <el-tooltip content="删除页面" :trigger="['hover', 'focus']" :trigger-keys="[]" :enterable="false">
-          <el-button link size="small" type="danger" :disabled="disabled || draft.pages.length <= 1" :aria-label="`删除页面：${page.pageTitle}`" @click="$emit('delete-page', page.pageCode)"><TrashIcon width="12" height="12" aria-hidden="true" /></el-button>
+          <el-button link size="small" type="danger" :disabled="disabled || draft.pages.length <= 1" :aria-label="`删除页面：${page.pageTitle}`" @click="$emit('delete-page', page.pageCode)"><TrashIcon width="10" height="10" aria-hidden="true" /></el-button>
         </el-tooltip>
+      </div>
+        <small>{{ page.questions.length }} 题</small>
       </div>
       <el-button
         v-for="question in page.questions"
@@ -78,14 +78,14 @@ const questionNumbers = computed(() => new Map(props.draft.pages.flatMap(page =>
 .add-page { width: 24px; height: 24px; padding: 0; }
 .outline-page-group { min-width: 0; margin-bottom: 10px; padding: 6px 0; }
 .outline-page-group + .outline-page-group { border-top: 1px solid var(--fb-border, #e5e7eb); box-shadow: 0 -4px 6px -4px rgb(15 23 42 / 12%); }
-.outline-page { padding: 0 10px; gap: 4px; }
+.outline-page { padding: 0 8px 4px; gap: 3px; margin-bottom: 4px; border-bottom: 1px solid var(--fb-border, #f0f2f5); }
 .page-select { flex: 1; min-width: 0; padding: 4px 0; justify-content: flex-start; font-weight: 600; }
 .page-select:deep(> span) { display: flex; gap: 6px; min-width: 0; }
 .page-select svg { flex: none; color: #409eff; }
 .page-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .outline-page small { flex: none; padding: 2px 5px; border-radius: 4px; color: var(--fb-text-muted, #909399); background: var(--fb-surface-muted, #f4f4f5); font-size: 11px; }
-.page-actions { display: flex; align-items: center; gap: 2px; margin-bottom: 4px; padding: 0 10px 4px; border-bottom: 1px solid var(--fb-border, #f0f2f5); }
-.page-actions .el-button { width: 24px; height: 26px; padding: 0; margin-left: 0; }
+.page-actions { display: flex; flex: none; align-items: center; gap: 0; }
+.page-actions .el-button { width: 18px; height: 22px; padding: 0; margin-left: 0; }
 .page-actions { justify-content: flex-end; }
 .page-actions { opacity: .45; transition: opacity .15s; }
 .outline-page-group:hover .page-actions, .outline-page-group:focus-within .page-actions { opacity: 1; }
@@ -95,7 +95,7 @@ const questionNumbers = computed(() => new Map(props.draft.pages.flatMap(page =>
 .outline-question svg { flex: none; color: var(--fb-text-muted, #909399); }
 .question-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 18px; }
 .outline-question:hover, .outline-question:focus-visible { background: var(--fb-surface-muted, #f5f7fa); }
-.outline-question.active { color: var(--el-color-primary); font-weight: 600; background: var(--fb-primary-bg, #ecf5ff); box-shadow: inset 3px 0 var(--el-color-primary); }
+.outline-question.active { color: var(--el-color-primary); font-weight: 600; background: var(--fb-primary-bg, #ecf5ff); }
 .outline-question.active svg { color: #409eff; }
 .outline-empty { margin: 10px; text-align: center; font-size: 12px; color: var(--fb-text-disabled, #a8abb2); }
 </style>

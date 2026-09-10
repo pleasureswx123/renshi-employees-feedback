@@ -23,6 +23,7 @@ const router = useRouter()
 const draftStore = useQuestionnaireDraftStore()
 const permissionStore = usePermissionStore()
 const questionnaireFormRef = ref()
+const canvasRef = ref()
 const questionnaireInfoOpen = ref(['info'])
 const questionCards = new Map()
 const savePending = ref(false)
@@ -99,6 +100,15 @@ async function addQuestion(questionType) {
   const question = draftStore.addQuestion(questionType)
   if (activeRightTab.value === 'indicator') activeRightTab.value = 'question'
   if (question) await focusQuestion(question.questionCode, true)
+}
+
+async function turnCanvasPage(offset) {
+  if (isSaving.value) return
+  const page = draft.value?.pages[selectedPageIndex.value + offset]
+  if (!page) return
+  draftStore.selectPage(page.pageCode)
+  await nextTick()
+  canvasRef.value?.scrollTo?.({ top: 0, behavior: 'instant' })
 }
 
 async function duplicateQuestion(questionCode) {
@@ -341,7 +351,7 @@ onBeforeUnmount(() => draftStore.reset())
         </el-tabs>
       </aside>
 
-      <main class="canvas-panel editor-panel">
+      <main ref="canvasRef" class="canvas-panel editor-panel">
         <el-collapse v-model="questionnaireInfoOpen" class="questionnaire-info">
         <el-collapse-item name="info">
           <template #title><span class="info-title">问卷信息</span><span class="info-summary">{{ draft.title || '填写问卷标题与说明' }}</span></template>
@@ -394,6 +404,11 @@ onBeforeUnmount(() => draftStore.reset())
           @move="moveQuestion"
           @delete="removeQuestion"
         />
+        <nav v-if="draft.pages.length > 1" class="canvas-pagination" aria-label="画布分页">
+          <el-button size="small" :disabled="isSaving || selectedPageIndex === 0" @click="turnCanvasPage(-1)">上一页</el-button>
+          <span aria-live="polite">第 {{ selectedPageIndex + 1 }} / {{ draft.pages.length }} 页</span>
+          <el-button size="small" :disabled="isSaving || selectedPageIndex === draft.pages.length - 1" @click="turnCanvasPage(1)">下一页</el-button>
+        </nav>
       </main>
 
       <aside class="right-panel editor-panel" aria-label="预览与设置">
@@ -536,6 +551,7 @@ onBeforeUnmount(() => draftStore.reset())
 .dirty-state, .saved-state { width: 100px; text-align: right; }
 .page-heading { margin-bottom: 14px; color: var(--fb-text-muted, #64748b); font-size: 13px; }
 .canvas-summary { flex-wrap: wrap; gap: 8px 12px; margin: 10px 0; color: var(--fb-text-muted, #64748b); font-size: 13px; }
+.canvas-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--fb-border, #e5e7eb); color: var(--fb-text-muted, #64748b); font-size: 12px; }
 .canvas-summary > span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .canvas-summary > span:last-child { flex: none; margin-left: auto; padding: 5px 0; color: var(--fb-text-muted, #64748b); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 22px; white-space: nowrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); }

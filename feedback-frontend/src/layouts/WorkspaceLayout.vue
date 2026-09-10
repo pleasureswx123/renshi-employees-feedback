@@ -160,6 +160,11 @@ async function handleLogout() {
 .header-actions > .el-button { padding-inline: 4px; }
 .workspace-main { min-width: 0; padding: 22px 24px 32px; }
 .workspace-layout.is-editor { height: 100dvh; min-height: 0; overflow: hidden; }
+/* 桌面编辑器只允许面板内部滚动，防止浮层或聚焦产生外层空白滚动区。 */
+@media (min-width: 761px) {
+  :global(html:has(.workspace-layout.is-editor)),
+  :global(body:has(.workspace-layout.is-editor)) { height: 100%; overflow: clip; }
+}
 .is-editor .workspace-body { display: flex; flex-direction: column; height: 100%; }
 .is-editor .workspace-header { flex-shrink: 0; }
 .is-editor .workspace-main { flex: 1; min-height: 0; padding: 14px 20px 20px; overflow: hidden; }
