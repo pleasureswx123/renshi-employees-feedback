@@ -1,4 +1,5 @@
 <script setup>
+import ArrowLeftIcon from '@iconify-vue/lucide/arrow-left'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import QuestionnaireEditorView from './QuestionnaireEditorView.vue'
@@ -33,7 +34,7 @@ watch(() => route.query.step, async value => {
 <template>
   <section class="configuration-workspace">
     <header class="configuration-heading workspace-page-header">
-      <el-button text @click="router.push('/hr/projects')">返回项目列表</el-button>
+      <el-button text :icon="ArrowLeftIcon" @click="router.push('/hr/projects')">返回项目列表</el-button>
       <h1>项目配置</h1><span>{{ projectName }}</span>
     </header>
     <QuestionnaireEditorView v-if="step < 2 && canEdit" ref="child" embedded :initial-step="step" @step-change="changeStep" />

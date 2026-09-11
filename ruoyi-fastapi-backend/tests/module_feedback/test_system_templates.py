@@ -135,3 +135,5 @@ async def test_history_create_transaction(monkeypatch, fail_copy):
     assert all(i.version_id == 22 for i in indicators)
     assert version.settings['sourceProjectId'] == 19
     assert source.version_id == 19
+    created_version = FeedbackProjectDao.add_questionnaire_version.call_args.args[1]
+    assert created_version.title == '员工评价问卷'

@@ -49,7 +49,7 @@ it.each(['employee-360-v1', '', '__history__'])('创建项目保留问卷来源�
   if (templateKey && templateKey !== '__history__') expect(dialog.find('.template-preview').text()).toContain('团队合作')
   await dialog.findAll('button').find(b => b.text().includes('创建并编辑问卷')).trigger('click')
   await flushPromises()
-  expect(api.createProject).toHaveBeenLastCalledWith({ projectName: '模板创建测试', description: null, questionnaireTitle: '模板创建测试', ...(templateKey === '__history__' ? { sourceProjectId: 19 } : templateKey ? { templateKey } : {}) })
+  expect(api.createProject).toHaveBeenLastCalledWith({ projectName: '模板创建测试', description: null, ...(templateKey === '__history__' ? { sourceProjectId: 19 } : templateKey ? { templateKey } : {}) })
   expect(router.currentRoute.value.path).toBe('/hr/projects/9/editor')
   wrapper.unmount()
 })

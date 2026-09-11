@@ -165,7 +165,7 @@ class FeedbackProjectService:
         """在同一事务中创建项目、空白或模板草稿和固定评价关系。"""
         try:
             template = (
-                build_template(page_object.template_key, 0, page_object.questionnaire_title or page_object.project_name)
+                build_template(page_object.template_key, 0, page_object.questionnaire_title or '员工评价问卷')
                 if page_object.template_key
                 else None
             )
@@ -189,7 +189,7 @@ class FeedbackProjectService:
                 FbQuestionnaireVersion(
                     project_id=project.project_id,
                     version_no=1,
-                    title=page_object.questionnaire_title or page_object.project_name,
+                    title=page_object.questionnaire_title or '员工评价问卷',
                     description=page_object.questionnaire_description,
                     create_by=operator_name,
                     update_by=operator_name,

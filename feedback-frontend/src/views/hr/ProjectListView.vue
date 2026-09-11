@@ -208,7 +208,6 @@ async function submitProject() {
       const response = await createProject({
         projectName: projectForm.projectName,
         description: projectForm.description || null,
-        questionnaireTitle: projectForm.projectName,
         ...(historyMode.value ? { sourceProjectId: projectForm.sourceProjectId } : projectForm.templateKey ? { templateKey: projectForm.templateKey } : {})
       })
       ElMessage.success('项目已创建，正在进入问卷编辑器')
