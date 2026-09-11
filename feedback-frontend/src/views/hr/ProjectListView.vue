@@ -1,12 +1,14 @@
 <script setup>
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import {
   getPublicationConfig,
   publishProject,
   listSystemTemplates,
+  listQuestionnaireSources,
+  getQuestionnaireSource,
   createProject,
   listProjects,
   removeProject,
@@ -16,6 +18,7 @@ import { ProjectStatus } from '@/constants/feedbackEnums'
 import { usePermissionStore } from '@/stores/permission'
 import PublicationConfigurationReview from '@/components/feedback/publication/PublicationConfigurationReview.vue'
 import { normalizePublicationConfig } from '@/utils/publicationConfig'
+import QuestionnairePreviewContent from '@/components/feedback/QuestionnairePreviewContent.vue'
 import WorkspaceIcon from '@/components/WorkspaceIcon.vue'
 import { formatDateTime } from '@/utils/displayFormat'
 import { useWorkspaceUiStore } from '@/stores/workspaceUi'
@@ -70,8 +73,60 @@ async function loadTemplates() {
   catch (error) { templatesError.value = error.message || '模板加载失败，请重试' }
   finally { templatesLoading.value = false }
 }
-const projectForm = reactive({ templateKey: '', projectId: null, projectName: '', description: '', lockVersion: 0 })
+const projectForm = reactive({ sourceProjectId: null, templateKey: '', projectId: null, projectName: '', description: '', lockVersion: 0 })
+const historyMode = computed(() => projectForm.templateKey === '__history__')
+const sourceProjects = ref([])
+const sourceTotal = ref(0)
+const sourcePage = ref(1)
+const sourceSearch = ref('')
+const sourceLoading = ref(false)
+const sourceError = ref('')
+const sourcePreview = ref(null)
+const sourcePreviewLoading = ref(false)
+let sourceRequest = 0
+let sourceListRequest = 0
+async function searchSources(query = '', page = 1) {
+  const request = ++sourceListRequest
+  sourceSearch.value = query
+  sourcePage.value = page
+  sourceLoading.value = true
+  sourceError.value = ''
+  try {
+    const response = await listQuestionnaireSources({ projectName: query || undefined, pageNum: page, pageSize: 10 })
+    if (request !== sourceListRequest) return
+    sourceProjects.value = response.rows || []
+    sourceTotal.value = Number(response.total || 0)
+  } catch (error) { if (request === sourceListRequest) sourceError.value = error.message || '历史项目加载失败' }
+  finally { if (request === sourceListRequest) sourceLoading.value = false }
+}
+async function previewSource(id) {
+  const request = ++sourceRequest
+  projectFormRef.value?.clearValidate('sourceProjectId')
+  sourcePreview.value = null
+  sourceError.value = ''
+  sourcePreviewLoading.value = Boolean(id)
+  if (!id) return
+  try {
+    const response = await getQuestionnaireSource(id)
+    if (request === sourceRequest) sourcePreview.value = response.data
+  } catch (error) { if (request === sourceRequest) sourceError.value = error.message || '问卷加载失败，请重试' }
+  finally {
+    if (request === sourceRequest) {
+      sourcePreviewLoading.value = false
+      await nextTick()
+      if (request === sourceRequest && historyMode.value && sourcePreview.value) {
+        await projectFormRef.value?.validateField('sourceProjectId').catch(() => false)
+      }
+    }
+  }
+}
+watch(historyMode, active => {
+  projectForm.sourceProjectId = null
+  previewSource(null)
+  if (active) searchSources()
+})
 const projectRules = {
+  sourceProjectId: [{ validator: (_rule, value, callback) => callback(historyMode.value && (!value || !sourcePreview.value || sourcePreviewLoading.value) ? new Error('请选择历史项目并加载问卷预览') : undefined), trigger: 'change' }],
   projectName: [
     { required: true, message: '请填写项目名称', trigger: 'blur' },
     { max: 200, message: '项目名称不能超过200个字符', trigger: 'blur' }
@@ -118,6 +173,8 @@ function handleReset() {
 
 function resetProjectForm() {
   projectForm.templateKey = ''
+  projectForm.sourceProjectId = null
+  previewSource(null)
   projectForm.projectId = null
   projectForm.projectName = ''
   projectForm.description = ''
@@ -152,7 +209,7 @@ async function submitProject() {
         projectName: projectForm.projectName,
         description: projectForm.description || null,
         questionnaireTitle: projectForm.projectName,
-        ...(projectForm.templateKey ? { templateKey: projectForm.templateKey } : {})
+        ...(historyMode.value ? { sourceProjectId: projectForm.sourceProjectId } : projectForm.templateKey ? { templateKey: projectForm.templateKey } : {})
       })
       ElMessage.success('项目已创建，正在进入问卷编辑器')
       dialogVisible.value = false
@@ -396,7 +453,28 @@ onMounted(loadProjects)
           />
         </el-form-item>
         <template v-if="dialogMode === 'create'">
-          <el-form-item label="问卷来源" prop="templateKey"><el-select v-model="projectForm.templateKey" :loading="templatesLoading" style="width: 100%"><el-option label="空白问卷 · 自行设计" value="" /><el-option v-for="item in templates" :key="item.templateKey" :value="item.templateKey" :label="item.name" /></el-select></el-form-item>
+          <el-form-item label="问卷来源" prop="templateKey"><el-select v-model="projectForm.templateKey" :loading="templatesLoading" style="width: 100%"><el-option label="空白问卷 · 自行设计" value="" /><el-option label="从历史项目复制" value="__history__" /><el-option v-for="item in templates" :key="item.templateKey" :value="item.templateKey" :label="item.name" /></el-select></el-form-item>
+          <template v-if="historyMode">
+            <el-form-item label="历史项目" prop="sourceProjectId">
+              <el-select v-model="projectForm.sourceProjectId" :validate-event="false" filterable remote :remote-method="searchSources" :loading="sourceLoading" placeholder="搜索项目名称" style="width: 100%" @change="previewSource">
+                <el-option v-for="item in sourceProjects" :key="item.projectId" :value="item.projectId" :label="`${item.projectName} · ${statusMeta(item.status).label}`" />
+              </el-select>
+            </el-form-item>
+            <el-pagination v-if="sourceTotal > 10" small layout="prev, pager, next" :total="sourceTotal" :page-size="10" :current-page="sourcePage" @current-change="page => searchSources(sourceSearch, page)" />
+            <el-alert v-if="sourceError" :title="sourceError" type="error" :closable="false"><el-button link @click="projectForm.sourceProjectId ? previewSource(projectForm.sourceProjectId) : searchSources(sourceSearch, sourcePage)">重新加载</el-button></el-alert>
+            <div v-loading="sourcePreviewLoading" class="source-preview">
+              <el-tabs v-if="sourcePreview" type="border-card">
+                <el-tab-pane label="问卷预览"><QuestionnairePreviewContent :key="projectForm.sourceProjectId" :draft="sourcePreview" :show-editing-indicator="false" /></el-tab-pane>
+                <el-tab-pane label="指标与权重及绑定题目">
+                  <div v-for="indicator in sourcePreview.indicators" :key="indicator.indicatorCode" class="template-indicator">
+                    <strong>{{ indicator.indicatorName }} · {{ Number(indicator.weight) }}%</strong><p>{{ indicator.description }}</p>
+                    <ul><li v-for="code in indicator.questionCodes" :key="code">{{ sourcePreview.pages.flatMap(page => page.questions).find(question => question.questionCode === code)?.title }}</li></ul>
+                  </div>
+                  <el-empty v-if="!sourcePreview.indicators.length" description="尚未设置指标，创建后可继续完善" />
+                </el-tab-pane>
+              </el-tabs>
+            </div>
+          </template>
           <el-alert v-if="templatesError" :title="templatesError" type="error" :closable="false"><el-button link @click="loadTemplates">重试加载模板</el-button></el-alert>
           <section v-if="selectedTemplate" class="template-preview">
             <p class="template-summary">{{ selectedTemplate.description }}</p>
@@ -489,6 +567,8 @@ onMounted(loadProjects)
     flex-direction: column;
   }
 }
+.source-preview { min-height: 40px; margin-top: 12px; }
+.source-preview :deep(.el-tabs__content) { height: 360px; overflow: auto; }
 .template-preview { padding: 10px 12px; background: var(--el-fill-color-light); border-radius: 8px; line-height: 1.5; font-size: 13px; }
 .template-preview p { margin: 4px 0; color: var(--fb-text-muted, #64748b); }
 .template-indicator { margin-bottom: 10px; }

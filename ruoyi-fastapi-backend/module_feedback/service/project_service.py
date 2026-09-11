@@ -11,6 +11,7 @@ from module_feedback.constants import DEFAULT_RELATION_DEFINITIONS
 from module_feedback.dao import FeedbackProjectDao, FeedbackQuestionnaireDao
 from module_feedback.entity.do import FbProject, FbQuestionnairePage, FbQuestionnaireVersion, FbRelation
 from module_feedback.entity.vo import (
+    QuestionnaireDraftSaveModel,
     ProjectCreateModel,
     ProjectDetailModel,
     ProjectPageQueryModel,
@@ -123,6 +124,35 @@ class FeedbackProjectService:
         )
 
     @classmethod
+    async def get_questionnaire_source(cls, query_db, project_id, data_scope_sql):
+        result = await FeedbackQuestionnaireDao.get_source_by_project_id(query_db, project_id, data_scope_sql)
+        if result is None:
+            raise ServiceException(message='来源项目不存在或不在当前数据范围内')
+        return QuestionnaireDraftSaveModel.model_validate(FeedbackQuestionnaireService._document_payload(result[1]))
+
+    @classmethod
+    def clone_questionnaire(cls, source):
+        """复制独立文档并重建稳定标识及题目绑定。"""
+        draft = source.model_copy(deep=True)
+        codes = {}
+        for page in draft.pages:
+            page.page_id = None
+            page.page_code = cls._stable_code('P')
+            for question in page.questions:
+                question.question_id = None
+                codes[question.question_code] = cls._stable_code('Q')
+                question.question_code = codes[question.question_code]
+                for option in question.options:
+                    option.option_id = None
+                    option.option_code = cls._stable_code('O')
+        for indicator in draft.indicators:
+            indicator.indicator_id = None
+            indicator.indicator_code = cls._stable_code('I')
+            indicator.question_codes = [codes[code] for code in indicator.question_codes]
+        draft.lock_version = 0
+        return draft
+
+    @classmethod
     async def create_project(
         cls,
         query_db: AsyncSession,
@@ -130,6 +160,7 @@ class FeedbackProjectService:
         owner_user_id: int,
         owner_dept_id: int | None,
         operator_name: str,
+        data_scope_sql: ColumnElement = False,
     ) -> ProjectDetailModel:
         """在同一事务中创建项目、空白或模板草稿和固定评价关系。"""
         try:
@@ -138,6 +169,10 @@ class FeedbackProjectService:
                 if page_object.template_key
                 else None
             )
+            if page_object.source_project_id:
+                await cls._get_locked_project(query_db, page_object.source_project_id, data_scope_sql)
+                source = await cls.get_questionnaire_source(query_db, page_object.source_project_id, data_scope_sql)
+                template = cls.clone_questionnaire(source)
             project = await FeedbackProjectDao.add_project(
                 query_db,
                 FbProject(
@@ -163,7 +198,12 @@ class FeedbackProjectService:
             query_db.add_all(cls._build_default_relations(project.project_id, version.version_id, operator_name))
             if template:
                 template.version_id = version.version_id
-                version.settings = {'systemTemplateKey': page_object.template_key}
+                version.settings = template.settings
+                if page_object.source_project_id:
+                    version.settings = {**template.settings, 'sourceProjectId': page_object.source_project_id}
+                else:
+                    version.settings = {'systemTemplateKey': page_object.template_key}
+                version.description_doc = template.description_doc
                 version.description = page_object.questionnaire_description or template.description
                 pages = FeedbackQuestionnaireService._build_pages(template, operator_name)
                 indicators, bindings = FeedbackQuestionnaireService._build_indicators(template, operator_name)

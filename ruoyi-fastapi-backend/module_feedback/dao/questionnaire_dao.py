@@ -46,6 +46,42 @@ class FeedbackQuestionnaireDao:
         return row[0], row[1]
 
     @classmethod
+    async def get_source_by_project_id(
+        cls,
+        db: AsyncSession,
+        project_id: int,
+        data_scope_sql: ColumnElement,
+    ) -> tuple[FbProject, FbQuestionnaireVersion] | None:
+        """按数据范围读取历史来源；已发布项目只读取冻结版本。"""
+        statement = (
+            select(FbProject, FbQuestionnaireVersion)
+            .join(FbQuestionnaireVersion, FbQuestionnaireVersion.project_id == FbProject.project_id)
+            .where(
+                FbProject.project_id == project_id,
+                FbProject.del_flag == '0',
+                (
+                    (FbProject.status == 'PREPARING')
+                    & (FbQuestionnaireVersion.status == QuestionnaireVersionStatus.DRAFT.value)
+                )
+                | (
+                    (FbProject.status != 'PREPARING')
+                    & (FbQuestionnaireVersion.version_id == FbProject.current_questionnaire_version_id)
+                ),
+                data_scope_sql,
+            )
+            .options(
+                selectinload(FbQuestionnaireVersion.pages)
+                .selectinload(FbQuestionnairePage.questions)
+                .selectinload(FbQuestion.options),
+                selectinload(FbQuestionnaireVersion.indicators).selectinload(FbIndicator.question_bindings),
+            )
+        )
+        row = (await db.execute(statement)).unique().first()
+        if row is None:
+            return None
+        return row[0], row[1]
+
+    @classmethod
     async def get_draft_for_update(
         cls,
         db: AsyncSession,

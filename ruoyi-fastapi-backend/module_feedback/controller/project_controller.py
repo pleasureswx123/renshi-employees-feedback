@@ -81,6 +81,34 @@ async def list_feedback_projects(
     return ResponseUtil.success(model_content=result)
 
 
+@project_controller.get('/questionnaire-sources', dependencies=[UserInterfaceAuthDependency('feedback:project:add')])
+async def list_questionnaire_sources(
+    request: Request,
+    query_object: Annotated[ProjectPageQueryModel, Query()],
+    query_db: Annotated[AsyncSession, DBSessionDependency()],
+    data_scope_sql: Annotated[
+        ColumnElement, DataScopeDependency(FbProject, user_alias='owner_user_id', dept_alias='owner_dept_id')
+    ],
+) -> Response:
+    result = await FeedbackProjectService.list_projects(query_db, query_object, data_scope_sql)
+    return ResponseUtil.success(model_content=result)
+
+
+@project_controller.get(
+    '/{project_id}/questionnaire-source', dependencies=[UserInterfaceAuthDependency('feedback:project:add')]
+)
+async def get_questionnaire_source(
+    request: Request,
+    project_id: Annotated[int, Path(ge=1)],
+    query_db: Annotated[AsyncSession, DBSessionDependency()],
+    data_scope_sql: Annotated[
+        ColumnElement, DataScopeDependency(FbProject, user_alias='owner_user_id', dept_alias='owner_dept_id')
+    ],
+) -> Response:
+    result = await FeedbackProjectService.get_questionnaire_source(query_db, project_id, data_scope_sql)
+    return ResponseUtil.success(data=result.model_dump(by_alias=True))
+
+
 @project_controller.post(
     '',
     summary='创建准备阶段评价项目',
@@ -99,10 +127,14 @@ async def create_feedback_project(
     page_object: ProjectCreateModel,
     query_db: Annotated[AsyncSession, DBSessionDependency()],
     current_user: Annotated[CurrentUserModel, CurrentUserDependency()],
+    data_scope_sql: Annotated[
+        ColumnElement, DataScopeDependency(FbProject, user_alias='owner_user_id', dept_alias='owner_dept_id')
+    ],
 ) -> Response:
     result = await FeedbackProjectService.create_project(
         query_db,
         page_object,
+        data_scope_sql=data_scope_sql,
         owner_user_id=current_user.user.user_id,
         owner_dept_id=current_user.user.dept_id,
         operator_name=current_user.user.user_name,

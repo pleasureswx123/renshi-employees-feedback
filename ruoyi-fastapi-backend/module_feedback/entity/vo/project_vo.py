@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
 from module_feedback.enums import ProjectStatus
@@ -23,6 +23,14 @@ class ProjectCreateModel(FeedbackVoModel):
     template_key: str | None = Field(
         default=None, max_length=100, description='系统问卷模板版本标识；为空时创建空白问卷'
     )
+    source_project_id: int | None = Field(default=None, ge=1, description='复制问卷的历史项目ID')
+
+    @model_validator(mode='after')
+    def validate_source(self):
+        if self.source_project_id and self.template_key:
+            raise ValueError('历史项目与系统模板不能同时选择')
+        return self
+
     project_name: str = Field(min_length=1, max_length=200, description='评价项目名称')
     description: str | None = Field(default=None, max_length=5000, description='评价项目说明')
     questionnaire_title: str | None = Field(default=None, max_length=200, description='初始问卷标题')

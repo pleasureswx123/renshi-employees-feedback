@@ -99,3 +99,10 @@ export function completeProject(projectId, data) {
 }
 
 export const listSystemTemplates = () => request({ url: '/feedback/projects/system-templates', method: 'get' })
+
+export function listQuestionnaireSources(params) {
+  return request({ url: '/feedback/projects/questionnaire-sources', method: 'get', params })
+}
+export function getQuestionnaireSource(projectId) {
+  return request({ url: `/feedback/projects/${projectId}/questionnaire-source`, method: 'get' })
+}
