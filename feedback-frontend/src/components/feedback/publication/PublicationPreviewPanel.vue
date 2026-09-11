@@ -28,8 +28,8 @@ function issueMessage(issue) {
   <section class="preview-panel">
     <div class="section-heading">
       <div>
-        <h2>6. 检查并发布</h2>
-        <p>确认谁被评价、谁来填写，以及将生成的任务。通过检查后即可发布。</p>
+        <h2>6. 预览并完成</h2>
+        <p>请核对下方完整问卷、指标权重、评价关系与人员安排；发现问题可返回修改，确认无误后完成配置，再到项目列表发布。</p>
       </div>
       <el-tag :type="ready && !stale ? 'success' : 'warning'">
         {{ stale ? '需要重新检查' : ready ? '可以发布' : `待处理 ${issues.length} 项` }}

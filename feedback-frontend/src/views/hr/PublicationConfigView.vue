@@ -6,6 +6,7 @@ import { getParticipantDepartments, listParticipantOptions } from '@/api/feedbac
 
 import EvaluatorSelectionPanel from '@/components/feedback/publication/EvaluatorSelectionPanel.vue'
 import ProjectPreparationSteps from '@/components/feedback/ProjectPreparationSteps.vue'
+import PublicationConfigurationReview from '@/components/feedback/publication/PublicationConfigurationReview.vue'
 import PublicationPreviewPanel from '@/components/feedback/publication/PublicationPreviewPanel.vue'
 import PublicationDetails from '@/components/feedback/publication/PublicationDetails.vue'
 import RelationConfigPanel from '@/components/feedback/publication/RelationConfigPanel.vue'
@@ -27,10 +28,9 @@ const activeStep = ref(0)
 const evaluationMode = ref('')
 const evaluationModeForm = ref(null)
 const modeChanging = ref(false)
-const confirmingPublish = ref(false)
 const evaluatorPanel = ref(null)
 const stepContent = ref(null)
-const busy = computed(() => publicationStore.saving || publicationStore.publishing || modeChanging.value || confirmingPublish.value)
+const busy = computed(() => publicationStore.saving || publicationStore.publishing || modeChanging.value)
 const workflow = computed(() => analyzePublicationWorkflow(config.value, evaluationMode.value))
 const currentIssues = computed(() => [workflow.value.targetIssues, workflow.value.relationIssues, workflow.value.assignmentIssues.map(item => item.message)][activeStep.value] || [])
 const nextLabel = computed(() => activeStep.value === 1 && evaluationMode.value === 'self' ? '保存并检查发布条件' : activeStep.value === 2 ? '保存并检查发布条件' : `下一步：${PUBLICATION_STEPS[activeStep.value + 1]}`)
@@ -54,15 +54,7 @@ const preparationDescriptions = computed(() => [
   questionnaireNeedsCheck.value ? '问卷或指标需检查' : '已配置，可返回修改',
   ...stepDescriptions.value
 ])
-const canPublishPermission = computed(() => permissionStore.hasPermission('feedback:project:publish'))
 const participantDirectory = computed(() => Array.from(publicationStore.participantDirectory.values()))
-const canPublish = computed(
-  () =>
-    publicationStore.editable &&
-    canPublishPermission.value &&
-    !publicationStore.dirty &&
-    config.value?.isPublishReady
-)
 
 async function loadTargetDepartments() {
   if (!canManage.value || !config.value?.editable) return []
@@ -178,34 +170,18 @@ async function locateIssue(issue) {
     await nextTick()
     const index = Number(issue.path?.split('.')[1])
     evaluatorPanel.value?.locate({
-      targetUserId: ['TARGET_SCORING_ASSIGNMENT_REQUIRED', 'TARGET_RELATION_ASSIGNMENT_REQUIRED'].includes(issue.code) ? config.value.targets[index]?.userId : undefined,
-      relationCode: issue.code === 'TARGET_RELATION_ASSIGNMENT_REQUIRED' ? issue.path?.split('.')[3] : issue.code === 'RELATION_POSITIVE_ASSIGNMENT_REQUIRED' ? config.value.relations[index]?.relationCode : undefined
+      targetUserId: ['EVALUATOR_RELATION_CONFLICT', 'TARGET_SCORING_ASSIGNMENT_REQUIRED', 'TARGET_RELATION_ASSIGNMENT_REQUIRED'].includes(issue.code) ? config.value.targets[index]?.userId : undefined,
+      relationCode: ['EVALUATOR_RELATION_CONFLICT', 'TARGET_RELATION_ASSIGNMENT_REQUIRED'].includes(issue.code) ? issue.path?.split('.')[3] : issue.code === 'RELATION_POSITIVE_ASSIGNMENT_REQUIRED' ? config.value.relations[index]?.relationCode : undefined
     })
   }
 }
 
-async function publish() {
-  if (busy.value || !canPublish.value) return
-  confirmingPublish.value = true
-  const preview = config.value.preview
-  try {
-    await ElMessageBox.confirm(
-      `将冻结${preview.targetCount}名被评价人的配置并生成${preview.assignmentCount}项任务。发布后不可修改，确认继续吗？`,
-      '确认发布项目',
-      {
-        type: 'warning',
-        confirmButtonText: '确认发布',
-        cancelButtonText: '返回检查'
-      }
-    )
-    const result = await publicationStore.publish()
-    if (result) ElMessage.success(result.alreadyPublished ? '项目已经发布，已返回冻结结果' : '项目发布成功')
-  } catch (error) {
-    if (error === 'cancel' || error === 'close') return
-    if (!error.status) ElMessage.warning(error.message)
-  } finally {
-    confirmingPublish.value = false
-  }
+async function completeConfiguration() {
+  if (busy.value || !canManage.value || !config.value?.editable) return
+  const saved = await saveConfig()
+  if (!saved || !saved.isPublishReady || saved.validationIssues.length) return
+  ElMessage.success('配置已完成，可在项目列表发布项目')
+  await router.push('/hr/projects')
 }
 
 onBeforeRouteLeave(async () => {
@@ -360,32 +336,33 @@ onBeforeUnmount(() => publicationStore.reset())
           :can-edit-questionnaire="config.editable && permissionStore.hasPermission('feedback:questionnaire:edit') && !busy"
           @locate="locateIssue"
         />
+        <PublicationConfigurationReview v-if="activeStep === 3" :config="config" :can-edit-questionnaire="config.editable && canEditQuestionnaire && !busy" :can-manage="config.editable && canManage && !busy" @edit="goPreparationStep" />
       </el-card>
       </div>
       <div v-if="config.editable" class="action-bar">
         <div aria-live="polite">
           <strong>{{ `第 ${activeStep + 3} 步：${PUBLICATION_STEPS[activeStep]}` }}</strong>
-          <span>{{ activeStep === 3 ? publicationStore.dirty ? '配置已修改，请保存并重新检查。' : '发布后生成评价任务，参评人员在「我的待办」中填写。' : currentIssues[0] || '本步已完成，可以继续；返回修改会保留当前配置。' }}</span>
+          <span>{{ activeStep === 3 ? publicationStore.dirty ? '配置已修改，请保存并重新检查。' : '完成配置后返回列表，项目保持准备阶段，可在列表中正式发布。' : currentIssues[0] || '本步已完成，可以继续；返回修改会保留当前配置。' }}</span>
         </div>
         <div class="action-buttons">
           <el-button v-if="activeStep > 0 || canEditQuestionnaire" :disabled="busy" @click="activeStep === 0 ? goPreparationStep(1) : goStep(activeStep === 3 && evaluationMode === 'self' ? 1 : activeStep - 1)">上一步</el-button>
           <el-button
             v-if="canManage"
             :loading="publicationStore.saving"
-            :disabled="publicationStore.publishing || modeChanging || confirmingPublish"
+            :disabled="publicationStore.publishing || modeChanging"
             @click="saveConfig"
           >
             {{ activeStep === 3 && publicationStore.dirty ? '保存并重新检查' : '保存配置' }}
           </el-button>
           <el-button v-if="activeStep < 3" type="primary" :loading="publicationStore.saving" :disabled="publicationStore.publishing || modeChanging" @click="nextStep">{{ nextLabel }}</el-button>
           <el-button
-            v-if="activeStep === 3 && canPublishPermission"
+            v-if="activeStep === 3 && canManage"
             type="primary"
-            :loading="publicationStore.publishing"
-            :disabled="!canPublish || busy"
-            @click="publish"
+            :loading="publicationStore.saving"
+            :disabled="busy"
+            @click="completeConfiguration"
           >
-            发布项目
+            完成配置
           </el-button>
         </div>
       </div>

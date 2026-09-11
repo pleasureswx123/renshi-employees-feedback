@@ -104,7 +104,7 @@ describe('问卷画布直接编辑', () => {
     useAuthStore().permissions.push('feedback:participant:manage')
     await flushPromises()
     expect(wrapper.get('[aria-label="评价准备流程"]').findAll('.el-step')).toHaveLength(6)
-    await wrapper.get('[aria-label="第6步：检查并发布"]').trigger('click')
+    await wrapper.get('[aria-label="第6步：预览并完成"]').trigger('click')
     await flushPromises()
     expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
     expect(wrapper.get('[aria-current="step"]').text()).toBe('配置指标与权重')
@@ -114,7 +114,7 @@ describe('问卷画布直接编辑', () => {
     expect(store.dirty).toBe(true)
     expect(store.draft.indicators[0].questionCodes).toHaveLength(4)
     persisted.isPublishReady = true
-    await wrapper.get('[aria-label="第6步：检查并发布"]').trigger('click')
+    await wrapper.get('[aria-label="第6步：预览并完成"]').trigger('click')
     await flushPromises()
     expect(api.saveQuestionnaireDraft).toHaveBeenCalledOnce()
     expect(router.currentRoute.value.fullPath).toBe('/hr/projects/7/publication?step=6')
@@ -187,7 +187,7 @@ describe('问卷画布直接编辑', () => {
   it('进入指标前保存问卷，未绑定题目时不继续保存和前进', async () => {
     useAuthStore().permissions.push('feedback:participant:manage')
     expect(wrapper.get('.editor-workflow').text()).toContain('编辑问卷')
-    expect(wrapper.get('.editor-workflow').text()).toContain('检查并发布')
+    expect(wrapper.get('.editor-workflow').text()).toContain('预览并完成')
     expect(wrapper.find('.properties-panel').text()).not.toContain('先在“评价指标”中添加指标')
     await button('下一步：配置指标与权重').trigger('click')
     await flushPromises()

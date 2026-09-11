@@ -324,6 +324,7 @@ class FeedbackPublicationService:
             preview=cls._preview(targets, relations, selections),
             isPublishReady=not issue_payloads,
             validationIssues=[ValidationIssueModel.model_validate(item) for item in issue_payloads],
+            questionnaire=questionnaire,
             frozenDetails=(
                 {
                     'publishedBy': project.published_by,

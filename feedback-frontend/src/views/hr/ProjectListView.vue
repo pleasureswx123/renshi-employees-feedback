@@ -4,6 +4,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import {
+  getPublicationConfig,
+  publishProject,
   listSystemTemplates,
   createProject,
   listProjects,
@@ -12,6 +14,8 @@ import {
 } from '@/api/feedback/projects'
 import { ProjectStatus } from '@/constants/feedbackEnums'
 import { usePermissionStore } from '@/stores/permission'
+import PublicationConfigurationReview from '@/components/feedback/publication/PublicationConfigurationReview.vue'
+import { normalizePublicationConfig } from '@/utils/publicationConfig'
 import WorkspaceIcon from '@/components/WorkspaceIcon.vue'
 import { formatDateTime } from '@/utils/displayFormat'
 import { useWorkspaceUiStore } from '@/stores/workspaceUi'
@@ -23,6 +27,32 @@ const ui = useWorkspaceUiStore()
 const showProjectDelete = false
 const loading = ref(false)
 const mutating = ref(false)
+const publishingId = ref(null)
+const previewVisible = ref(false)
+const previewLoading = ref(false)
+const previewConfig = ref(null)
+const previewError = ref('')
+const previewReady = computed(() => Boolean(previewConfig.value?.isPublishReady && !previewConfig.value?.validationIssues.length))
+const canCompletePreview = computed(() => permissionStore.hasAnyPermission(['feedback:questionnaire:edit', 'feedback:participant:manage']))
+const previewProject = ref(null)
+let previewRequest = 0
+async function openPreview(row) {
+  if (!permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish'])) return
+  const request = ++previewRequest
+  previewProject.value = row
+  previewVisible.value = true
+  previewLoading.value = true
+  previewConfig.value = null
+  previewError.value = ''
+  try {
+    const response = await getPublicationConfig(row.projectId)
+    if (request === previewRequest && previewVisible.value) previewConfig.value = normalizePublicationConfig(response.data)
+  } catch (error) {
+    if (request === previewRequest) previewError.value = error?.message || '预览加载失败，请重试'
+  } finally { if (request === previewRequest) previewLoading.value = false }
+}
+function closePreview() { ++previewRequest; previewLoading.value = false; previewConfig.value = null }
+
 const dialogVisible = ref(false)
 const dialogMode = ref('create')
 const projectFormRef = ref()
@@ -157,6 +187,27 @@ async function handleDelete(row) {
   await loadProjects()
 }
 
+async function handlePublish(row) {
+  if (publishingId.value !== null || row.status !== ProjectStatus.PREPARING || !permissionStore.hasPermission('feedback:project:publish')) return
+  publishingId.value = row.projectId
+  try {
+    const { data: config } = await getPublicationConfig(row.projectId)
+    if (!config.editable) { await loadProjects(); return }
+    if (!config.isPublishReady || config.validationIssues?.length) {
+      await ElMessageBox.confirm(config.validationIssues?.map(issue => issue.message).join('；') || '配置尚未满足发布条件，请返回完善。', '发布前检查未通过', { type: 'warning', confirmButtonText: '去完善配置', cancelButtonText: '返回列表' })
+      await router.push(`/hr/projects/${row.projectId}/editor?step=6`)
+      return
+    }
+    await ElMessageBox.confirm(`项目“${row.projectName}”将为${config.preview.targetCount}名被评价人生成${config.preview.assignmentCount}项任务。发布后配置将冻结，确认发布吗？`, '确认发布项目', { type: 'warning', confirmButtonText: '确认发布', cancelButtonText: '暂不发布' })
+    await publishProject(row.projectId, { projectLockVersion: config.projectLockVersion, versionId: config.versionId, versionLockVersion: config.versionLockVersion })
+    ElMessage.success('项目已发布，可查看评价进度')
+    await loadProjects()
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    if (!error?.__requestClassified) ElMessage.error(error?.message || '发布失败，请重新检查配置后重试')
+  } finally { publishingId.value = null }
+}
+
 function handlePageChange(pageNum) {
   filters.pageNum = pageNum
   loadProjects()
@@ -217,6 +268,9 @@ onMounted(loadProjects)
         <el-table-column prop="projectName" label="项目名称" min-width="220" show-overflow-tooltip>
           <template #default="{ row }"><div class="project-name-cell"><WorkspaceIcon name="project" /><strong>{{ row.projectName }}</strong></div></template>
         </el-table-column>
+        <el-table-column prop="description" label="项目说明" min-width="220" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.description || '—' }}</template>
+        </el-table-column>
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
             <el-tag :type="statusMeta(row.status).type">{{ statusMeta(row.status).label }}</el-tag>
@@ -226,26 +280,19 @@ onMounted(loadProjects)
         <el-table-column label="创建 / 更新时间" width="215" class-name="date-column">
           <template #default="{ row }"><div class="project-times"><span>创建 {{ formatDateTime(row.createTime) }}</span><span>更新 {{ formatDateTime(row.updateTime) }}</span></div></template>
         </el-table-column>
-        <el-table-column label="操作" width="320" :fixed="ui.compact ? false : 'right'">
+        <el-table-column label="操作" width="350" :fixed="ui.compact ? false : 'right'">
           <template #default="{ row }">
             <div class="project-row-actions">
             <el-button
-              v-if="row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:questionnaire:edit')"
-              type="primary"
-              plain
-              size="small"
-              @click="router.push(`/hr/projects/${row.projectId}/editor`)"
-            >
-              编辑问卷
-            </el-button>
-            <el-button
-              v-if="permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish'])"
+              v-if="permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish']) || row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:questionnaire:edit')"
               type="primary"
               link
-              @click="router.push(`/hr/projects/${row.projectId}/publication`)"
+              @click="router.push(`/hr/projects/${row.projectId}/editor?step=${row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:questionnaire:edit') ? 1 : 3}`)"
             >
-              {{ row.status === ProjectStatus.PREPARING ? '配置并发布' : '查看发布配置' }}
+              {{ row.status === ProjectStatus.PREPARING ? '编辑配置' : '查看发布配置' }}
             </el-button>
+            <el-button v-if="row.status === ProjectStatus.PREPARING && permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish'])" type="primary" link @click="openPreview(row)">预览项目</el-button>
+            <el-button v-if="row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:project:publish')" type="primary" link :loading="publishingId === row.projectId" :disabled="publishingId !== null" @click="handlePublish(row)">发布项目</el-button>
             <el-button
               v-if="[ProjectStatus.ACTIVE, ProjectStatus.COMPLETED].includes(row.status) && permissionStore.hasPermission('feedback:progress:view')"
               type="primary"
@@ -263,7 +310,7 @@ onMounted(loadProjects)
               link
               @click="openEditDialog(row)"
             >
-              编辑项目
+              编辑基本信息
             </el-button>
             <el-button
               v-if="showProjectDelete && row.status === ProjectStatus.PREPARING && permissionStore.hasPermission('feedback:project:remove')"
@@ -290,10 +337,36 @@ onMounted(loadProjects)
       </div>
     </el-card>
 
+    <el-drawer v-model="previewVisible" class="project-preview-drawer" :title="`预览项目 · ${previewProject?.projectName || ''}`" size="min(1200px, 100vw)" append-to-body destroy-on-close @close="closePreview">
+      <div v-loading="previewLoading" class="project-preview-content">
+        <template v-if="previewError"><el-alert :title="previewError" type="error" :closable="false" /><el-button @click="openPreview(previewProject)">重新加载</el-button></template>
+        <template v-else-if="previewConfig">
+          <el-alert title="以下为已保存的配置，预览和试填不会保存修改或发布项目。" type="info" :closable="false" />
+          <PublicationConfigurationReview :key="previewConfig.projectId" :config="previewConfig" />
+        </template>
+      </div>
+      <template #footer>
+        <div class="preview-footer">
+          <div v-if="previewConfig" class="preview-completeness" role="status">
+            <el-tag :type="previewReady ? 'success' : 'warning'">{{ previewReady ? '配置完整，可以发布' : previewConfig.validationIssues.length ? `配置未完成 · 待完善 ${previewConfig.validationIssues.length} 项` : '配置尚未通过发布前检查' }}</el-tag>
+            <span v-if="!previewReady" class="preview-first-issue">{{ previewConfig.validationIssues[0]?.message || '请进入配置页检查并完善。' }}</span>
+            <el-popover v-if="previewConfig.validationIssues.length" trigger="click" placement="top-start" :width="360" title="待完善问题">
+              <ul class="preview-issue-list"><li v-for="(issue, index) in previewConfig.validationIssues" :key="index">{{ issue.message }}</li></ul>
+              <template #reference><el-button link type="primary">查看全部问题</el-button></template>
+            </el-popover>
+          </div>
+          <span v-else role="status">{{ previewLoading ? '正在检查配置…' : '配置状态未获取，请重新加载' }}</span>
+          <div class="preview-footer-actions">
+            <el-button v-if="previewConfig?.editable && !previewReady && canCompletePreview" type="primary" @click="router.push(`/hr/projects/${previewProject.projectId}/editor?step=6`)">去完善配置</el-button>
+            <el-button @click="previewVisible = false">关闭</el-button>
+          </div>
+        </div>
+      </template>
+    </el-drawer>
     <el-dialog
       v-model="dialogVisible"
       class="project-dialog"
-      :title="dialogMode === 'create' ? '创建评价项目' : '编辑评价项目'"
+      :title="dialogMode === 'create' ? '创建评价项目' : '编辑基本信息'"
       width="min(560px, 94vw)"
       destroy-on-close
       :close-on-click-modal="!mutating"
@@ -344,6 +417,19 @@ onMounted(loadProjects)
 </template>
 
 <style scoped>
+.preview-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; text-align: left; }
+.preview-completeness { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
+.preview-first-issue { flex-basis: 100%; overflow-wrap: anywhere; color: var(--el-text-color-secondary); font-size: 12px; }
+.preview-footer-actions { display: flex; flex-shrink: 0; }
+.preview-issue-list { max-height: 240px; overflow: auto; margin: 0; padding-left: 20px; line-height: 1.8; }
+@media (max-width: 760px) { .preview-footer { align-items: flex-start; flex-direction: column; } .preview-footer-actions { align-self: flex-end; } }
+.project-preview-content { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+:global(.project-preview-drawer .el-drawer__body) { min-height: 0; overflow: hidden; }
+.project-preview-content > .el-alert { flex-shrink: 0; max-height: 25%; overflow: auto; }
+.project-preview-content :deep(.configuration-review) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.project-preview-content :deep(.configuration-review > .el-tabs__header) { flex-shrink: 0; }
+.project-preview-content :deep(.configuration-review > .el-tabs__content) { height: 0; min-height: 0; flex: 1; }
+.project-preview-content > .el-alert + .el-alert { margin-top: 12px; }
 .project-page {
   display: grid;
   gap: 16px;

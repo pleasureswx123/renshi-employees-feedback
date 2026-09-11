@@ -31,7 +31,19 @@ export function analyzePublicationWorkflow(config, mode = 'others') {
   const targetSummaries = targets.map(target => {
     const assigned = selections.filter(item => item.targetUserId === target.userId)
     const missingRelations = enabled.filter(relation => !assigned.some(item => item.relationCode === relation.relationCode))
-    const missingScoring = missingRelations.length > 0
+    const superiorCodes = new Set(enabled.filter(item => item.relationType === 'SUPERVISOR').map(item => item.relationCode))
+    const superiorIds = new Set(assigned.filter(item => superiorCodes.has(item.relationCode)).flatMap(item => item.evaluatorUserIds))
+    const peers = enabled.filter(item => item.relationType === 'PEER')
+    let conflict = false
+    for (const peer of peers) {
+      const duplicates = assigned.filter(item => item.relationCode === peer.relationCode).flatMap(item => item.evaluatorUserIds).filter(id => superiorIds.has(id))
+      if (duplicates.length) {
+        conflict = true
+        const names = duplicates.map(id => { const person = config.configuredParticipants?.find(item => item.userId === id); return person?.nickName || person?.userName || `用户${id}` })
+        assignmentIssues.push({ message: `“${target.nickName || target.userName}”的上级与同级重复：${names.join('、')}，请保留一种关系`, targetUserId: target.userId, relationCode: peer.relationCode })
+      }
+    }
+    const missingScoring = missingRelations.length > 0 || conflict
     for (const relation of missingRelations) {
       assignmentIssues.push({
         message: `“${target.nickName || target.userName}”尚未配置“${relation.relationName}”评价人`,
@@ -50,7 +62,7 @@ export function analyzePublicationWorkflow(config, mode = 'others') {
 }
 
 export function publicationIssueDestination(issue) {
-  if (['TARGET_RELATION_ASSIGNMENT_REQUIRED', 'RELATION_POSITIVE_ASSIGNMENT_REQUIRED', 'TARGET_SCORING_ASSIGNMENT_REQUIRED', 'EVALUATOR_USER_UNAVAILABLE'].includes(issue.code)) return 2
+  if (['EVALUATOR_RELATION_CONFLICT', 'TARGET_RELATION_ASSIGNMENT_REQUIRED', 'RELATION_POSITIVE_ASSIGNMENT_REQUIRED', 'TARGET_SCORING_ASSIGNMENT_REQUIRED', 'EVALUATOR_USER_UNAVAILABLE'].includes(issue.code)) return 2
   if (issue.path?.startsWith('targets')) return 0
   if (issue.path?.startsWith('relations')) return 1
   if (issue.path?.startsWith('evaluatorSelections')) return 2

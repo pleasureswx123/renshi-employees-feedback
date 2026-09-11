@@ -30,6 +30,7 @@ async function open(config = fixture(), query = '', mode = 'others') {
   api.getPublicationConfig.mockResolvedValue({ data: config })
   api.listParticipantOptions.mockResolvedValue({ rows: [person], total: 1 })
   const router = createRouter({ history: createMemoryHistory(), routes: [
+    { path: '/hr/projects', component: { template: '<div>项目列表</div>' } },
     { path: '/hr/projects/:projectId/publication', component: PublicationConfigView },
     { path: '/hr/projects/:projectId/editor', component: { template: '<div>问卷</div>' } }
   ] })
@@ -59,6 +60,20 @@ function mockSave({ issues = [] } = {}) {
 afterEach(() => { wrapper?.unmount(); vi.restoreAllMocks() })
 
 describe('统一六步中的人员发布引导', () => {
+  it('完成配置保存检查成功返回列表，不调用发布；检查失败保留本页', async () => {
+    const value = fixture()
+    value.targets = [person]
+    const router = await open(value, '', 'self')
+    await click('保存并检查发布条件')
+    mockSave({ issues: [{ code: 'INVALID', path: 'targets', message: '仍需完善' }] })
+    await click('完成配置')
+    expect(router.currentRoute.value.path).toContain('/publication')
+    mockSave()
+    await click('完成配置')
+    expect(router.currentRoute.value.path).toBe('/hr/projects')
+    expect(api.publishProject).not.toHaveBeenCalled()
+  })
+
   it('明确选择他评后默认上级60同级40，重新载入保留手动权重', async () => {
     const config = fixture()
     config.relations.push({ relationCode: 'REL_SUPERVISOR', relationType: 'SUPERVISOR', relationName: '上级', isEnabled: false, participatesInScore: false, weight: '0', fixed: true })
@@ -108,7 +123,7 @@ describe('统一六步中的人员发布引导', () => {
     expect(store.participantDirectory.get(120)).toEqual(missing)
     expect(new DOMWrapper(document.body).get('.el-drawer .selected-column').text()).toContain('补全姓名')
     expect(new DOMWrapper(document.body).get('.el-drawer .selected-column').text()).not.toContain('失效')
-    await click('完成')
+    await click('完成此人配置')
     await click('配置')
     expect(store.evaluatorIds(10, 'REL_PEER')).toEqual([119, 120])
   })
@@ -157,7 +172,7 @@ describe('统一六步中的人员发布引导', () => {
     expect(steps.get('[aria-current="step"]').text()).toBe('评价谁')
     expect(wrapper.get('.action-bar').text()).toContain('第 3 步：评价谁')
     expect(api.savePublicationConfig).not.toHaveBeenCalled()
-    await steps.get('[aria-label="第6步：检查并发布"]').trigger('click')
+    await steps.get('[aria-label="第6步：预览并完成"]').trigger('click')
     await flushPromises()
     expect(wrapper.get('.selector-panel').isVisible()).toBe(true)
   })
@@ -221,12 +236,12 @@ describe('统一六步中的人员发布引导', () => {
     mockSave()
     await click('保存并检查发布条件')
     expect(wrapper.get('.preview-panel').isVisible()).toBe(true)
-    expect(wrapper.get('[aria-current="step"]').text()).toBe('检查并发布')
+    expect(wrapper.get('[aria-current="step"]').text()).toBe('预览并完成')
     expect(wrapper.get('[aria-label="第5步：谁来评价"]').element.disabled).toBe(true)
     expect(wrapper.get('.preparation-steps').text()).toContain('无需配置')
     expect(wrapper.get('.preview-panel').text()).toContain('张三')
     expect(api.savePublicationConfig.mock.calls.at(-1)[1].evaluatorSelections).toEqual([])
-    expect([...wrapper.findAll('button'), ...new DOMWrapper(document.body).findAll('.el-drawer button')].find(item => item.text() === '发布项目').element.disabled).toBe(false)
+    expect([...wrapper.findAll('button'), ...new DOMWrapper(document.body).findAll('.el-drawer button')].find(item => item.text() === '完成配置').element.disabled).toBe(false)
     await click('上一步')
     expect(wrapper.get('.evaluation-mode').isVisible()).toBe(true)
     expect(store.config.targets).toHaveLength(1)
@@ -245,7 +260,7 @@ describe('统一六步中的人员发布引导', () => {
     store.addTarget({ userId: 12, nickName: '新员工' })
     await flushPromises()
     expect(wrapper.get('.preview-panel').text()).toContain('需要重新检查')
-    expect([...wrapper.findAll('button'), ...new DOMWrapper(document.body).findAll('.el-drawer button')].find(item => item.text() === '发布项目').element.disabled).toBe(true)
+    expect(wrapper.findAll('button').some(item => item.text() === '发布项目')).toBe(false)
     mockSave({ issues: [{ code: 'TARGET_USER_UNAVAILABLE', path: 'targets.1', message: '新员工不可用' }] })
     await click('保存并重新检查')
     await click('去处理')

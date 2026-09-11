@@ -1,4 +1,5 @@
 <script setup>
+import { ElMessage } from 'element-plus'
 import { computed, ref, watch, watchEffect } from 'vue'
 
 import TargetSelectorPanel from './TargetSelectorPanel.vue'
@@ -27,7 +28,7 @@ const targetName = computed(() => personName(props.targets.find(item => item.use
 const relationName = computed(() => props.relations.find(item => item.relationCode === relationCode.value)?.relationName || '')
 
 const selectableRelations = computed(() =>
-  props.relations.filter(item => item.isEnabled && item.relationCode !== SELF_RELATION_CODE)
+  props.relations.filter(item => item.isEnabled && item.relationCode !== SELF_RELATION_CODE).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
 )
 const selectionByTarget = computed(() => {
   const result = new Map()
@@ -41,7 +42,12 @@ const selectedIds = computed(() => evaluatorIds(targetUserId.value, relationCode
 let pendingIds = []
 watchEffect(() => { pendingIds = [...selectedIds.value] })
 const participantById = computed(() => new Map(props.participants.map(item => [item.userId, item])))
-const excludedIds = computed(() => [targetUserId.value])
+const excludedIds = computed(() => {
+  const type = props.relations.find(item => item.relationCode === relationCode.value)?.relationType
+  const opposite = type === 'SUPERVISOR' ? 'PEER' : type === 'PEER' ? 'SUPERVISOR' : null
+  const codes = new Set(props.relations.filter(item => item.isEnabled && item.relationType === opposite).map(item => item.relationCode))
+  return [targetUserId.value, ...props.selections.filter(item => item.targetUserId === targetUserId.value && codes.has(item.relationCode)).flatMap(item => item.evaluatorUserIds)]
+})
 const selectedParticipants = computed(() => selectedIds.value.map(evaluator))
 const assignmentRows = computed(() => props.summaries.map(target => ({
   ...target,
@@ -78,7 +84,7 @@ watchEffect(() => {
 })
 
 function addPerson(person) {
-  if (!props.editable || person.userId === targetUserId.value || person.available === false) return
+  if (!props.editable || excludedIds.value.includes(person.userId) || person.available === false) return
   emit('remember-person', person)
   addEvaluator(person.userId)
 }
@@ -100,9 +106,42 @@ function removeEvaluator(userId) {
   )
 }
 
+const relationIndex = computed(() => selectableRelations.value.findIndex(item => item.relationCode === relationCode.value))
+const nextRelation = computed(() => selectableRelations.value[relationIndex.value + 1])
+const nextTarget = computed(() => props.targets[props.targets.findIndex(item => item.userId === targetUserId.value) + 1])
+function relationIssue(code) {
+  const ids = evaluatorIds(targetUserId.value, code)
+  const relation = selectableRelations.value.find(item => item.relationCode === code)
+  if (!ids.length) return `请先为${targetName.value}选择${relation?.relationName || ''}评价人`
+  const issue = props.assignmentIssues.find(item => item.targetUserId === targetUserId.value && item.relationCode === code)
+  if (issue) return issue.message
+  if (ids.some(id => participantById.value.get(id)?.available === false)) return '已选评价人存在失效人员，请移除后重新选择'
+  return ''
+}
+function validateRelations(items) {
+  for (const relation of items) {
+    const issue = relationIssue(relation.relationCode)
+    if (issue) { relationCode.value = relation.relationCode; ElMessage.warning(issue); return false }
+  }
+  return true
+}
+function selectRelation(index) {
+  if (props.editable && index > relationIndex.value && !validateRelations(selectableRelations.value.slice(0, index))) return
+  relationCode.value = selectableRelations.value[index]?.relationCode || ''
+}
+function selectTarget() {
+  relationCode.value = selectableRelations.value.find(item => relationIssue(item.relationCode))?.relationCode || selectableRelations.value[0]?.relationCode || ''
+}
+function completeTarget(continueNext = false) {
+  if (props.editable && !validateRelations(selectableRelations.value)) return
+  if (continueNext && nextTarget.value) { targetUserId.value = nextTarget.value.userId; selectTarget() }
+  else drawerOpen.value = false
+}
+
 function locate({ targetUserId: target, relationCode: relation } = {}) {
   if (target) targetUserId.value = target
   if (relation) relationCode.value = relation
+  else selectTarget()
   drawerOpen.value = true
 }
 defineExpose({ locate })
@@ -161,7 +200,7 @@ defineExpose({ locate })
       <div class="evaluator-drawer-content">
     <el-form inline :model="contextModel" class="context-form">
       <el-form-item label="被评价人">
-        <el-select v-model="targetUserId" placeholder="选择被评价人" style="width: 220px">
+        <el-select v-model="targetUserId" @change="selectTarget" placeholder="选择被评价人" style="width: 220px">
           <el-option
             v-for="item in targets"
             :key="item.userId"
@@ -170,16 +209,13 @@ defineExpose({ locate })
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="评价关系" class="relation-picker-item">
-        <el-radio-group v-model="relationCode" class="relation-picker" size="small" aria-label="评价关系">
-          <el-radio-button
-            v-for="item in selectableRelations"
-            :key="item.relationCode"
-            :value="item.relationCode"
-          >{{ item.relationName }}<span class="relation-count">{{ evaluatorIds(targetUserId, item.relationCode).length }} 人</span></el-radio-button>
-        </el-radio-group>
-      </el-form-item>
     </el-form>
+    <el-steps :active="relationIndex" align-center class="relation-steps">
+      <el-step v-for="(item, index) in selectableRelations" :key="item.relationCode" :status="index === relationIndex ? 'process' : relationIssue(item.relationCode) ? 'wait' : 'success'" :description="`已选 ${evaluatorIds(targetUserId, item.relationCode).length} 人 · ${relationIssue(item.relationCode) ? '待完善' : '已配置'}`">
+        <template #title><el-button text :aria-current="index === relationIndex ? 'step' : undefined" :aria-label="`设置${item.relationName}`" @click="selectRelation(index)">设置{{ item.relationName }}</el-button></template>
+      </el-step>
+    </el-steps>
+    <p class="relation-exclusion-hint">同一位被评价人的上级与同级不能为同一人，已在另一关系选中的人员会自动排除。</p>
     <p v-if="targetName && relationName" class="assignment-context" aria-live="polite">正在为 <strong>{{ targetName }}</strong> 选择 <strong>{{ relationName }}</strong> 评价人<span>已选 {{ selectedParticipants.length }} 人</span></p>
 
     <el-empty
@@ -205,13 +241,20 @@ defineExpose({ locate })
       </div>
       <template #footer>
         <span v-if="editable" class="drawer-save-hint">选择结果已保留在当前配置中，请在页面保存配置。</span>
-        <el-button type="primary" @click="drawerOpen = false">完成</el-button>
+        <el-button v-if="relationIndex > 0" @click="selectRelation(relationIndex - 1)">上一步</el-button>
+        <el-button v-if="nextRelation" type="primary" @click="selectRelation(relationIndex + 1)">下一步：设置{{ nextRelation.relationName }}</el-button>
+        <template v-else>
+          <el-button v-if="editable && nextTarget" @click="completeTarget(true)">完成并配置下一位</el-button>
+          <el-button type="primary" @click="completeTarget()">{{ editable ? '完成此人配置' : '关闭' }}</el-button>
+        </template>
       </template>
     </el-drawer>
   </section>
 </template>
 
 <style scoped>
+.relation-steps { padding: 12px 0; }
+.relation-exclusion-hint { margin: 0; font-size: 12px; color: var(--el-text-color-secondary); }
 .evaluator-drawer-content { display: grid; gap: 16px; }
 .drawer-save-hint { margin-right: 16px; color: var(--el-text-color-secondary); font-size: 12px; }
 .evaluator-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }

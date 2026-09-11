@@ -88,7 +88,8 @@ describe('P5发布配置组件', () => {
     await flushPromises()
     expect(wrapper.emitted('set-evaluators').at(-1)).toEqual([10, 'REL_PEER', [11, 12]])
     expect(wrapper.emitted('remember-person')).toEqual(people.map(person => [person]))
-    await new DOMWrapper(document.body).get('.relation-picker input[value="REL_UPPER"]').setValue(true)
+    await wrapper.setProps({ selections: [{ targetUserId: 10, relationCode: 'REL_PEER', evaluatorUserIds: [11, 12] }] })
+    await new DOMWrapper(document.body).get('[aria-label="设置上级"]').trigger('click')
     await flushPromises()
     expect(new DOMWrapper(document.body).find('[aria-label="添加研发部全部人员"]').exists()).toBe(false)
     wrapper.unmount()
@@ -279,4 +280,53 @@ describe('人员配置返回问卷编辑', () => {
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/hr/projects/7/publication')
   })
+})
+
+it('同一被评价人的上级和同级互相排除，批量添加同样过滤冲突人员', async () => {
+  const person = { userId: 11, nickName: '已选上级', available: true }
+  const wrapper = mount(EvaluatorSelectionPanel, { global: { plugins: [ElementPlus] }, props: {
+    editable: true, targets: [{ userId: 10, nickName: '张三' }, { userId: 20, nickName: '李四' }],
+    relations: [...relations, { ...relations[0], relationCode: 'REL_UPPER', relationType: 'SUPERVISOR' }],
+    selections: [{ targetUserId: 10, relationCode: 'REL_UPPER', evaluatorUserIds: [11] }, { targetUserId: 10, relationCode: 'REL_PEER', evaluatorUserIds: [12] }],
+    loadDepartments: async () => [], loadPeople: async () => ({ rows: [], total: 0 })
+  } })
+  wrapper.vm.locate({ targetUserId: 10, relationCode: 'REL_PEER' })
+  await flushPromises()
+  let selector = wrapper.findComponent({ name: 'TargetSelectorPanel' })
+  expect(selector.props('excludedIds')).toContain(11)
+  selector.vm.$emit('add', person)
+  expect(wrapper.emitted('set-evaluators')).toBeUndefined()
+  selector.vm.$emit('add', { ...person, userId: 13 })
+  expect(wrapper.emitted('set-evaluators').at(-1)).toEqual([10, 'REL_PEER', [12, 13]])
+  wrapper.vm.locate({ relationCode: 'REL_UPPER' })
+  await flushPromises()
+  expect(wrapper.findComponent({ name: 'TargetSelectorPanel' }).props('excludedIds')).toContain(12)
+  wrapper.vm.locate({ targetUserId: 20, relationCode: 'REL_PEER' })
+  await flushPromises()
+  expect(wrapper.findComponent({ name: 'TargetSelectorPanel' }).props('excludedIds')).not.toContain(11)
+  wrapper.unmount()
+})
+
+it('关系向导阻止空选跳步，完成后可连续配置下一位', async () => {
+  const wrapper = mount(EvaluatorSelectionPanel, { global: { plugins: [ElementPlus] }, props: {
+    editable: true, targets: [{ userId: 10, nickName: '张三' }, { userId: 20, nickName: '李四' }],
+    relations: [{ ...relations[0], relationCode: 'REL_UPPER', relationName: '上级', relationType: 'SUPERVISOR', sortOrder: 1 }, { ...relations[0], sortOrder: 2 }],
+    loadDepartments: async () => [], loadPeople: async () => ({ rows: [], total: 0 })
+  } })
+  wrapper.vm.locate({ targetUserId: 10 })
+  await flushPromises()
+  const body = new DOMWrapper(document.body)
+  const click = async name => { await body.findAll('.el-drawer button').find(item => item.text() === name).trigger('click'); await flushPromises() }
+  await click('下一步：设置同级')
+  expect(body.get('.relation-steps [aria-current="step"]').text()).toContain('设置上级')
+  await wrapper.setProps({ selections: [{ targetUserId: 10, relationCode: 'REL_UPPER', evaluatorUserIds: [11] }] })
+  await click('下一步：设置同级')
+  expect(body.get('.relation-steps [aria-current="step"]').text()).toContain('设置同级')
+  await click('完成并配置下一位')
+  expect(body.get('.el-drawer__title').text()).toContain('张三')
+  await wrapper.setProps({ selections: [{ targetUserId: 10, relationCode: 'REL_UPPER', evaluatorUserIds: [11] }, { targetUserId: 10, relationCode: 'REL_PEER', evaluatorUserIds: [12] }] })
+  await click('完成并配置下一位')
+  expect(body.get('.el-drawer__title').text()).toContain('李四')
+  expect(body.get('.relation-steps [aria-current="step"]').text()).toContain('设置上级')
+  wrapper.unmount()
 })

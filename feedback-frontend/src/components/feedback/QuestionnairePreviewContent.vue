@@ -10,7 +10,8 @@ const props = defineProps({
   pageCode: { type: String, default: '' },
   selectedQuestionCode: { type: String, default: '' },
   compact: { type: Boolean, default: false },
-  active: { type: Boolean, default: true }
+  active: { type: Boolean, default: true },
+  showEditingIndicator: { type: Boolean, default: true }
 })
 const pages = computed(() => props.pageCode ? props.draft.pages.filter(page => page.pageCode === props.pageCode) : props.draft.pages)
 const questions = computed(() => props.draft.pages.flatMap(page => page.questions))
@@ -82,7 +83,7 @@ defineExpose({ resetAnswers })
           <h3 class="preview-question-title">
             <span class="preview-question-number">{{ questionNumbers.get(question.questionCode) }}、</span><strong>{{ question.title.trim() || `${getQuestionTypeDefinition(question.questionType)?.label} · 待填写题目内容` }}</strong><span v-if="question.isRequired" class="required-mark" aria-label="必答">*</span>
           </h3>
-          <span v-if="compact && question.questionCode === selectedQuestionCode" class="editing-indicator">正在编辑</span>
+          <span v-if="showEditingIndicator && compact && question.questionCode === selectedQuestionCode" class="editing-indicator">正在编辑</span>
         </header>
         <p v-if="question.description" class="preview-question-description">{{ question.description }}</p>
         <QuestionRenderer

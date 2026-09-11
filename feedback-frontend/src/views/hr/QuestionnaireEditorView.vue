@@ -371,7 +371,7 @@ onBeforeUnmount(() => draftStore.reset())
       :completed="workflow.questionReady ? (workflow.indicatorReady ? [0, 1] : [0]) : []"
       :disabled="!draft || isSaving || advancing"
       :disabled-steps="canConfigurePeople ? [] : [2, 3, 4, 5]"
-      :descriptions="['编辑题目与说明', '设置权重与绑定题目', '选择被评价员工', '设置关系与计分', '安排各人的评价人', '保存检查后发布']"
+      :descriptions="['编辑题目与说明', '设置权重与绑定题目', '选择被评价员工', '设置关系与计分', '安排各人的评价人', '预览检查并完成配置']"
       @select="goPreparationStep"
     />
 
@@ -388,7 +388,7 @@ onBeforeUnmount(() => draftStore.reset())
             <div class="directory-content">
         <div class="directory-heading"><h3>指标目录</h3><el-tag size="small" type="info" round>{{ draft.indicators.length }}</el-tag></div>
         <p class="directory-caption">选择指标，定位配置</p>
-        <el-button class="directory-add" type="primary" plain @click="draftStore.addIndicator">＋ 增加指标</el-button>
+        <el-button class="directory-add" type="primary" @click="draftStore.addIndicator">＋ 增加指标</el-button>
         <div class="directory-items">
           <el-button v-for="(indicator, index) in draft.indicators" :key="indicator.indicatorCode" text class="directory-item" :class="{ active: activeIndicatorCode === indicator.indicatorCode }" :aria-pressed="activeIndicatorCode === indicator.indicatorCode" @click="selectIndicator(indicator.indicatorCode, index)">
             <span class="directory-number">{{ index + 1 }}</span><span class="directory-detail"><strong>{{ indicator.indicatorName || '未命名指标' }}</strong><small>{{ indicator.questionCodes.length }} 道计分题</small></span><span class="directory-weight">{{ Number(indicator.weight) }}%</span>
@@ -450,7 +450,7 @@ onBeforeUnmount(() => draftStore.reset())
                 <el-button link size="small" type="primary" @click="indicatorPreview?.resetAnswers()">重新试填</el-button>
               </div>
             </div>
-            <QuestionnairePreviewContent ref="indicatorPreview" :draft="draft" :page-code="draft.pages[indicatorPreviewPage]?.pageCode" :selected-question-code="indicatorPreviewCode" :active="indicatorPreviewOpen" compact />
+            <QuestionnairePreviewContent ref="indicatorPreview" :draft="draft" :page-code="draft.pages[indicatorPreviewPage]?.pageCode" :selected-question-code="indicatorPreviewCode" :active="indicatorPreviewOpen" :show-editing-indicator="false" compact />
           </el-tab-pane>
         </el-tabs>
       </aside>

@@ -239,6 +239,7 @@ class PublicationConfigModel(QuestionnaireVoModel):
     preview: PublicationPreviewModel
     is_publish_ready: bool = Field(description='是否满足发布条件')
     validation_issues: list[ValidationIssueModel] = Field(default_factory=list)
+    questionnaire: QuestionnaireDraftSaveModel | None = Field(default=None, description='与发布校验一致的完整问卷及指标预览')
     frozen_details: FrozenPublicationDetailsModel | None = Field(default=None, description='仅已发布项目返回冻结详情')
 
 

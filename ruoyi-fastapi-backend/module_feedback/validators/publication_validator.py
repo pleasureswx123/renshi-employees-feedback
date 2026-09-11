@@ -94,6 +94,16 @@ def get_publication_validation_issues(
                     }
                 )
 
+    # 对同一被评价人，上级与同级互斥；不同被评价人之间不受此限制。
+    superior_ids = {item.relation_id for item in enabled_relations if getattr(item, 'relation_type', None) == 'SUPERVISOR'}
+    peer_relations = [item for item in enabled_relations if getattr(item, 'relation_type', None) == 'PEER']
+    for target_index, target in enumerate(targets):
+        superior_people = {item.evaluator_user_id for item in non_self_selections if item.target_id == target.target_id and item.relation_id in superior_ids}
+        for peer in peer_relations:
+            duplicate_people = {item.evaluator_user_id for item in non_self_selections if item.target_id == target.target_id and item.relation_id == peer.relation_id} & superior_people
+            if duplicate_people:
+                issues.append({'code': 'EVALUATOR_RELATION_CONFLICT', 'path': f'targets.{target_index}.relations.{peer.relation_code}', 'message': f'被评价人“{target.target_user_name}”有{len(duplicate_people)}名评价人同时被设为上级与同级，请保留一种关系'})
+
     scored_relation_ids = {item.relation_id for item in scored_relations}
     for target_index, target in enumerate(targets):
         target_non_self = [item for item in non_self_selections if item.target_id == target.target_id]
