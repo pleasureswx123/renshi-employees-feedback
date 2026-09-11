@@ -71,7 +71,16 @@ describe('问卷草稿Store', () => {
     await store.load(7)
 
     expect(store.draft.pages[0]).not.toHaveProperty('pageDescription')
-    expect(store.addPage()).not.toHaveProperty('pageDescription')
+    expect(store.addPage()).toBeUndefined()
+    expect(store.draft.pages).toHaveLength(1)
+    store.addQuestion('TEXT')
+    store.updateQuestion({ ...store.selectedQuestion, title: '意见建议' })
+    const newPage = store.addPage()
+    expect(newPage).not.toHaveProperty('pageDescription')
+    store.selectPage(store.draft.pages[0].pageCode)
+    expect(store.addPage()).toBeUndefined()
+    expect(store.draft.pages).toHaveLength(2)
+    expect(store.selectedPageCode).toBe(newPage.pageCode)
     // 即使旧客户端内存残留该字段，保存契约也不会将其重新写回。
     store.draft.pages[0].pageDescription = '旧内存残留'
     saveQuestionnaireDraft.mockImplementation(async (_, payload) => ({

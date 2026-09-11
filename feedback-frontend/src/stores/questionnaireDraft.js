@@ -94,6 +94,11 @@ export const useQuestionnaireDraftStore = defineStore('questionnaireDraft', {
     },
     addPage() {
       if (!this.draft || this.draft.pages.length >= 50) return
+      const emptyPage = this.draft.pages.find(page => page.questions.length === 0)
+      if (emptyPage) {
+        this.selectPage(emptyPage.pageCode)
+        return
+      }
       const page = {
         pageId: null,
         pageCode: createStableCode('P'),

@@ -39,7 +39,7 @@ function changeQuestion(patch) {
           />
         </el-form-item>
       </div>
-      <el-form-item label="所在页面">
+      <el-form-item v-if="pages.length > 1" label="所在页面">
         <el-select
           :model-value="currentPageCode"
           aria-label="题目所在页面"
@@ -61,9 +61,9 @@ function changeQuestion(patch) {
 <style scoped>
 .properties-panel { display: grid; gap: 14px; }
 .property-context { margin: 0; font-size: 13px; font-weight: 600; color: var(--el-color-primary); }
-.panel-heading { display: flex; align-items: flex-start; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--fb-border, #ebeef5); }
+.panel-heading { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--fb-border, #ebeef5); }
 .switch-row { display: grid; gap: 2px; padding: 4px 10px; margin-bottom: 14px; background: var(--fb-surface-muted, #f6f8fa); border-radius: 6px; }
-.panel-heading strong { min-width: 0; overflow-wrap: anywhere; font-size: 14px; line-height: 1.6; }
+.panel-heading strong { min-width: 0; width: 100%; overflow-wrap: anywhere; font-size: 13px; font-weight: 400; line-height: 1.6; color: var(--el-text-color-regular); }
 .panel-heading:deep(.el-tag) { flex: none; }
 .properties-panel:deep(.el-form-item) { margin-bottom: 14px; }
 .properties-panel:deep(.el-form-item:last-child) { margin-bottom: 0; }

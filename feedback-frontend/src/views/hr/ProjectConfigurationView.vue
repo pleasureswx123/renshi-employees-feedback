@@ -43,7 +43,7 @@ watch(() => route.query.step, async value => {
 </template>
 
 <style scoped>
-.configuration-workspace { height: calc(100dvh - 110px); min-height: 600px; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 16px; }
+.configuration-workspace { height: 100%; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 16px; }
 .configuration-heading { display: flex; align-items: center; gap: 16px; padding: 10px 14px; min-width: 0; }
 .configuration-heading h1 { margin: 0; font-size: 18px; white-space: nowrap; }
 .configuration-heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fb-text-muted); }

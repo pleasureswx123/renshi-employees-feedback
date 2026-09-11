@@ -120,24 +120,17 @@ describe('问卷画布直接编辑', () => {
     expect(router.currentRoute.value.fullPath).toBe('/hr/projects/7/publication?step=6')
   })
 
-  it('画布多页导航同步当前页面且不修改草稿，单页不显示', async () => {
-    const canvas = wrapper.get('.canvas-panel').element
-    canvas.scrollTo = vi.fn()
-    const nav = wrapper.get('[aria-label="画布分页"]')
-    expect(nav.findAll('button')[0].attributes('disabled')).toBeDefined()
-    await nav.findAll('button')[1].trigger('click')
+  it('画布隐藏分页，通过大纲切换页面且不修改草稿', async () => {
+    await wrapper.get('#tab-outline').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[aria-label="画布分页"]').exists()).toBe(false)
+    await wrapper.get('[aria-label="2. 第2页"]').trigger('click')
     await flushPromises()
     expect(store.selectedPageCode).toBe('P2')
-    expect(nav.text()).toContain('第 2 / 2 页')
-    expect(nav.findAll('button')[1].attributes('disabled')).toBeDefined()
-    expect(canvas.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'instant' })
-    await nav.findAll('button')[0].trigger('click')
+    await wrapper.get('[aria-label="1. 第1页"]').trigger('click')
     await flushPromises()
     expect(store.selectedPageCode).toBe('P1')
     expect(store.dirty).toBe(false)
-    store.removePage('P2')
-    await flushPromises()
-    expect(wrapper.find('[aria-label="画布分页"]').exists()).toBe(false)
   })
 
   it('新增题目聚焦不滚动整页，只在画布内定位', async () => {

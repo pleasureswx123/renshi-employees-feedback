@@ -20,7 +20,7 @@ const questionNumbers = computed(() => new Map(props.draft.pages.flatMap(page =>
 
 <template>
   <section class="questionnaire-outline">
-    <div class="panel-title">
+    <div v-if="draft.pages.length > 0 && draft.pages.every(page => page.questions.length > 0)" class="panel-title">
       <el-tooltip content="增加页面" :trigger="['hover', 'focus']" :trigger-keys="[]" :enterable="false">
         <el-button class="add-page" text size="small" type="primary" aria-label="增加页面" :disabled="disabled || draft.pages.length >= 50" @click="$emit('add-page')">
           <FilePlusIcon width="14" height="14" aria-hidden="true" />

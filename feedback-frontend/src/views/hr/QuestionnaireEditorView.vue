@@ -61,7 +61,7 @@ function selectIndicator(code, index) {
   indicatorMain.value?.querySelectorAll('.indicator-card')[index]?.scrollIntoView?.({ block: 'nearest' })
 }
 const indicatorPreview = ref(null)
-const indicatorPreviewOpen = ref(true)
+const indicatorPreviewOpen = ref(false)
 const indicatorDirectoryOpen = ref(true)
 const indicatorPreviewPage = ref(0)
 watch(previewQuestionCode, code => {
@@ -122,15 +122,6 @@ async function addQuestion(questionType) {
   const question = draftStore.addQuestion(questionType)
   if (activeRightTab.value === 'indicator') activeRightTab.value = 'question'
   if (question) await focusQuestion(question.questionCode, true)
-}
-
-async function turnCanvasPage(offset) {
-  if (isSaving.value) return
-  const page = draft.value?.pages[selectedPageIndex.value + offset]
-  if (!page) return
-  draftStore.selectPage(page.pageCode)
-  await nextTick()
-  canvasRef.value?.scrollTo?.({ top: 0, behavior: 'instant' })
 }
 
 async function duplicateQuestion(questionCode) {
@@ -343,10 +334,19 @@ onBeforeUnmount(() => draftStore.reset())
           <el-button class="editor-help" text circle size="small" aria-label="编辑流程说明">?</el-button>
         </el-tooltip>
       </div>
+      <div v-if="props.embedded" class="editor-step-summary" aria-live="polite">
+        <strong>{{ preparationStep === 0 ? '第 1 步：编辑问卷' : '第 2 步：配置指标与权重' }}</strong>
+        <span>{{ (preparationStep === 0 ? workflow.questionIssues[0] : workflow.indicatorIssues[0]) || (draftStore.dirty ? '本步检查已通过，继续下一步时将保存当前修改。' : '本步已完成，可以继续；返回修改会保留当前配置。') }}</span>
+      </div>
       <div class="editor-actions">
         <span v-if="draftStore.dirty" class="dirty-state">有未保存修改</span>
         <span v-else-if="draftStore.lastSavedAt" class="saved-state">草稿已保存</span>
         <span v-else class="saved-state">未修改</span>
+        <el-button
+          v-if="preparationStep === 1"
+          :disabled="!draft || isSaving || advancing"
+          @click="goPreparationStep(0)"
+        >上一步</el-button>
         <el-button
           :disabled="!draft || isSaving || advancing"
           @click="saveDraft"
@@ -487,7 +487,7 @@ onBeforeUnmount(() => draftStore.reset())
         <el-collapse v-model="questionnaireInfoOpen" class="questionnaire-info">
         <el-collapse-item name="info">
           <template #title><span class="info-title">问卷信息</span><span class="info-summary">{{ draft.title || '填写问卷标题与说明' }}</span></template>
-        <el-form ref="questionnaireFormRef" :model="draft" :disabled="isSaving" label-position="top" class="questionnaire-form" scroll-to-error>
+        <el-form ref="questionnaireFormRef" :model="draft" :disabled="isSaving" label-position="right" label-width="88px" class="questionnaire-form" scroll-to-error>
           <el-form-item
             label="问卷标题"
             prop="title"
@@ -503,6 +503,7 @@ onBeforeUnmount(() => draftStore.reset())
           </el-form-item>
           <el-form-item label="问卷说明">
             <RichTextEditor
+              class="questionnaire-description-editor"
               :model-value="draft.descriptionDoc"
               @update:model-value="changeDescriptionDocument"
             />
@@ -512,8 +513,7 @@ onBeforeUnmount(() => draftStore.reset())
         </el-collapse>
 
         <div class="canvas-summary">
-          <span>{{ selectedPage?.pageTitle }} · {{ selectedPageIndex + 1 }} / {{ draft.pages.length }} 页 · {{ selectedPage?.questions.length || 0 }} 题</span>
-          <span>原始满分预览：{{ rawMaxScoreLabel }}</span>
+          <span>共 {{ draft.pages.reduce((total, page) => total + page.questions.length, 0) }} 道题 · 原始满分预览：{{ rawMaxScoreLabel }}</span>
         </div>
         <el-empty
           v-if="selectedPage && !selectedPage.questions.length"
@@ -536,11 +536,6 @@ onBeforeUnmount(() => draftStore.reset())
           @move="moveQuestion"
           @delete="removeQuestion"
         />
-        <nav v-if="draft.pages.length > 1" class="canvas-pagination" aria-label="画布分页">
-          <el-button size="small" :disabled="isSaving || selectedPageIndex === 0" @click="turnCanvasPage(-1)">上一页</el-button>
-          <span aria-live="polite">第 {{ selectedPageIndex + 1 }} / {{ draft.pages.length }} 页</span>
-          <el-button size="small" :disabled="isSaving || selectedPageIndex === draft.pages.length - 1" @click="turnCanvasPage(1)">下一页</el-button>
-        </nav>
       </main>
 
       <aside class="right-panel editor-panel" aria-label="预览与设置">
@@ -601,6 +596,7 @@ onBeforeUnmount(() => draftStore.reset())
 </template>
 
 <style scoped>
+.questionnaire-description-editor :deep(.tiptap) { min-height: 0; height: 64px; box-sizing: border-box; padding: 8px 12px; line-height: 24px; overflow-y: auto; }
 .indicator-workspace { display: grid; grid-template-columns: var(--indicator-left-width, 240px) minmax(320px, 1fr) clamp(390px, 40%, 760px); gap: 16px; min-height: 0; }
 .directory-content { display: flex; flex-direction: column; gap: 10px; min-height: 100%; padding: 14px; box-sizing: border-box; }
 .indicator-directory :deep(#pane-directory) { height: 100%; }
@@ -625,7 +621,10 @@ onBeforeUnmount(() => draftStore.reset())
 .indicator-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .indicator-reference h3, .indicator-reference p { margin: 0; }
 .embedded.editor-page { height: 100%; padding: 0; grid-template-rows: auto minmax(0, 1fr) auto; }
-.embedded .editor-header { grid-row: 3; justify-content: flex-end; }
+.embedded .editor-header { grid-row: 3; justify-content: space-between; }
+.editor-step-summary { display: grid; gap: 3px; min-width: 0; margin-right: auto; }
+.editor-step-summary strong { font-size: 14px; }
+.editor-step-summary span { color: var(--fb-text-muted, #64748b); font-size: 12px; overflow-wrap: anywhere; }
 .embedded .editor-workflow { grid-row: 1; }
 .embedded .editor-grid, .embedded .indicator-workspace { grid-row: 2; }
 @media (max-width: 1100px) { .indicator-workspace { grid-template-columns: minmax(320px, 1fr) minmax(330px, 40%); } .indicator-directory { grid-column: 1 / -1; max-height: 160px; } .directory-items { flex-direction: row; overflow: auto; } .directory-item { min-width: 170px; } }
@@ -672,17 +671,20 @@ onBeforeUnmount(() => draftStore.reset())
 .live-preview-pagination { flex: 1; min-width: 0; margin: 0; }
 .live-preview-toolbar:deep(.el-pagination) { justify-content: center; }
 .live-preview-pagination:deep(.number), .live-preview-pagination :deep(.btn-prev), .live-preview-pagination :deep(.btn-next), .live-preview-pagination :deep(.more) { min-width: 22px; margin-inline: 0; }
-.questionnaire-form { padding: 12px 0 0; }
+.canvas-panel { padding-top: 10px; }
+.questionnaire-form { padding: 4px 0 0; }
 .questionnaire-info { border-top: 0; }
-.questionnaire-info:deep(.el-collapse-item__header) { gap: 12px; background: transparent; }
-.questionnaire-info:deep(.el-collapse-item__content) { padding-bottom: 0; }
+.questionnaire-info:deep(.el-collapse-item__header) { height: 32px; line-height: 32px; gap: 12px; background: transparent; }
+.questionnaire-info:deep(.el-collapse-item__content) { padding-bottom: 10px; }
+.questionnaire-form :deep(.el-form-item) { margin-bottom: 12px; }
+.questionnaire-form :deep(.el-form-item:last-child) { margin-bottom: 0; }
+.questionnaire-form :deep(.el-form-item__label) { height: auto; line-height: 32px; margin-bottom: 0; padding: 0 12px 0 0; }
+.questionnaire-form :deep(.el-form-item__content) { min-width: 0; }
 .info-title { flex: none; margin-right: 12px; font-size: 14px; font-weight: 600; }
 .info-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fb-text-muted, #73767a); font-size: 13px; }
 .dirty-state, .saved-state { width: 100px; text-align: right; }
 .page-heading { margin-bottom: 14px; color: var(--fb-text-muted, #64748b); font-size: 13px; }
-.canvas-summary { flex-wrap: wrap; gap: 8px 12px; margin: 10px 0; color: var(--fb-text-muted, #64748b); font-size: 13px; }
-.canvas-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--fb-border, #e5e7eb); color: var(--fb-text-muted, #64748b); font-size: 12px; }
-.canvas-summary > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.canvas-summary { display: flex; justify-content: flex-end; gap: 8px 12px; margin: 10px 0; color: var(--fb-text-muted, #64748b); font-size: 13px; }
 .canvas-summary > span:last-child { flex: none; margin-left: auto; padding: 5px 0; color: var(--fb-text-muted, #64748b); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 22px; white-space: nowrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); }
 .validation-issues { margin-top: 16px; padding: 10px 12px; border: 1px solid var(--fb-warning-border, #fae4c5); border-radius: 6px; color: var(--fb-warning-text, #a65c16); background: var(--fb-warning-bg, #fffbf5); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
