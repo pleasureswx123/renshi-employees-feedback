@@ -156,13 +156,6 @@ defineExpose({ locate })
       </div>
     </div>
 
-    <div v-if="assignmentIssues.length" class="assignment-issues" role="status">
-      <strong>还需完成 {{ assignmentIssues.length }} 项</strong>
-      <div v-for="issue in assignmentIssues" :key="issue.message">
-        <span>{{ issue.message }}</span>
-        <el-button size="small" type="primary" link @click="locate(issue)">去配置</el-button>
-      </div>
-    </div>
     <el-table :data="assignmentRows" row-key="userId" size="small" class="assignment-summary">
       <el-table-column label="被评价人" width="140">
         <template #default="{ row }"><strong>{{ personName(row) }}</strong></template>
@@ -192,7 +185,7 @@ defineExpose({ locate })
         <template #default="{ row }"><el-tag size="small" :type="row.missingScoring ? 'warning' : row.hasOthers ? 'success' : 'info'">{{ row.missingScoring ? '待补评价人' : row.hasOthers ? '已分配' : '仅自评' }}</el-tag></template>
       </el-table-column>
       <el-table-column label="操作" width="90">
-        <template #default="{ row }"><el-button link type="primary" @click="locate({ targetUserId: row.userId })">{{ editable ? '配置' : '查看' }}</el-button></template>
+        <template #default="{ row }"><el-button :link="!editable" type="primary" @click="locate({ targetUserId: row.userId })">{{ editable ? '配置' : '查看' }}</el-button></template>
       </el-table-column>
     </el-table>
 
@@ -215,8 +208,6 @@ defineExpose({ locate })
         <template #title><el-button text :aria-current="index === relationIndex ? 'step' : undefined" :aria-label="`设置${item.relationName}`" @click="selectRelation(index)">设置{{ item.relationName }}</el-button></template>
       </el-step>
     </el-steps>
-    <p class="relation-exclusion-hint">同一位被评价人的上级与同级不能为同一人，已在另一关系选中的人员会自动排除。</p>
-    <p v-if="targetName && relationName" class="assignment-context" aria-live="polite">正在为 <strong>{{ targetName }}</strong> 选择 <strong>{{ relationName }}</strong> 评价人<span>已选 {{ selectedParticipants.length }} 人</span></p>
 
     <el-empty
       v-if="!targets.length || !selectableRelations.length"
@@ -254,7 +245,6 @@ defineExpose({ locate })
 
 <style scoped>
 .relation-steps { padding: 12px 0; }
-.relation-exclusion-hint { margin: 0; font-size: 12px; color: var(--el-text-color-secondary); }
 .evaluator-drawer-content { display: grid; gap: 16px; }
 .drawer-save-hint { margin-right: 16px; color: var(--el-text-color-secondary); font-size: 12px; }
 .evaluator-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
@@ -262,7 +252,7 @@ defineExpose({ locate })
 .section-heading h2 { font-size: 18px; }
 .section-heading p { margin-top: 6px; color: var(--fb-text-muted, #64748b); font-size: 13px; }
 .context-form, .participant-filter { margin-bottom: -8px; }
-.context-form { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.context-form { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 20px; }
 .context-form:deep(.el-form-item) { margin: 0 0 8px; }
 .relation-picker-item { flex: 1; min-width: 0; }
 .relation-picker { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -280,10 +270,6 @@ defineExpose({ locate })
 .group-members:deep(.el-tag__content) { overflow: hidden; text-overflow: ellipsis; }
 .self-note, .unassigned-label { color: var(--el-text-color-secondary); font-size: 12px; }
 .self-note { padding-left: 8px; }
-.assignment-context { margin: 0; padding: 10px 14px; color: var(--fb-primary-text, #337ecc); background: var(--fb-primary-bg, #ecf5ff); border-radius: 6px; font-size: 14px; }
-.assignment-context > span { margin-left: 16px; font-size: 12px; }
-.assignment-issues { display: grid; gap: 6px; padding: 12px; border-radius: 6px; background: var(--fb-warning-bg, #fdf6ec); font-size: 13px; color: var(--fb-warning-text, #b26a16); }
-.assignment-issues > div { display: flex; justify-content: space-between; gap: 12px; }
 .dual-list { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
 .list-column { min-width: 0; padding: 14px; border: 1px solid var(--fb-border, #e5e7eb); border-radius: 8px; }
 .list-column > strong { display: block; margin-bottom: 10px; }
