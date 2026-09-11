@@ -2,7 +2,7 @@
 import ChevronsRightIcon from '@iconify-vue/lucide/chevrons-right'
 import ChevronsLeftIcon from '@iconify-vue/lucide/chevrons-left'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import IndicatorPanel from '@/components/feedback/IndicatorPanel.vue'
@@ -19,6 +19,9 @@ import { usePermissionStore } from '@/stores/permission'
 import { calculateRawMaxScore } from '@/utils/questionnaireDraft'
 import { getQuestionnaireWorkflow } from '@/utils/questionnaireWorkflow'
 
+const props = defineProps({ embedded: Boolean, initialStep: { type: Number, default: 0 } })
+const emit = defineEmits(['step-change'])
+const editorStep = ref(0)
 const route = useRoute()
 const router = useRouter()
 const draftStore = useQuestionnaireDraftStore()
@@ -47,6 +50,26 @@ function toggleRightPanel(tab) {
 }
 const livePreviewRef = ref()
 const projectId = Number(route.params.projectId)
+const previewQuestionCode = ref('')
+const indicatorMain = ref(null)
+const indicatorPanel = ref(null)
+const activeIndicatorCode = ref('')
+function selectIndicator(code, index) {
+  activeIndicatorCode.value = code
+  const indicator = draft.value?.indicators.find(item => item.indicatorCode === code)
+  if (indicator?.questionCodes.length) previewQuestionCode.value = indicator.questionCodes[0]
+  indicatorMain.value?.querySelectorAll('.indicator-card')[index]?.scrollIntoView?.({ block: 'nearest' })
+}
+const indicatorPreview = ref(null)
+const indicatorPreviewOpen = ref(true)
+const indicatorDirectoryOpen = ref(true)
+const indicatorPreviewPage = ref(0)
+watch(previewQuestionCode, code => {
+  const index = draft.value?.pages.findIndex(page => page.questions.some(question => question.questionCode === code)) ?? -1
+  if (index >= 0) indicatorPreviewPage.value = index
+  indicatorPreviewOpen.value = true
+})
+const indicatorPreviewCode = computed(() => draft.value?.pages.flatMap(page => page.questions).some(question => question.questionCode === previewQuestionCode.value) ? previewQuestionCode.value : draft.value?.pages[0]?.questions[0]?.questionCode || '')
 const draft = computed(() => draftStore.draft)
 const selectedPage = computed(() => draftStore.selectedPage)
 const selectedQuestion = computed(() => draftStore.selectedQuestion)
@@ -66,7 +89,7 @@ const selectedPageIndex = computed(() =>
   draft.value?.pages.findIndex(page => page.pageCode === draftStore.selectedPageCode) ?? -1
 )
 const workflow = computed(() => getQuestionnaireWorkflow(draft.value))
-const preparationStep = computed(() => workflow.value.questionReady && activeRightTab.value === 'indicator' ? 1 : 0)
+const preparationStep = computed(() => editorStep.value)
 const canConfigurePeople = computed(() => permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish']))
 
 function changeDraftField(field, value) {
@@ -94,6 +117,8 @@ async function selectQuestion(questionCode) {
 
 async function addQuestion(questionType) {
   if (isSaving.value) return
+  editorStep.value = 0
+  emit('step-change', 0)
   const question = draftStore.addQuestion(questionType)
   if (activeRightTab.value === 'indicator') activeRightTab.value = 'question'
   if (question) await focusQuestion(question.questionCode, true)
@@ -211,10 +236,12 @@ function nextStep() {
   return goPreparationStep(preparationStep.value === 0 ? 1 : 2)
 }
 
-async function goPreparationStep(step) {
+async function goPreparationStep(step, { saveBeforeAdvance = true } = {}) {
   if (!draft.value || isSaving.value || advancing.value) return
   if (step === 0) {
+    editorStep.value = 0
     activeRightTab.value = 'question'
+    emit('step-change', 0)
     return
   }
   if (step >= 2 && !canConfigurePeople.value) return
@@ -234,9 +261,23 @@ async function goPreparationStep(step) {
     }
     return
   }
-  activeRightTab.value = 'indicator'
-  rightPanelOpen.value = true
-  if (step === 1) return
+  if (step === 1) {
+    if (saveBeforeAdvance && preparationStep.value === 0) {
+      advancing.value = true
+      try {
+        if (!await saveDraft()) return
+      } finally {
+        advancing.value = false
+      }
+    }
+    editorStep.value = 1
+    emit('step-change', 1)
+    return
+  }
+  editorStep.value = 1
+  emit('step-change', 1)
+  await nextTick()
+  if (!await indicatorPanel.value?.validate()) return
   if (!workflow.value.indicatorReady) {
     rightPanelOpen.value = true
     ElMessage.warning(workflow.value.indicatorIssues[0])
@@ -251,7 +292,8 @@ async function goPreparationStep(step) {
       ElMessage.warning(saved.validationIssues[0]?.message || '请完成问卷与指标的发布前检查')
       return
     }
-    await router.push({ path: `/hr/projects/${projectId}/publication`, query: { step: String(step + 1) } })
+    if (props.embedded) emit('step-change', step)
+    else await router.push({ path: `/hr/projects/${projectId}/publication`, query: { step: String(step + 1) } })
   } finally {
     advancing.value = false
   }
@@ -273,15 +315,16 @@ onBeforeRouteLeave(async () => {
 
 onMounted(async () => {
   await draftStore.load(projectId)
-  if (route.query.step === '2') await goPreparationStep(1)
+  if (props.initialStep === 1 || route.query.step === '2') await goPreparationStep(1, { saveBeforeAdvance: false })
 })
+defineExpose({ goPreparationStep })
 onBeforeUnmount(() => draftStore.reset())
 </script>
 
 <template>
-  <section v-loading="draftStore.loading" class="editor-page">
+  <section v-loading="draftStore.loading" class="editor-page" :class="{ embedded: props.embedded }">
     <header class="editor-header workspace-page-header workspace-detail-header">
-      <div class="workspace-detail-heading">
+      <div v-if="!props.embedded" class="workspace-detail-heading">
         <el-button class="workspace-detail-back" text size="small" aria-label="返回项目列表" title="返回项目列表" @click="router.push('/hr/projects')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m10 6-6 6 6 6M4 12h16" />
@@ -311,13 +354,13 @@ onBeforeUnmount(() => draftStore.reset())
           保存草稿
         </el-button>
         <el-button
-          v-if="!workflow.questionReady || activeRightTab !== 'indicator' || permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish'])"
+          v-if="!workflow.questionReady || preparationStep === 0 || permissionStore.hasAnyPermission(['feedback:participant:manage', 'feedback:project:publish'])"
           type="primary"
           :loading="advancing"
           :disabled="!draft || isSaving"
           @click="nextStep()"
         >
-          {{ !workflow.questionReady ? '完善问卷' : activeRightTab === 'indicator' ? '下一步：评价谁' : '下一步：配置指标' }}
+          {{ !workflow.questionReady ? '完善问卷' : preparationStep === 1 ? '下一步：评价谁' : '下一步：配置指标与权重' }}
         </el-button>
       </div>
     </header>
@@ -332,8 +375,89 @@ onBeforeUnmount(() => draftStore.reset())
       @select="goPreparationStep"
     />
 
+    <section v-if="draft && preparationStep === 1" class="indicator-workspace" :class="{ 'preview-expanded': indicatorPreviewOpen, 'right-collapsed': !indicatorPreviewOpen, 'left-collapsed': !indicatorDirectoryOpen }" :inert="isSaving ? true : null">
+      <aside class="indicator-directory left-panel editor-panel" aria-label="指标目录">
+        <div class="panel-toggle-bar">
+          <el-button class="collapse-panel-button" text :aria-label="indicatorDirectoryOpen ? '收起指标目录' : '展开指标目录'" :title="indicatorDirectoryOpen ? '收起指标目录' : '展开指标目录'" :aria-expanded="indicatorDirectoryOpen" @click="indicatorDirectoryOpen = !indicatorDirectoryOpen">
+            <ChevronsLeftIcon v-if="indicatorDirectoryOpen" aria-hidden="true" />
+            <ChevronsRightIcon v-else aria-hidden="true" />
+          </el-button>
+        </div>
+        <el-tabs model-value="directory" tab-position="left" @tab-click="indicatorDirectoryOpen = !indicatorDirectoryOpen">
+          <el-tab-pane label="指标目录" name="directory">
+            <div class="directory-content">
+        <div class="directory-heading"><h3>指标目录</h3><el-tag size="small" type="info" round>{{ draft.indicators.length }}</el-tag></div>
+        <p class="directory-caption">选择指标，定位配置</p>
+        <el-button class="directory-add" type="primary" plain @click="draftStore.addIndicator">＋ 增加指标</el-button>
+        <div class="directory-items">
+          <el-button v-for="(indicator, index) in draft.indicators" :key="indicator.indicatorCode" text class="directory-item" :class="{ active: activeIndicatorCode === indicator.indicatorCode }" :aria-pressed="activeIndicatorCode === indicator.indicatorCode" @click="selectIndicator(indicator.indicatorCode, index)">
+            <span class="directory-number">{{ index + 1 }}</span><span class="directory-detail"><strong>{{ indicator.indicatorName || '未命名指标' }}</strong><small>{{ indicator.questionCodes.length }} 道计分题</small></span><span class="directory-weight">{{ Number(indicator.weight) }}%</span>
+          </el-button>
+        </div>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </aside>
+      <main ref="indicatorMain" class="indicator-main editor-panel">
+        <h2>2. 配置指标与权重</h2>
+        <p>设置评价指标及权重，并将每道计分题绑定到一个指标。</p>
+
+            <div v-if="!workflow.questionReady" class="indicator-step-notice">
+              <span>请先完成问卷，再配置指标与权重。已有指标配置会保留。</span>
+              <el-button link type="primary" size="small" @click="nextStep">返回完善问卷</el-button>
+            </div>
+            <div v-else-if="workflow.indicatorIssues.length" class="indicator-step-notice">
+              <strong>完成以下配置即可进入人员配置</strong>
+              <ul><li v-for="issue in workflow.indicatorIssues" :key="issue">{{ issue }}</li></ul>
+            </div>
+            <div v-else-if="!draftStore.dirty && draft.validationIssues.length" class="indicator-step-notice">
+              <strong>保存检查发现以下问题</strong>
+              <ul><li v-for="issue in draft.validationIssues" :key="`${issue.code}-${issue.path}`">{{ issue.message }}</li></ul>
+            </div>
+            <IndicatorPanel
+              ref="indicatorPanel"
+              :show-add="false"
+              :active-code="activeIndicatorCode"
+              @select="activeIndicatorCode = $event"
+              v-if="workflow.questionReady"
+              :indicators="draft.indicators"
+              :questions="draftStore.scoredQuestions"
+              :pages="draft.pages"
+              @add="draftStore.addIndicator"
+              @change="draftStore.updateIndicator"
+              @delete="draftStore.removeIndicator"
+              @move="draftStore.moveIndicator"
+              @set-bindings="draftStore.setIndicatorBindings"
+              @set-question-indicator="draftStore.setQuestionIndicator"
+              @locate-question="previewQuestionCode = $event"
+            />
+
+
+      </main>
+      <aside class="indicator-reference right-panel editor-panel" aria-label="问卷实时预览">
+        <div class="panel-toggle-bar">
+          <el-button class="collapse-panel-button" text :aria-label="indicatorPreviewOpen ? '收起问卷预览' : '展开问卷预览'" :aria-expanded="indicatorPreviewOpen" @click="indicatorPreviewOpen = !indicatorPreviewOpen">
+            <ChevronsRightIcon v-if="indicatorPreviewOpen" aria-hidden="true" />
+            <ChevronsLeftIcon v-else aria-hidden="true" />
+          </el-button>
+        </div>
+        <el-tabs model-value="preview" tab-position="right" @tab-click="indicatorPreviewOpen = !indicatorPreviewOpen">
+          <el-tab-pane label="实时预览" name="preview">
+            <div class="live-preview-controls">
+              <div class="live-preview-toolbar">
+                <span class="preview-page-status">第 {{ indicatorPreviewPage + 1 }} / {{ draft.pages.length }} 页</span>
+                <el-pagination v-if="draft.pages.length > 1" class="live-preview-pagination" aria-label="预览页码" :current-page="indicatorPreviewPage + 1" :page-count="draft.pages.length" :pager-count="5" :disabled="isSaving" layout="prev, pager, next" size="small" @update:current-page="indicatorPreviewPage = $event - 1" />
+                <el-button link size="small" type="primary" @click="indicatorPreview?.resetAnswers()">重新试填</el-button>
+              </div>
+            </div>
+            <QuestionnairePreviewContent ref="indicatorPreview" :draft="draft" :page-code="draft.pages[indicatorPreviewPage]?.pageCode" :selected-question-code="indicatorPreviewCode" :active="indicatorPreviewOpen" compact />
+          </el-tab-pane>
+        </el-tabs>
+      </aside>
+    </section>
+
     <p class="sr-only" role="status" aria-live="polite">{{ actionMessage }}</p>
-    <div v-if="draft" :key="projectId" class="editor-grid" :class="{ 'preview-expanded': rightPanelOpen && activeRightTab === 'preview', 'right-collapsed': !rightPanelOpen, 'left-collapsed': !leftPanelOpen }" :inert="isSaving ? true : null">
+    <div v-if="draft" v-show="preparationStep === 0" :key="projectId" class="editor-grid" :class="{ 'preview-expanded': rightPanelOpen && activeRightTab === 'preview', 'right-collapsed': !rightPanelOpen, 'left-collapsed': !leftPanelOpen }" :inert="isSaving ? true : null">
       <aside class="left-panel editor-panel" aria-label="题型与大纲">
         <div class="panel-toggle-bar">
           <el-button class="collapse-panel-button" text :aria-label="leftPanelOpen ? '收起左侧面板' : '展开左侧面板'" :title="leftPanelOpen ? '收起左侧面板' : '展开左侧面板'" :aria-expanded="leftPanelOpen" @click="leftPanelOpen = !leftPanelOpen">
@@ -440,33 +564,6 @@ onBeforeUnmount(() => draftStore.reset())
             />
             <el-empty v-else description="选择一道题后配置属性" :image-size="84" />
           </el-tab-pane>
-          <el-tab-pane label="评价指标" name="indicator">
-            <div v-if="!workflow.questionReady" class="indicator-step-notice">
-              <span>请先完成问卷，再配置指标。已有指标配置会保留。</span>
-              <el-button link type="primary" size="small" @click="nextStep">返回完善问卷</el-button>
-            </div>
-            <div v-else-if="workflow.indicatorIssues.length" class="indicator-step-notice">
-              <strong>完成以下配置即可进入人员配置</strong>
-              <ul><li v-for="issue in workflow.indicatorIssues" :key="issue">{{ issue }}</li></ul>
-            </div>
-            <div v-else-if="!draftStore.dirty && draft.validationIssues.length" class="indicator-step-notice">
-              <strong>保存检查发现以下问题</strong>
-              <ul><li v-for="issue in draft.validationIssues" :key="`${issue.code}-${issue.path}`">{{ issue.message }}</li></ul>
-            </div>
-            <IndicatorPanel
-              v-if="workflow.questionReady"
-              :indicators="draft.indicators"
-              :questions="draftStore.scoredQuestions"
-              :pages="draft.pages"
-              @add="draftStore.addIndicator"
-              @change="draftStore.updateIndicator"
-              @delete="draftStore.removeIndicator"
-              @move="draftStore.moveIndicator"
-              @set-bindings="draftStore.setIndicatorBindings"
-              @set-question-indicator="draftStore.setQuestionIndicator"
-              @locate-question="draftStore.selectQuestion($event); focusQuestion($event)"
-            />
-          </el-tab-pane>
           <el-tab-pane label="实时预览" name="preview">
             <div class="live-preview-controls">
               <div class="live-preview-toolbar">
@@ -504,6 +601,36 @@ onBeforeUnmount(() => draftStore.reset())
 </template>
 
 <style scoped>
+.indicator-workspace { display: grid; grid-template-columns: var(--indicator-left-width, 240px) minmax(320px, 1fr) clamp(390px, 40%, 760px); gap: 16px; min-height: 0; }
+.directory-content { display: flex; flex-direction: column; gap: 10px; min-height: 100%; padding: 14px; box-sizing: border-box; }
+.indicator-directory :deep(#pane-directory) { height: 100%; }
+.indicator-workspace.left-collapsed { --indicator-left-width: 34px; }
+.directory-heading { display: flex; align-items: center; justify-content: space-between; }
+.directory-caption { font-size: 12px; color: var(--fb-text-muted); }
+.directory-items { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.directory-item { width: 100%; border: 1px solid transparent; border-radius: 8px; padding: 12px 8px; }
+.directory-item.active { background: var(--el-color-primary-light-9); border-color: var(--el-color-primary-light-5); color: var(--el-color-primary); }
+.directory-item:deep(> span) { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+.directory-number { border-radius: 6px; background: var(--fb-surface-muted, #f5f7fa); padding: 4px 6px; font-size: 11px; }
+.directory-detail { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 5px; text-align: left; }
+.directory-detail strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.directory-detail small { font-size: 11px; color: var(--fb-text-muted); }
+.directory-weight { font-weight: 600; font-size: 12px; }
+.indicator-directory .directory-add { justify-content: center; flex: none; }
+.indicator-directory h3, .indicator-directory p { margin: 0; }
+.directory-content .el-button { margin: 0; justify-content: flex-start; white-space: normal; height: auto; min-height: 32px; }
+.indicator-main, .indicator-reference { overflow: auto; }
+.indicator-main h2 { margin-top: 0; font-size: 18px; }
+
+.indicator-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.indicator-reference h3, .indicator-reference p { margin: 0; }
+.embedded.editor-page { height: 100%; padding: 0; grid-template-rows: auto minmax(0, 1fr) auto; }
+.embedded .editor-header { grid-row: 3; justify-content: flex-end; }
+.embedded .editor-workflow { grid-row: 1; }
+.embedded .editor-grid, .embedded .indicator-workspace { grid-row: 2; }
+@media (max-width: 1100px) { .indicator-workspace { grid-template-columns: minmax(320px, 1fr) minmax(330px, 40%); } .indicator-directory { grid-column: 1 / -1; max-height: 160px; } .directory-items { flex-direction: row; overflow: auto; } .directory-item { min-width: 170px; } }
+@media (max-width: 760px) { .indicator-workspace { grid-template-columns: minmax(0, 1fr); overflow: auto; } .directory-items { flex-direction: row; overflow-x: auto; } .directory-item { min-width: 190px; } }
+
 .editor-page { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); gap: 10px; height: 100%; min-height: 0; }
 .indicator-step-notice { margin-bottom: 12px; padding: 10px; border-radius: 6px; background: var(--fb-primary-bg, #f4f8ff); color: var(--fb-text-regular, #606266); font-size: 12px; line-height: 1.7; }
 .indicator-step-notice ul { margin: 6px 0 0; padding-left: 16px; }
@@ -538,7 +665,7 @@ onBeforeUnmount(() => draftStore.reset())
 :is(.left-panel, .right-panel):deep(.el-tabs__item) { width: 32px; height: 96px; padding: 12px 8px; font-size: 12px; writing-mode: vertical-rl; letter-spacing: 2px; justify-content: center; border-bottom: 1px solid var(--fb-border, #e5e7eb); }
 :is(.left-panel, .right-panel):deep(.el-tabs__item.is-active) { background: var(--fb-primary-bg, #ecf5ff); }
 :is(.left-panel, .right-panel):deep(.el-tabs__content) { flex: 1; min-width: 0; overflow-y: auto; min-height: 0; padding: 14px; }
-.editor-grid.preview-expanded .right-panel:deep(.el-tabs__content) { --preview-gutter: clamp(14px, 1vw, 22px); padding: var(--preview-gutter); background: var(--fb-surface-muted, #e7ecef); }
+:is(.editor-grid, .indicator-workspace).preview-expanded .right-panel:deep(.el-tabs__content) { --preview-gutter: clamp(14px, 1vw, 22px); padding: var(--preview-gutter); background: var(--fb-surface-muted, #e7ecef); }
 .live-preview-controls { position: sticky; top: calc(-1 * var(--preview-gutter, 14px)); z-index: 2; margin: calc(-1 * var(--preview-gutter, 14px)) calc(-1 * var(--preview-gutter, 14px)) 16px; padding: 10px var(--preview-gutter, 14px); border-bottom: 1px solid var(--fb-border, #dce1e6); background: var(--fb-surface, #fff); }
 .live-preview-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; color: var(--fb-text-regular, #606266); }
 .preview-page-status, .live-preview-toolbar > .el-button { flex: none; white-space: nowrap; }
@@ -611,4 +738,10 @@ onBeforeUnmount(() => draftStore.reset())
 .left-collapsed .left-panel :deep(.el-tabs__content) { display: none; }
 .left-collapsed .left-panel :deep(.el-tabs__item.is-active) { color: var(--fb-text-regular, #606266); background: transparent; }
 @media (max-width: 760px) { .left-panel { min-height: 300px; } }
+</style>
+
+<style scoped>
+.indicator-workspace.right-collapsed { grid-template-columns: var(--indicator-left-width, 240px) minmax(0, 1fr) 34px; }
+@media (max-width: 1100px) { .indicator-workspace.right-collapsed { grid-template-columns: minmax(0, 1fr) 34px; } }
+@media (max-width: 760px) { .indicator-workspace.preview-expanded { grid-template-columns: minmax(0, 1fr); overflow: auto; } .indicator-reference { min-height: 460px; } }
 </style>

@@ -45,7 +45,8 @@ async function selectQuestion(code) {
 }
 
 async function switchRightTab(name) {
-  await wrapper.findAll('[role="tab"]').find(item => item.text() === name).trigger('click')
+  if (name === '评价指标') await wrapper.get('[aria-label="第2步：配置指标与权重"]').trigger('click')
+  else await wrapper.findAll('[role="tab"]').find(item => item.text() === name).trigger('click')
   await flushPromises()
 }
 
@@ -87,9 +88,9 @@ describe('问卷画布直接编辑', () => {
     await router.replace('/hr/projects/7/editor?step=2')
     wrapper = mount(RouterView, { attachTo: document.body, global: { plugins: [createPinia(), router, ElementPlus] } })
     await flushPromises()
-    expect(wrapper.get('[aria-current="step"]').text()).toBe('配置指标')
-    expect(wrapper.get('#tab-indicator').attributes('aria-selected')).toBe('true')
-    expect(wrapper.get('.editor-grid').classes()).not.toContain('right-collapsed')
+    expect(wrapper.get('[aria-current="step"]').text()).toBe('配置指标与权重')
+    expect(wrapper.get('.indicator-workspace').isVisible()).toBe(true)
+    expect(wrapper.get('.editor-grid').isVisible()).toBe(false)
     wrapper.unmount()
     persisted.pages[0].questions[0].title = ''
     wrapper = mount(RouterView, { attachTo: document.body, global: { plugins: [createPinia(), router, ElementPlus] } })
@@ -106,7 +107,7 @@ describe('问卷画布直接编辑', () => {
     await wrapper.get('[aria-label="第6步：检查并发布"]').trigger('click')
     await flushPromises()
     expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
-    expect(wrapper.get('[aria-current="step"]').text()).toBe('配置指标')
+    expect(wrapper.get('[aria-current="step"]').text()).toBe('配置指标与权重')
     store.setIndicatorBindings('I1', ['Q1', 'Q2', 'Q3', 'Q4'])
     await wrapper.get('[aria-label="第1步：编辑问卷"]').trigger('click')
     await flushPromises()
@@ -176,25 +177,47 @@ describe('问卷画布直接编辑', () => {
     await selectQuestion('Q4')
     expect(wrapper.get('.property-context').text()).toBe('正在编辑 · 第 4 题')
     expect(wrapper.get('[aria-current="step"]').text()).toBe('编辑问卷')
-    await button('下一步：配置指标').trigger('click')
+    await button('下一步：配置指标与权重').trigger('click')
+    await flushPromises()
     await flushPromises()
     expect(wrapper.findAllComponents({ name: 'ElStep' })[0].props('status')).toBe('success')
-    expect(wrapper.get('[aria-current="step"]').text()).toBe('配置指标')
+    expect(wrapper.get('[aria-current="step"]').text()).toBe('配置指标与权重')
   })
 
-  it('顺序进入指标步骤，未绑定题目时留在当前页且不发送保存', async () => {
+  it('进入指标前保存问卷，未绑定题目时不继续保存和前进', async () => {
     useAuthStore().permissions.push('feedback:participant:manage')
     expect(wrapper.get('.editor-workflow').text()).toContain('编辑问卷')
     expect(wrapper.get('.editor-workflow').text()).toContain('检查并发布')
     expect(wrapper.find('.properties-panel').text()).not.toContain('先在“评价指标”中添加指标')
-    await button('下一步：配置指标').trigger('click')
+    await button('下一步：配置指标与权重').trigger('click')
     await flushPromises()
-    expect(wrapper.get('#tab-indicator').attributes('aria-selected')).toBe('true')
+    await flushPromises()
+    expect(wrapper.get('.indicator-workspace').isVisible()).toBe(true)
     expect(wrapper.get('.indicator-step-notice').text()).toContain('还有3道计分题未绑定指标')
     await button('下一步：评价谁').trigger('click')
     await flushPromises()
-    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+    expect(api.saveQuestionnaireDraft).toHaveBeenCalledOnce()
     expect(router.currentRoute.value.path).toBe('/hr/projects/7/editor')
+  })
+
+  it('问卷进入指标前保存失败保留草稿，重试期间阻止重复提交', async () => {
+    store.markDirty()
+    api.saveQuestionnaireDraft.mockRejectedValueOnce(new Error('保存失败'))
+    await button('下一步：配置指标与权重').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[aria-current="step"]').text()).toBe('编辑问卷')
+    expect(store.dirty).toBe(true)
+    let finishSave
+    api.saveQuestionnaireDraft.mockImplementationOnce(() => new Promise(resolve => { finishSave = resolve }))
+    await button('下一步：配置指标与权重').trigger('click')
+    await flushPromises()
+    await button('下一步：配置指标与权重').trigger('click')
+    expect(api.saveQuestionnaireDraft).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('[aria-current="step"]').text()).toBe('编辑问卷')
+    finishSave({ data: structuredClone(persisted) })
+    await flushPromises()
+    expect(wrapper.get('[aria-current="step"]').text()).toBe('配置指标与权重')
+    expect(store.dirty).toBe(false)
   })
 
   it('问卷未完成时下一步定位空题，完成后才进入指标', async () => {
@@ -206,15 +229,17 @@ describe('问卷画布直接编辑', () => {
     expect(store.selectedQuestionCode).toBe('Q5')
     expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
     await activeCard().get('.title-field textarea').setValue('改进建议')
-    await button('下一步：配置指标').trigger('click')
+    await button('下一步：配置指标与权重').trigger('click')
     await flushPromises()
-    expect(wrapper.get('#tab-indicator').attributes('aria-selected')).toBe('true')
+    await flushPromises()
+    expect(wrapper.get('.indicator-workspace').isVisible()).toBe(true)
   })
 
-  it('配置指标后新增题目，按钮和步骤回到问卷，补完后保留指标并提示绑定新题', async () => {
+  it('配置指标与权重后新增题目，按钮和步骤回到问卷，补完后保留指标并提示绑定新题', async () => {
     useAuthStore().permissions.push('feedback:participant:manage')
     store.setIndicatorBindings('I1', ['Q1', 'Q2', 'Q3', 'Q4'])
-    await button('下一步：配置指标').trigger('click')
+    await button('下一步：配置指标与权重').trigger('click')
+    await flushPromises()
     expect(button('下一步：评价谁')).toBeDefined()
     await wrapper.findAll('.question-type-button').find(item => item.text() === '单选题').trigger('click')
     await flushPromises()
@@ -227,31 +252,34 @@ describe('问卷画布直接编辑', () => {
     expect(button('完善问卷')).toBeDefined()
     expect(button('下一步：评价谁')).toBeUndefined()
     expect(wrapper.findComponent({ name: 'ElSteps' }).props('active')).toBe(0)
-    expect(wrapper.get('.indicator-step-notice').text()).toContain('已有指标配置会保留')
+    expect(wrapper.find('.indicator-workspace').exists()).toBe(false)
+    expect(store.draft.indicators).toHaveLength(1)
     await button('完善问卷').trigger('click')
     await flushPromises()
     expect(document.activeElement).toBe(activeCard().get('.title-field textarea').element)
     expect(store.selectedQuestionCode).toBe(addedCode)
     await activeCard().get('.title-field textarea').setValue('新增协作题')
-    await button('下一步：配置指标').trigger('click')
+    await button('下一步：配置指标与权重').trigger('click')
+    await flushPromises()
     await flushPromises()
     expect(wrapper.get('.indicator-step-notice').text()).toContain('还有1道计分题未绑定指标')
     expect(store.draft.indicators[0]).toMatchObject({ indicatorName: '协作', weight: '100.0000', questionCodes: ['Q1', 'Q2', 'Q3', 'Q4'] })
     expect(wrapper.findComponent({ name: 'ElSteps' }).props('active')).toBe(1)
-    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+    expect(api.saveQuestionnaireDraft).toHaveBeenCalledTimes(2)
   })
 
-  it('指标页签内清空题目时也能返回完善问卷，不受人员配置权限限制', async () => {
-    await button('下一步：配置指标').trigger('click')
-    expect(button('下一步：评价谁')).toBeUndefined()
+  it('第二步返回问卷后可修改题目，无需人员配置权限', async () => {
+    await button('下一步：配置指标与权重').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.editor-grid').isVisible()).toBe(false)
+    await wrapper.get('[aria-label="第1步：编辑问卷"]').trigger('click')
+    await flushPromises()
     await activeCard().get('.title-field textarea').setValue('')
-    expect(button('完善问卷')).toBeDefined()
-    expect(wrapper.findComponent({ name: 'ElSteps' }).props('active')).toBe(0)
     await button('完善问卷').trigger('click')
     await flushPromises()
-    expect(wrapper.get('#tab-question').attributes('aria-selected')).toBe('true')
-    expect(document.activeElement).toBe(activeCard().get('.title-field textarea').element)
-    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+    expect(wrapper.get('[aria-current="step"]').text()).toBe('编辑问卷')
+    expect(wrapper.find('.indicator-workspace').exists()).toBe(false)
+    expect(api.saveQuestionnaireDraft).toHaveBeenCalledOnce()
   })
 
   it('保存草稿允许指标未完成；下一步服从后端完整性检查并展示问题', async () => {
@@ -261,10 +289,11 @@ describe('问卷画布直接编辑', () => {
     expect(api.saveQuestionnaireDraft).toHaveBeenCalledOnce()
     store.setIndicatorBindings('I1', ['Q1', 'Q2', 'Q3', 'Q4'])
     persisted.validationIssues = [{ code: 'CHECK_FAILED', path: 'indicators', message: '请核对指标配置' }]
-    await button('下一步：配置指标').trigger('click')
+    await button('下一步：配置指标与权重').trigger('click')
+    await flushPromises()
     await button('下一步：评价谁').trigger('click')
     await flushPromises()
-    expect(api.saveQuestionnaireDraft).toHaveBeenCalledTimes(2)
+    expect(api.saveQuestionnaireDraft).toHaveBeenCalledTimes(3)
     expect(router.currentRoute.value.path).toBe('/hr/projects/7/editor')
     expect(wrapper.get('.indicator-step-notice').text()).toContain('请核对指标配置')
   })
@@ -272,8 +301,10 @@ describe('问卷画布直接编辑', () => {
   it('下一步保存失败保留本页草稿，重试成功后进入人员配置', async () => {
     useAuthStore().permissions.push('feedback:participant:manage')
     store.setIndicatorBindings('I1', ['Q1', 'Q2', 'Q3', 'Q4'])
+    await button('下一步：配置指标与权重').trigger('click')
+    await flushPromises()
+    store.markDirty()
     api.saveQuestionnaireDraft.mockRejectedValueOnce(new Error('保存失败，请重试'))
-    await button('下一步：配置指标').trigger('click')
     await button('下一步：评价谁').trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/hr/projects/7/editor')
@@ -288,10 +319,12 @@ describe('问卷画布直接编辑', () => {
 
   it('下一步等待保存时禁止重复提交和编辑；无人员权限不显示人员入口', async () => {
     store.setIndicatorBindings('I1', ['Q1', 'Q2', 'Q3', 'Q4'])
-    await button('下一步：配置指标').trigger('click')
+    await button('下一步：配置指标与权重').trigger('click')
+    await flushPromises()
     expect(button('下一步：评价谁')).toBeUndefined()
     useAuthStore().permissions.push('feedback:participant:manage')
     await flushPromises()
+    api.saveQuestionnaireDraft.mockClear()
     let finishSave
     api.saveQuestionnaireDraft.mockImplementation(() => new Promise(resolve => { finishSave = resolve }))
     await button('下一步：评价谁').trigger('click')
@@ -315,8 +348,9 @@ describe('问卷画布直接编辑', () => {
     expect(wrapper.get('.unbound-panel').text()).not.toContain('工作表现评价 5')
     await items()[1].get('button').trigger('click')
     await flushPromises()
-    expect(store.selectedQuestionCode).toBe('Q3')
-    expect(wrapper.get('#tab-indicator').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('.indicator-reference').text()).toContain('工作表现评价 3')
+    expect(store.selectedQuestionCode).toBe('Q1')
+    expect(wrapper.get('.indicator-workspace').isVisible()).toBe(true)
     for (const item of items()) {
       item.findComponent({ name: 'ElSelect' }).vm.$emit('change', 'I1')
     }
@@ -325,7 +359,7 @@ describe('问卷画布直接编辑', () => {
     expect(wrapper.get('.binding-complete').text()).toBe('计分题已全部绑定')
     expect(store.draft.indicators[0].questionCodes).toEqual(['Q1', 'Q2', 'Q3', 'Q4'])
     expect(store.dirty).toBe(true)
-    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+    expect(api.saveQuestionnaireDraft).toHaveBeenCalledOnce()
     await button('保存草稿').trigger('click')
     await flushPromises()
     await store.load(7)
@@ -378,7 +412,7 @@ describe('问卷画布直接编辑', () => {
   it('右栏默认折叠，点击展开与收起并保留当前题目和预览试填', async () => {
     const tab = name => wrapper.findAll('[role="tab"]').find(item => item.text() === name)
     expect(wrapper.get('.editor-grid').classes()).toContain('right-collapsed')
-    expect(wrapper.findAll('.right-panel [role="tab"]').map(item => item.text())).toEqual(['题目属性', '评价指标', '实时预览'])
+    expect(wrapper.findAll('.right-panel [role="tab"]').map(item => item.text())).toEqual(['题目属性', '实时预览'])
     expect(wrapper.get('button[aria-label="展开右侧面板"]').attributes('aria-expanded')).toBe('false')
     await wrapper.get('button[aria-label="展开右侧面板"]').trigger('click')
     expect(wrapper.get('.editor-grid').classes()).not.toContain('right-collapsed')
@@ -400,10 +434,12 @@ describe('问卷画布直接编辑', () => {
     await switchRightTab('题目属性')
     expect(store.selectedQuestionCode).toBe('Q1')
     await switchRightTab('评价指标')
+    await wrapper.get('[aria-label="第1步：编辑问卷"]').trigger('click')
+    await flushPromises()
     await switchRightTab('实时预览')
-    expect(wrapper.get('#pane-preview .el-radio input').element.checked).toBe(true)
+    expect(wrapper.get('.editor-grid #pane-preview .el-radio input').element.checked).toBe(true)
     expect(store.dirty).toBe(false)
-    expect(api.saveQuestionnaireDraft).not.toHaveBeenCalled()
+    expect(api.saveQuestionnaireDraft).toHaveBeenCalledOnce()
   })
 
   it('五题型用独立标识和内容示例引导，新题留空并在大纲提示待填写', async () => {
@@ -431,9 +467,9 @@ describe('问卷画布直接编辑', () => {
       expect(document.activeElement).toBe(field.element)
       expect(wrapper.get('.outline-question.active').text()).toContain(`${typeLabel} · 待填写`)
       if (typeLabel === '单选题') {
-        await wrapper.findAll('[role="tab"]').find(item => item.text() === '评价指标').trigger('click')
+        await wrapper.get('[aria-label="第2步：配置指标与权重"]').trigger('click')
         await flushPromises()
-        expect(wrapper.get('.indicator-step-notice').text()).toContain('请先完成问卷，再配置指标')
+        expect(wrapper.get('[aria-current="step"]').text()).toBe('编辑问卷')
         expect(wrapper.find('.indicator-panel').exists()).toBe(false)
         await wrapper.findAll('[role="tab"]').find(item => item.text() === '题目属性').trigger('click')
       }
@@ -458,7 +494,7 @@ describe('问卷画布直接编辑', () => {
     await activeCard().get('input[type="checkbox"]').setValue(true)
     await button('增加选项').trigger('click')
     expect(activeCard().findAll('.option-editor')).toHaveLength(3)
-    expect(store.selectedQuestion.options[2].score).toBe('1.0000')
+    expect(store.selectedQuestion.options[2].score).toBe('2.0000')
     await button('删除选项 3').trigger('click')
     expect(button('删除选项 1').element.disabled).toBe(true)
     expect(wrapper.get('.properties-panel').findAll('textarea')).toHaveLength(0)
@@ -612,7 +648,7 @@ describe('问卷画布直接编辑', () => {
     expect(store.dirty).toBe(true)
   })
 
-  it.each(['0', '4.5'])('批量选项拒绝%s分并保留原选项，省略分值默认1分', async score => {
+  it.each(['0', '4.5'])('批量选项拒绝%s分并保留原选项，省略分值默认2分', async score => {
     const oldCodes = store.selectedQuestion.options.map(option => option.optionCode)
     await button('批量设置').trigger('click')
     await flushPromises()
@@ -625,7 +661,7 @@ describe('问卷画布直接编辑', () => {
     await dialog.get('textarea').setValue('较好 | 5\n一般\n需改进 | ')
     await dialog.findAll('button').find(item => item.text() === '应用选项').trigger('click')
     await flushPromises()
-    expect(store.selectedQuestion.options.map(option => option.score)).toEqual(['5.0000', '1.0000', '1.0000'])
+    expect(store.selectedQuestion.options.map(option => option.score)).toEqual(['5.0000', '2.0000', '2.0000'])
   })
 
   it('图标操作保持复制独立标识、排序、当前选择与指标绑定', async () => {
@@ -746,6 +782,7 @@ describe('问卷画布直接编辑', () => {
     expect(store.selectedQuestionCode).toBe('Q5')
     await vi.waitFor(() => expect(activeCard().text()).toContain('请填写题目内容'))
     await activeCard().get('.title-field textarea').setValue('改进建议')
+    api.saveQuestionnaireDraft.mockClear()
     let finishSave
     api.saveQuestionnaireDraft.mockImplementation(() => new Promise(resolve => { finishSave = resolve }))
     await button('保存草稿').trigger('click')

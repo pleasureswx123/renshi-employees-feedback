@@ -24,6 +24,7 @@ for (const viewport of [{ width: 1466, height: 986 }, { width: 1236, height: 720
     await page.setViewportSize(viewport)
     await context.addCookies([{ name: 'Feedback-Token', value: 'layout-test-token', url: 'http://127.0.0.1:5176' }])
     let saves = 0
+    let persistedDraft = longDraft()
     await page.route('**/dev-api/**', route => {
       const path = new URL(route.request().url()).pathname.replace('/dev-api', '')
       if (route.request().method() !== 'GET') saves += 1
@@ -35,7 +36,10 @@ for (const viewport of [{ width: 1466, height: 986 }, { width: 1236, height: 720
         code: 200, user: { userId: 2, userName: '布局测试用户' }, roles: ['feedback_hr'],
         permissions: ['feedback:project:list', 'feedback:questionnaire:edit', 'feedback:participant:manage']
       } })
-      if (path === '/feedback/projects/101/questionnaire-draft') return route.fulfill({ json: { code: 200, data: longDraft() } })
+      if (path === '/feedback/projects/101/questionnaire-draft') {
+        if (route.request().method() === 'PUT') persistedDraft = { ...persistedDraft, ...route.request().postDataJSON(), lockVersion: persistedDraft.lockVersion + 1 }
+        return route.fulfill({ json: { code: 200, data: persistedDraft } })
+      }
       return route.fulfill({ status: 404, json: { code: 404, msg: '未匹配测试接口' } })
     })
     await page.goto('/hr/projects/101/editor')
@@ -111,12 +115,12 @@ for (const viewport of [{ width: 1466, height: 986 }, { width: 1236, height: 720
     await assertTypePanelVisible()
     await page.screenshot({ path: testInfo.outputPath('editor-preview.png') })
 
-    await page.getByRole('button', { name: '下一步：配置指标', exact: true }).click()
+    await page.getByRole('button', { name: '下一步：配置指标与权重', exact: true }).click()
     await expect(page.getByRole('tab', { name: '评价指标', exact: true })).toHaveAttribute('aria-selected', 'true')
     await expect(page.locator('.indicator-step-notice')).toContainText('还有1道计分题未绑定指标')
     await page.getByRole('button', { name: '下一步：评价谁', exact: true }).click()
     await expect(page).toHaveURL(/\/hr\/projects\/101\/editor$/)
-    expect(saves).toBe(0)
+    expect(saves).toBe(1)
     await page.getByRole('button', { name: '增加指标', exact: true }).click()
     await page.getByRole('button', { name: '增加指标', exact: true }).click()
     const indicatorCards = page.locator('.indicator-card')
@@ -156,7 +160,7 @@ for (const viewport of [{ width: 1466, height: 986 }, { width: 1236, height: 720
     await expect(addedTitle).toBeFocused()
     const longQuestionTitle = '指标配置后追加的评分题：请评价跨部门协作中的实际表现。'.repeat(12)
     await addedTitle.fill(longQuestionTitle)
-    await page.getByRole('button', { name: '下一步：配置指标', exact: true }).click()
+    await page.getByRole('button', { name: '下一步：配置指标与权重', exact: true }).click()
     await expect(page.locator('.indicator-step-notice')).toContainText('还有2道计分题未绑定指标')
     await expect(indicatorCards).toHaveCount(2)
     await expect(indicatorCards.first().getByLabel('指标名称')).toHaveValue('跨部门协作与沟通能力'.repeat(5))
@@ -190,6 +194,6 @@ for (const viewport of [{ width: 1466, height: 986 }, { width: 1236, height: 720
     await page.getByRole('button', { name: '用户菜单', exact: true }).click()
     await expect(page.getByRole('menuitem', { name: '退出登录', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
-    expect(saves).toBe(0)
+    expect(saves).toBe(2)
   })
 }

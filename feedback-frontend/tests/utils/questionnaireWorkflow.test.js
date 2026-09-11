@@ -13,6 +13,14 @@ function fixture() {
 }
 
 describe('问卷到指标的步骤检查', () => {
+  it('零权重指标也必须绑定计分题，权重不能留空', () => {
+    const draft = fixture()
+    draft.indicators.push({ indicatorCode: 'I2', indicatorName: '补充指标', weight: '0', questionCodes: [] })
+    expect(getQuestionnaireWorkflow(draft).indicatorIssues).toContain('“补充指标”需要绑定有效计分题')
+    draft.indicators[1].weight = null
+    expect(getQuestionnaireWorkflow(draft).indicatorIssues).toContain('请填写所有指标权重')
+  })
+
   it('缺题、空题和没有有效计分题时，问卷步骤尚未完成', () => {
     const draft = fixture()
     draft.pages[0].questions[1].title = ''

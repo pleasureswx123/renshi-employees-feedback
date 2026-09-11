@@ -31,8 +31,7 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/dev-api/feedback/projects/*/participant-departments', route => route.fulfill({ json: { code: 200, data: candidateDepartments } }))
 })
 
-async function addTargetFromTree(page, name = '张三') {
-  const panel = page.locator('.selector-panel')
+async function addTargetFromTree(page, name = '张三', panel = page.locator('.selector-panel')) {
   await panel.locator('.department-node').filter({ hasText: '研发部' }).click()
   const personRow = panel.locator('.el-tree-node__content').filter({ has: page.locator('.person-node').filter({ hasText: name }) })
   await personRow.locator('.el-checkbox').click()
@@ -147,6 +146,11 @@ async function openPublicationWithPermissions(page, permissions, config) {
       })
     }
     if (path === '/feedback/projects/101/publication-config') {
+      if (request.method() === 'PUT') {
+        const payload = request.postDataJSON()
+        config = { ...config, ...payload, targets: payload.targets.map(target => candidates.find(person => person.userId === target.targetUserId)),
+          projectLockVersion: config.projectLockVersion + 1, versionLockVersion: config.versionLockVersion + 1 }
+      }
       return route.fulfill({ json: { code: 200, data: config } })
     }
     if (path === '/feedback/projects/101/participant-options') {
@@ -246,8 +250,7 @@ test('评价安排展示分组姓名，切换和增删只影响当前员工的�
   await expect(panel.getByRole('radio', { name: '同级2 人', exact: true })).toBeChecked()
   await expect(peerGroup.getByRole('button')).toHaveAttribute('aria-pressed', 'true')
   await panel.screenshot({ path: 'output/playwright/publication-evaluator-groups.png' })
-  const candidate = panel.locator('.dual-list .list-column').first().getByRole('row').filter({ has: page.getByText('李四', { exact: true }) })
-  await candidate.getByRole('button', { name: '添加', exact: true }).click()
+  await addTargetFromTree(page, '李四', panel)
   await expect(peerGroup).toContainText('3 人')
   await expect(peerGroup).toContainText('李四')
   await expect(upperGroup).toContainText('1 人')
@@ -255,12 +258,12 @@ test('评价安排展示分组姓名，切换和增删只影响当前员工的�
   await group('配置赵六的上级评价人').getByRole('button').click()
   await expect(panel.locator('.assignment-context')).toContainText('赵六')
   await expect(panel.getByText('已选上级评价人（1）', { exact: true })).toBeVisible()
-  await panel.locator('.selected-column').getByRole('button', { name: '移除', exact: true }).click()
+  await panel.locator('.selected-column').getByRole('button', { name: /^移除.+/ }).click()
   await expect(group('配置赵六的上级评价人')).toContainText('未分配')
   await expect(peerGroup).toContainText('3 人')
   await panel.locator('.relation-picker .el-radio-button').filter({ hasText: '同级' }).click()
   await expect(panel.getByText('已选同级评价人（0）', { exact: true })).toBeVisible()
-  await expect(panel.locator('.selected-column')).toContainText('从左侧为赵六添加同级评价人')
+  await expect(panel.locator('.selected-column')).toContainText('暂无人员，请从左侧勾选并添加')
   await expect.poll(() => panel.evaluate(el => el.closest('.el-card__body').scrollWidth - el.closest('.el-card__body').clientWidth)).toBe(0)
   expect(writes).toBe(0)
 })
@@ -372,6 +375,7 @@ test('计分说明可展开，实时提示占比变化，保留未保存配置',
   await page.getByRole('button', { name: '上一步', exact: true }).click()
   await expect(page.locator('.selector-panel').getByText('已选 1 人')).toBeVisible()
   await page.getByRole('button', { name: '下一步：设置评价关系' }).click()
+  await page.getByRole('radio', { name: '自评 + 他人评价', exact: true }).check()
   await expect(upperInput).toHaveValue('60')
   await expect(peerInput).toHaveValue('40')
   expect(writes).toBe(0)
@@ -526,6 +530,7 @@ test('HR配置目标和评价人、保存恢复、二次确认发布并进入只
   await addTargetFromTree(page)
   await expect(targetCard.getByText('已选 1 人')).toBeVisible()
   await page.getByRole('button', { name: '下一步：设置评价关系' }).click()
+  await page.getByRole('radio', { name: '自评 + 他人评价', exact: true }).check()
 
   const relationCard = page.locator('.relation-panel')
   const peerRow = relationCard.locator('tr').filter({ has: page.getByRole('switch', { name: '启用同级', exact: true }) })
@@ -551,14 +556,17 @@ test('HR配置目标和评价人、保存恢复、二次确认发布并进入只
   await page.getByRole('button', { name: '下一步：谁来评价' }).click()
   await expect(page.locator('.assignment-issues').getByText('“同级”尚未分配评价人')).toBeVisible()
 
-  const evaluatorCard = page.locator('.evaluator-panel')
-  const evaluatorRow = evaluatorCard.locator('tr').filter({ hasText: '李四' }).first()
-  await evaluatorRow.getByRole('button', { name: '添加' }).click()
+  await page.locator('.evaluator-panel').getByRole('button', { name: '配置', exact: true }).click()
+  const evaluatorCard = page.getByRole('dialog')
+  await addTargetFromTree(page, '李四', evaluatorCard)
   await expect(evaluatorCard.getByText('已选同级评价人（1）')).toBeVisible()
+  await evaluatorCard.getByRole('button', { name: '完成', exact: true }).click()
   await page.getByRole('button', { name: '上一步', exact: true }).click()
   await page.getByRole('button', { name: '下一步：谁来评价' }).click()
+  await page.locator('.evaluator-panel').getByRole('button', { name: '配置', exact: true }).click()
   await expect(evaluatorCard.getByText('已选同级评价人（1）')).toBeVisible()
   await page.screenshot({ path: 'output/playwright/publication-wizard-evaluators.png', fullPage: true })
+  await evaluatorCard.getByRole('button', { name: '完成', exact: true }).click()
 
   await page.getByRole('button', { name: '保存并检查发布条件' }).click()
   await expect(page.getByText('配置已保存，发布前检查已通过')).toBeVisible()
@@ -623,7 +631,7 @@ test('组织树默认展示部门，勾选增删和搜索保持已选人员', as
 test('仅自评跳过分配，保存失败可重试，返回修改后重新检查', async ({ page }) => {
   let persisted = initialConfig()
   await openPublicationWithPermissions(page, userInfo.permissions, persisted)
-  let fail = true
+  let fail = false
   let payload
   await page.route('**/dev-api/feedback/projects/101/publication-config', route => {
     if (route.request().method() !== 'PUT') return route.fulfill({ json: { code: 200, data: persisted } })
@@ -632,13 +640,15 @@ test('仅自评跳过分配，保存失败可重试，返回修改后重新检�
       return route.fulfill({ status: 500, json: { code: 500, msg: '测试保存失败，请重试' } })
     }
     payload = route.request().postDataJSON()
-    persisted = { ...persisted, targets: [candidates[0]], isPublishReady: true, validationIssues: [],
+    persisted = { ...persisted, projectLockVersion: persisted.projectLockVersion + 1, versionLockVersion: persisted.versionLockVersion + 1, targets: [candidates[0]], isPublishReady: true, validationIssues: [],
       preview: { targetCount: 1, evaluatorCount: 1, assignmentCount: 1, targetSummaries: [{ targetUserId: 10, selfCount: 1, nonSelfCount: 0, assignmentCount: 1 }] } }
     return route.fulfill({ json: { code: 200, data: persisted } })
   })
   await addTargetFromTree(page)
   await page.getByRole('button', { name: '下一步：设置评价关系' }).click()
+  await page.getByRole('radio', { name: '自评 + 他人评价', exact: true }).check()
   await page.locator('.evaluation-mode .el-radio-button').filter({ hasText: '仅自评' }).click()
+  fail = true
   await page.getByRole('button', { name: '保存并检查发布条件' }).click()
   await expect(page.getByText('测试保存失败，请重试')).toBeVisible()
   await expect(page.getByRole('radio', { name: '仅自评', exact: true })).toBeChecked()
@@ -693,12 +703,14 @@ test('两处人员搜索回车仅查询一次，不刷新页面且保留未保�
   expect(navigations).toEqual([])
 
   await page.getByRole('button', { name: '下一步：设置评价关系' }).click()
+  await page.getByRole('radio', { name: '自评 + 他人评价', exact: true }).check()
   const peerRow = page.locator('.relation-panel tr').filter({ has: page.getByRole('switch', { name: '启用同级', exact: true }) })
   await peerRow.locator('.el-switch').click()
   await peerRow.locator('.el-checkbox').click()
   await page.getByRole('button', { name: '下一步：谁来评价' }).click()
-  const evaluators = page.locator('.evaluator-panel')
-  await evaluators.getByRole('button', { name: '添加', exact: true }).click()
+  await page.locator('.evaluator-panel').getByRole('button', { name: '配置', exact: true }).click()
+  const evaluators = page.getByRole('dialog')
+  await addTargetFromTree(page, '李四', evaluators)
   await evaluators.getByRole('textbox', { name: '人员搜索' }).fill('张三')
   const evaluatorResponse = page.waitForResponse(response => response.url().includes('participant-options') && new URL(response.url()).searchParams.get('keyword') === '张三')
   await evaluators.getByRole('textbox', { name: '人员搜索' }).press('Enter')

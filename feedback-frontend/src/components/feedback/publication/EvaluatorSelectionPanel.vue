@@ -1,27 +1,28 @@
 <script setup>
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref, watch, watchEffect } from 'vue'
+
+import TargetSelectorPanel from './TargetSelectorPanel.vue'
 
 import { SELF_RELATION_CODE } from '@/utils/publicationConfig'
 
 const props = defineProps({
+  loadDepartments: { type: Function, required: true },
+  loadPeople: { type: Function, required: true },
   summaries: { type: Array, default: () => [] },
   assignmentIssues: { type: Array, default: () => [] },
   targets: { type: Array, default: () => [] },
   relations: { type: Array, default: () => [] },
   selections: { type: Array, default: () => [] },
   participants: { type: Array, default: () => [] },
-  candidateRows: { type: Array, default: () => [] },
-  candidateTotal: { type: Number, default: 0 },
-  candidatePageNum: { type: Number, default: 1 },
-  candidatePageSize: { type: Number, default: 10 },
-  loading: Boolean,
+  active: { type: Boolean, default: true },
   editable: Boolean
 })
-const emit = defineEmits(['search', 'page-change', 'set-evaluators'])
+const emit = defineEmits(['set-evaluators', 'remember-person'])
 const targetUserId = ref(null)
 const relationCode = ref('')
-const keyword = ref('')
-const contextForm = ref(null)
+const contextModel = computed(() => ({ targetUserId: targetUserId.value, relationCode: relationCode.value }))
+const drawerOpen = ref(false)
+watch(() => props.active, active => { if (!active) drawerOpen.value = false })
 const targetName = computed(() => personName(props.targets.find(item => item.userId === targetUserId.value)))
 const relationName = computed(() => props.relations.find(item => item.relationCode === relationCode.value)?.relationName || '')
 
@@ -37,7 +38,10 @@ const selectionByTarget = computed(() => {
   return result
 })
 const selectedIds = computed(() => evaluatorIds(targetUserId.value, relationCode.value))
+let pendingIds = []
+watchEffect(() => { pendingIds = [...selectedIds.value] })
 const participantById = computed(() => new Map(props.participants.map(item => [item.userId, item])))
+const excludedIds = computed(() => [targetUserId.value])
 const selectedParticipants = computed(() => selectedIds.value.map(evaluator))
 const assignmentRows = computed(() => props.summaries.map(target => ({
   ...target,
@@ -73,32 +77,33 @@ watchEffect(() => {
   }
 })
 
+function addPerson(person) {
+  if (!props.editable || person.userId === targetUserId.value || person.available === false) return
+  emit('remember-person', person)
+  addEvaluator(person.userId)
+}
+
 function addEvaluator(userId) {
-  if (!targetUserId.value || !relationCode.value || selectedIds.value.includes(userId)) return
-  emit('set-evaluators', targetUserId.value, relationCode.value, [...selectedIds.value, userId])
+  if (!targetUserId.value || !relationCode.value || pendingIds.includes(userId)) return
+  pendingIds = [...pendingIds, userId]
+  emit('set-evaluators', targetUserId.value, relationCode.value, pendingIds)
 }
 
 function removeEvaluator(userId) {
+  if (!props.editable) return
+  pendingIds = pendingIds.filter(item => item !== userId)
   emit(
     'set-evaluators',
     targetUserId.value,
     relationCode.value,
-    selectedIds.value.filter(item => item !== userId)
+    pendingIds
   )
-}
-
-function search(event) {
-  // 输入法确认选词时不查询；普通回车需在按下时阻止表单默认提交。
-  if (event?.isComposing || event?.keyCode === 229) return
-  event?.preventDefault()
-  if (event?.repeat || props.loading) return
-  emit('search', keyword.value.trim())
 }
 
 function locate({ targetUserId: target, relationCode: relation } = {}) {
   if (target) targetUserId.value = target
   if (relation) relationCode.value = relation
-  contextForm.value?.$el?.scrollIntoView?.({ block: 'center' })
+  drawerOpen.value = true
 }
 defineExpose({ locate })
 </script>
@@ -108,7 +113,7 @@ defineExpose({ locate })
     <div class="section-heading">
       <div>
         <h2>5. 谁来评价</h2>
-        <p>下方按关系列出已选评价人，点击关系可切换配置。未分配他评的员工将仅进行自评。</p>
+        <p>下方按关系列出已选评价人，点击关系可切换配置。每位被评价人都须配齐已启用关系的评价人。</p>
       </div>
     </div>
 
@@ -119,7 +124,7 @@ defineExpose({ locate })
         <el-button size="small" type="primary" link @click="locate(issue)">去配置</el-button>
       </div>
     </div>
-    <el-table :data="assignmentRows" row-key="userId" :max-height="260" size="small" class="assignment-summary">
+    <el-table :data="assignmentRows" row-key="userId" size="small" class="assignment-summary">
       <el-table-column label="被评价人" width="140">
         <template #default="{ row }"><strong>{{ personName(row) }}</strong></template>
       </el-table-column>
@@ -145,14 +150,16 @@ defineExpose({ locate })
         </template>
       </el-table-column>
       <el-table-column label="状态" width="125">
-        <template #default="{ row }"><el-tag size="small" :type="row.missingScoring ? 'warning' : row.hasOthers ? 'success' : 'info'">{{ row.missingScoring ? '待补计分评价' : row.hasOthers ? '已分配' : '仅自评' }}</el-tag></template>
+        <template #default="{ row }"><el-tag size="small" :type="row.missingScoring ? 'warning' : row.hasOthers ? 'success' : 'info'">{{ row.missingScoring ? '待补评价人' : row.hasOthers ? '已分配' : '仅自评' }}</el-tag></template>
       </el-table-column>
       <el-table-column label="操作" width="90">
         <template #default="{ row }"><el-button link type="primary" @click="locate({ targetUserId: row.userId })">{{ editable ? '配置' : '查看' }}</el-button></template>
       </el-table-column>
     </el-table>
 
-    <el-form ref="contextForm" inline :model="{ targetUserId, relationCode }" class="context-form">
+    <el-drawer v-model="drawerOpen" :title="`${editable ? '配置' : '查看'}评价人 · ${targetName}`" size="min(1100px, 100vw)" append-to-body destroy-on-close>
+      <div class="evaluator-drawer-content">
+    <el-form inline :model="contextModel" class="context-form">
       <el-form-item label="被评价人">
         <el-select v-model="targetUserId" placeholder="选择被评价人" style="width: 220px">
           <el-option
@@ -180,82 +187,33 @@ defineExpose({ locate })
       description="请先选择被评价人，并至少启用一种非自评关系"
       :image-size="84"
     />
-    <template v-else>
-      <el-form inline :model="{ keyword }" class="participant-filter">
-        <el-form-item label="人员搜索">
-          <el-input
-            v-model="keyword"
-            clearable
-            placeholder="输入评价人账号或姓名"
-            @keydown.enter="search"
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="loading" @click="search">查询</el-button>
-        </el-form-item>
-      </el-form>
-
-      <div class="dual-list">
-        <div class="list-column">
-          <strong>可选评价人</strong>
-          <el-table v-loading="loading" :data="candidateRows" :max-height="320" size="small">
-            <el-table-column prop="nickName" label="姓名" min-width="110" />
-            <el-table-column prop="userName" label="账号" min-width="110" />
-            <el-table-column prop="deptName" label="部门" min-width="120">
-              <template #default="{ row }">{{ row.deptName || '未分配部门' }}</template>
-            </el-table-column>
-            <el-table-column v-if="editable" label="操作" width="76" fixed="right">
-              <template #default="{ row }">
-                <el-button
-                  type="primary"
-                  link
-                  :disabled="row.userId === targetUserId || selectedIds.includes(row.userId)"
-                  @click="addEvaluator(row.userId)"
-                >
-                  {{ row.userId === targetUserId ? '本人' : selectedIds.includes(row.userId) ? '已选' : '添加' }}
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            class="mini-pagination"
-            size="small"
-            background
-            layout="total, prev, pager, next"
-            :total="candidateTotal"
-            :page-size="candidatePageSize"
-            :current-page="candidatePageNum"
-            @current-change="emit('page-change', $event)"
-          />
-        </div>
-
-        <div class="list-column selected-column">
-          <strong>已选{{ relationName }}评价人（{{ selectedParticipants.length }}）</strong>
-          <el-table :data="selectedParticipants" :max-height="320" size="small" :empty-text="`从左侧为${targetName}添加${relationName}评价人`">
-            <el-table-column prop="nickName" label="姓名" min-width="120" />
-            <el-table-column prop="deptName" label="部门" min-width="120">
-              <template #default="{ row }">{{ row.deptName || '未分配部门' }}</template>
-            </el-table-column>
-            <el-table-column label="状态" width="76">
-              <template #default="{ row }">
-                <el-tag :type="row.available ? 'success' : 'danger'" size="small">
-                  {{ row.available ? '可用' : '失效' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column v-if="editable" label="操作" width="76" fixed="right">
-              <template #default="{ row }">
-                <el-button type="danger" link @click="removeEvaluator(row.userId)">移除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
+    <TargetSelectorPanel
+      v-else
+      :key="`${targetUserId}-${relationCode}`"
+      :show-heading="false"
+      :selected-label="`已选${relationName}评价人（${selectedParticipants.length}）`"
+      :selected-targets="selectedParticipants"
+      :excluded-ids="excludedIds"
+      :allow-department="selectableRelations.find(item => item.relationCode === relationCode)?.relationType === 'PEER'"
+      :can-browse="editable"
+      :editable="editable"
+      :load-departments="loadDepartments"
+      :load-people="loadPeople"
+      @add="addPerson"
+      @remove="removeEvaluator"
+    />
       </div>
-    </template>
+      <template #footer>
+        <span v-if="editable" class="drawer-save-hint">选择结果已保留在当前配置中，请在页面保存配置。</span>
+        <el-button type="primary" @click="drawerOpen = false">完成</el-button>
+      </template>
+    </el-drawer>
   </section>
 </template>
 
 <style scoped>
+.evaluator-drawer-content { display: grid; gap: 16px; }
+.drawer-save-hint { margin-right: 16px; color: var(--el-text-color-secondary); font-size: 12px; }
 .evaluator-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .section-heading h2, .section-heading p { margin: 0; }
 .section-heading h2 { font-size: 18px; }

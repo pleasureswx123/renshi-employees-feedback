@@ -1,7 +1,7 @@
 import ElementPlus, { ElMessageBox } from 'element-plus'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
-import { flushPromises, mount } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import PublicationPreviewPanel from '@/components/feedback/publication/PublicationPreviewPanel.vue'
@@ -47,36 +47,56 @@ const relations = [
 ]
 
 describe('P5发布配置组件', () => {
-  it.each([EvaluatorSelectionPanel])('人员搜索阻止回车默认提交，输入法和加载期间不重复查询：$__name', async component => {
-    const wrapper = mount(component, {
-      global: { plugins: [ElementPlus] },
-      props: { editable: true, targets: [{ userId: 10, nickName: '张三' }], relations }
+  it('评价人通过组织树搜索，回车只发送一次查询', async () => {
+    const loadPeople = vi.fn().mockResolvedValue({ rows: [], total: 0 })
+    const wrapper = mount(EvaluatorSelectionPanel, {
+      global: { plugins: [ElementPlus], stubs: { teleport: false } },
+      props: { editable: true, targets: [{ userId: 10, nickName: '张三' }], relations,
+        loadDepartments: async () => [], loadPeople }
     })
-    const input = wrapper.get('.participant-filter input')
+    await flushPromises()
+    expect(wrapper.find('.participant-filter input').exists()).toBe(false)
+    wrapper.vm.locate({ targetUserId: 10 })
+    await flushPromises()
+    expect(new DOMWrapper(document.body).get('[role="dialog"]').text()).toContain('配置评价人 · 张三')
+    const input = new DOMWrapper(document.body).get('.participant-filter input')
     await input.setValue(' 李四 ')
-    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
-    input.element.dispatchEvent(enter)
-    expect(enter.defaultPrevented).toBe(true)
-    expect(wrapper.emitted('search')).toEqual([['李四']])
-    await input.trigger('keyup', { key: 'Enter' })
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect(loadPeople).toHaveBeenCalledOnce()
+    expect(loadPeople).toHaveBeenCalledWith({ pageNum: 1, pageSize: 50, keyword: '李四' })
     await input.trigger('keydown', { key: 'Enter', repeat: true })
     await input.trigger('keydown', { key: 'Enter', isComposing: true })
-    await input.trigger('keydown', { key: 'Enter', keyCode: 229 })
-    expect(wrapper.emitted('search')).toHaveLength(1)
-    await wrapper.setProps({ loading: true })
-    const busyEnter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
-    input.element.dispatchEvent(busyEnter)
-    expect(busyEnter.defaultPrevented).toBe(true)
-    expect(wrapper.emitted('search')).toHaveLength(1)
-    await wrapper.setProps({ loading: false })
-    await wrapper.get('.participant-filter button.el-button').trigger('click')
-    expect(wrapper.emitted('search')).toEqual([['李四'], ['李四']])
+    expect(loadPeople).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  it('同级整部门批量添加不丢人，切换上级后不提供整部门入口', async () => {
+    const people = [{ userId: 11, nickName: '甲', available: true }, { userId: 12, nickName: '乙', available: true }]
+    const wrapper = mount(EvaluatorSelectionPanel, {
+      global: { plugins: [ElementPlus], stubs: { teleport: false } }, props: {
+        editable: true, targets: [{ userId: 10, nickName: '张三' }],
+        relations: [...relations, { ...relations[0], relationCode: 'REL_UPPER', relationType: 'SUPERVISOR', relationName: '上级' }],
+        loadDepartments: async () => [{ deptId: 2, parentId: 0, label: '研发部', directCount: 0 }],
+        loadPeople: async () => ({ rows: people, total: 2 })
+      }
+    })
+    await flushPromises()
+    wrapper.vm.locate({ targetUserId: 10 })
+    await flushPromises()
+    await new DOMWrapper(document.body).get('[aria-label="添加研发部全部人员"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.emitted('set-evaluators').at(-1)).toEqual([10, 'REL_PEER', [11, 12]])
+    expect(wrapper.emitted('remember-person')).toEqual(people.map(person => [person]))
+    await new DOMWrapper(document.body).get('.relation-picker input[value="REL_UPPER"]').setValue(true)
+    await flushPromises()
+    expect(new DOMWrapper(document.body).find('[aria-label="添加研发部全部人员"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
   it('展示后端权威预览数量和稳定问题定位', () => {
     const wrapper = mount(PublicationPreviewPanel, {
-      global: { plugins: [ElementPlus] },
+      global: { plugins: [ElementPlus], stubs: { teleport: false } },
       props: {
         preview,
         ready: false,
@@ -97,9 +117,9 @@ describe('P5发布配置组件', () => {
     const target = { userId: 10, nickName: '张三' }
     const upper = { ...relations[0], relationCode: 'REL_UPPER', relationName: '上级' }
     const wrapper = mount(EvaluatorSelectionPanel, {
-      global: { plugins: [ElementPlus] },
+      global: { plugins: [ElementPlus], stubs: { teleport: false } },
       props: {
-        editable: false,
+        editable: false, loadDepartments: async () => [], loadPeople: async () => ({ rows: [], total: 0 }),
         targets: [target], summaries: [{ ...target, hasOthers: true }], relations: [upper, ...relations],
         selections: [{ targetUserId: 10, relationCode: 'REL_PEER', evaluatorUserIds: [11, 12] }],
         participants: [{ userId: 11, userName: '同事账号', available: true }, { userId: 12, nickName: '离职同事', available: false }]
@@ -109,7 +129,7 @@ describe('P5发布配置组件', () => {
     expect(wrapper.get('.assignment-summary').text()).toContain('离职同事（失效）')
     await wrapper.get('button[aria-label="查看张三的同级评价人"]').trigger('click')
     await flushPromises()
-    expect(wrapper.get('.selected-column').text()).toContain('已选同级评价人（2）')
+    expect(new DOMWrapper(document.body).get('.selected-column').text()).toContain('已选同级评价人（2）')
     expect(wrapper.findAll('button').some(button => button.text() === '移除')).toBe(false)
     expect(wrapper.emitted('set-evaluators')).toBeUndefined()
     wrapper.unmount()
@@ -117,7 +137,7 @@ describe('P5发布配置组件', () => {
 
   it('冻结视图禁用关系编辑且不显示增删入口', () => {
     const wrapper = mount(RelationConfigPanel, {
-      global: { plugins: [ElementPlus] },
+      global: { plugins: [ElementPlus], stubs: { teleport: false } },
       props: { relations, editable: false }
     })
 
@@ -131,7 +151,7 @@ describe('P5发布配置组件', () => {
     const peer = { ...relations[0], weight: '40.0000' }
     const other = { ...relations[0], relationCode: 'REL_OTHER', relationName: '其他', isEnabled: false, weight: '80.0000' }
     const wrapper = mount(RelationConfigPanel, {
-      global: { plugins: [ElementPlus] },
+      global: { plugins: [ElementPlus], stubs: { teleport: false } },
       props: { relations: [upper, peer, relations[1], other], editable: true }
     })
     await flushPromises()
@@ -162,7 +182,7 @@ describe('P5发布配置组件', () => {
       { ...relations[0], weight: '33.3333' },
       { ...relations[0], relationCode: 'REL_OTHER', weight: '66.6667' }
     ]
-    const wrapper = mount(RelationConfigPanel, { global: { plugins: [ElementPlus] }, props: { relations: config } })
+    const wrapper = mount(RelationConfigPanel, { global: { plugins: [ElementPlus], stubs: { teleport: false } }, props: { relations: config } })
     expect(wrapper.get('.scoring-summary').text()).toContain('权重合计 100%')
     expect(wrapper.get('.scoring-summary').text()).toContain('占比已达标')
     expect(wrapper.emitted('update')).toBeUndefined()
@@ -176,7 +196,7 @@ describe('P5发布配置组件', () => {
 
   it('关系启用和发布冻结后，权重输入的无障碍禁用状态与实际状态一致', async () => {
     const wrapper = mount(RelationConfigPanel, {
-      global: { plugins: [ElementPlus] },
+      global: { plugins: [ElementPlus], stubs: { teleport: false } },
       props: { relations: [{ ...relations[0], participatesInScore: false }], editable: true }
     })
     await flushPromises()

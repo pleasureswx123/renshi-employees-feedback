@@ -80,6 +80,20 @@ def get_publication_validation_issues(
                 }
             )
 
+    # 启用关系是每位被评价人的必配项，不能用其他人的分配抵消缺口。
+    enabled_relations = [item for item in relations if item.is_enabled and item.relation_code != SELF_RELATION_CODE]
+    selected_pairs = {(item.target_id, item.relation_id) for item in non_self_selections}
+    for target_index, target in enumerate(targets):
+        for relation in enabled_relations:
+            if (target.target_id, relation.relation_id) not in selected_pairs:
+                issues.append(
+                    {
+                        'code': 'TARGET_RELATION_ASSIGNMENT_REQUIRED',
+                        'path': f'targets.{target_index}.relations.{relation.relation_code}',
+                        'message': f'被评价人“{target.target_user_name}”尚未配置“{relation.relation_name}”评价人',
+                    }
+                )
+
     scored_relation_ids = {item.relation_id for item in scored_relations}
     for target_index, target in enumerate(targets):
         target_non_self = [item for item in non_self_selections if item.target_id == target.target_id]

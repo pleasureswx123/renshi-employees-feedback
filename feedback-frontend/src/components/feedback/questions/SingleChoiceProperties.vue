@@ -20,7 +20,7 @@ function parseBatchOptions(text) {
   if (lines.length < 2 || lines.length > 100) throw new Error('请填写 2 至 100 个选项')
   return lines.map((line, index) => {
     const [label, suppliedScore, ...extra] = line.split('|').map(item => item.trim())
-    const rawScore = suppliedScore || '1'
+    const rawScore = suppliedScore || '2'
     if (!label || label.length > 500 || extra.length) throw new Error(`第 ${index + 1} 行选项格式不正确`)
     if (!/^\d+(?:\.0+)?$/.test(rawScore) || Number(rawScore) < 1 || Number(rawScore) > 99999999) {
       throw new Error(`第 ${index + 1} 行分值必须是 1 至 99999999 的整数`)
@@ -62,7 +62,7 @@ function addOption() {
         optionId: null,
         optionCode: createStableCode('O'),
         optionLabel: `选项${props.question.options.length + 1}`,
-        score: '1.0000',
+        score: '2.0000',
         requiresReason: false,
         sortOrder: props.question.options.length + 1
       }
@@ -142,7 +142,7 @@ defineExpose({ validate })
               step-strictly
               :aria-label="`选项 ${index + 1} 分值`"
               controls-position="right"
-              @update:model-value="changeOption(index, { score: normalizeDecimal($event ?? 1) })"
+              @update:model-value="changeOption(index, { score: normalizeDecimal($event ?? 2) })"
             />
           </el-form-item>
           <el-form-item :label="`选项 ${index + 1} 要求说明`" class="option-reason">
@@ -167,7 +167,7 @@ defineExpose({ validate })
 
     <el-dialog v-model="batchVisible" title="批量设置选项" width="min(520px, 94vw)" append-to-body>
       <el-form ref="batchFormRef" :model="batchForm" :disabled="batchPending" label-position="top">
-        <el-form-item prop="text" :rules="[{ validator: validateBatch, trigger: 'blur' }]" label="每行一个选项，可用“选项文字 | 分值”格式；分值为正整数，省略时默认1分，应用后替换当前选项">
+        <el-form-item prop="text" :rules="[{ validator: validateBatch, trigger: 'blur' }]" label="每行一个选项，可用“选项文字 | 分值”格式；分值为正整数，省略时默认2分，应用后替换当前选项">
           <el-input
             v-model="batchForm.text"
             type="textarea"

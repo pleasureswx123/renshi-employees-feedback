@@ -137,14 +137,14 @@ def build_full_draft_payload() -> dict:
                 'indicatorName': '绩效表现',
                 'weight': '100.0000',
                 'sortOrder': 1,
-                'questionCodes': ['Q_SINGLE', 'Q_STAR', 'Q_NUMBER', 'Q_SLIDER'],
+                'questionCodes': ['Q_SINGLE', 'Q_NUMBER', 'Q_SLIDER'],
             },
             {
                 'indicatorCode': 'I_COMMENT',
                 'indicatorName': '定性建议',
                 'weight': '0.0000',
                 'sortOrder': 2,
-                'questionCodes': ['Q_TEXT'],
+                'questionCodes': ['Q_STAR', 'Q_TEXT'],
             },
         ],
     }
@@ -339,3 +339,14 @@ def test_question_type_config_rejects_unknown_fields() -> None:
 
     with pytest.raises(ValidationError, match='Extra inputs are not permitted'):
         QuestionnaireDraftSaveModel.model_validate(payload)
+
+
+def test_zero_weight_indicator_requires_scored_question() -> None:
+    payload = build_full_draft_payload()
+    payload['indicators'].append({
+        'indicatorCode': 'I_EMPTY', 'indicatorName': '待绑定指标',
+        'weight': '0.0000', 'sortOrder': len(payload['indicators']) + 1, 'questionCodes': [],
+    })
+    draft = QuestionnaireDraftSaveModel.model_validate(payload)
+    issues = get_publish_validation_issues(draft)
+    assert any(issue['code'] == 'INDICATOR_SCORED_QUESTION_REQUIRED' and '待绑定指标' in issue['message'] for issue in issues)

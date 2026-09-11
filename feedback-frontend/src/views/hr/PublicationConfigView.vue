@@ -15,6 +15,8 @@ import { usePublicationConfigStore } from '@/stores/publicationConfig'
 import { SELF_RELATION_CODE } from '@/utils/publicationConfig'
 import { analyzePublicationWorkflow, PUBLICATION_STEPS, publicationIssueDestination } from '@/utils/publicationWorkflow'
 
+const props = defineProps({ embedded: Boolean, initialStep: { type: Number, default: 2 } })
+const emit = defineEmits(['step-change'])
 const route = useRoute()
 const router = useRouter()
 const permissionStore = usePermissionStore()
@@ -22,7 +24,8 @@ const publicationStore = usePublicationConfigStore()
 const projectId = Number(route.params.projectId)
 const config = computed(() => publicationStore.config)
 const activeStep = ref(0)
-const evaluationMode = ref('others')
+const evaluationMode = ref('')
+const evaluationModeForm = ref(null)
 const modeChanging = ref(false)
 const confirmingPublish = ref(false)
 const evaluatorPanel = ref(null)
@@ -33,7 +36,7 @@ const currentIssues = computed(() => [workflow.value.targetIssues, workflow.valu
 const nextLabel = computed(() => activeStep.value === 1 && evaluationMode.value === 'self' ? '保存并检查发布条件' : activeStep.value === 2 ? '保存并检查发布条件' : `下一步：${PUBLICATION_STEPS[activeStep.value + 1]}`)
 const stepDescriptions = computed(() => [
   config.value?.targets.length ? `已选 ${config.value.targets.length} 人` : '选择本轮被评价员工',
-  evaluationMode.value === 'self' ? '仅自评' : `计分关系权重 ${workflow.value.totalWeight}%`,
+  !evaluationMode.value ? '请选择评价方式' : evaluationMode.value === 'self' ? '仅自评' : `计分关系权重 ${workflow.value.totalWeight}%`,
   evaluationMode.value === 'self' ? '自动添加自评，无需分配' : workflow.value.assignmentIssues.length ? `待处理 ${workflow.value.assignmentIssues.length} 项` : '核对每人的评价安排',
   publicationStore.dirty ? '修改后需重新检查' : config.value?.isPublishReady ? '检查已通过' : '保存后检查发布条件'
 ])
@@ -61,11 +64,6 @@ const canPublish = computed(
     config.value?.isPublishReady
 )
 
-async function loadCandidates({ pageNum = 1, keyword = publicationStore.candidateKeyword } = {}) {
-  if (!canManage.value || !config.value?.editable) return
-  await publicationStore.loadCandidates({ pageNum, keyword })
-}
-
 async function loadTargetDepartments() {
   if (!canManage.value || !config.value?.editable) return []
   return (await getParticipantDepartments(projectId)).data || []
@@ -73,7 +71,13 @@ async function loadTargetDepartments() {
 
 async function loadTargetPeople(params) {
   if (!canManage.value || !config.value?.editable) return { rows: [], total: 0 }
-  return listParticipantOptions(projectId, params)
+  const currentConfig = config.value
+  const response = await listParticipantOptions(projectId, params)
+  // 组织树不再经过旧分页列表，须同步缓存人员资料，避免已选名单只有编号。
+  if (config.value === currentConfig && currentConfig.editable) {
+    for (const person of response.rows || []) publicationStore.rememberParticipant(person)
+  }
+  return response
 }
 
 async function saveConfig() {
@@ -94,7 +98,7 @@ async function saveConfig() {
 
 function showStep(step) {
   activeStep.value = step
-  if (step === 2) loadCandidates().catch(() => { /* 请求层展示加载错误，保留当前配置。 */ })
+  emit('step-change', step + 2)
   nextTick(() => stepContent.value?.scrollIntoView?.({ block: 'start' }))
 }
 
@@ -110,17 +114,23 @@ async function goStep(step) {
     if (index === 2 && evaluationMode.value === 'self') continue
     if (issuesByStep[index].length) {
       showStep(index)
+      if (index === 1 && !evaluationMode.value) evaluationModeForm.value?.validate().catch(() => {})
       ElMessage.warning(issuesByStep[index][0])
       return
     }
   }
-  if (step === 3 && !await saveConfig()) return
+  if (!await saveConfig()) return
   showStep(step)
 }
 
 async function goPreparationStep(step) {
   if (busy.value) return
   if (step < 2) {
+    if (props.embedded && canEditQuestionnaire.value) {
+      if (publicationStore.dirty && !await saveConfig()) return
+      emit('step-change', step)
+      return
+    }
     if (canEditQuestionnaire.value) await router.push({ path: `/hr/projects/${projectId}/editor`, query: { step: String(step + 1) } })
     return
   }
@@ -145,6 +155,14 @@ async function changeMode(mode) {
       }
     }
   }
+  if (mode === 'others' && !config.value.relations.some(item => item.relationCode !== SELF_RELATION_CODE && (item.isEnabled || item.participatesInScore || Number(item.weight) !== 0))) {
+    const defaults = [['REL_SUPERVISOR', '60.0000'], ['REL_PEER', '40.0000']]
+    if (defaults.every(([code]) => config.value.relations.some(item => item.relationCode === code))) {
+      for (const [code, weight] of defaults) {
+        publicationStore.updateRelation(code, { isEnabled: true, participatesInScore: true, weight })
+      }
+    }
+  }
   evaluationMode.value = mode
 }
 
@@ -160,8 +178,8 @@ async function locateIssue(issue) {
     await nextTick()
     const index = Number(issue.path?.split('.')[1])
     evaluatorPanel.value?.locate({
-      targetUserId: issue.code === 'TARGET_SCORING_ASSIGNMENT_REQUIRED' ? config.value.targets[index]?.userId : undefined,
-      relationCode: issue.code === 'RELATION_POSITIVE_ASSIGNMENT_REQUIRED' ? config.value.relations[index]?.relationCode : undefined
+      targetUserId: ['TARGET_SCORING_ASSIGNMENT_REQUIRED', 'TARGET_RELATION_ASSIGNMENT_REQUIRED'].includes(issue.code) ? config.value.targets[index]?.userId : undefined,
+      relationCode: issue.code === 'TARGET_RELATION_ASSIGNMENT_REQUIRED' ? issue.path?.split('.')[3] : issue.code === 'RELATION_POSITIVE_ASSIGNMENT_REQUIRED' ? config.value.relations[index]?.relationCode : undefined
     })
   }
 }
@@ -208,22 +226,24 @@ onBeforeRouteLeave(async () => {
 onMounted(async () => {
   await publicationStore.load(projectId)
   if (!config.value) return
-  evaluationMode.value = config.value.targets.length && !config.value.relations.some(item => item.isEnabled && item.relationCode !== SELF_RELATION_CODE) ? 'self' : 'others'
+  // 未配置他评关系不代表用户已经选择仅自评，必须由用户明确选择。
+  evaluationMode.value = config.value.relations.some(item => item.isEnabled && item.relationCode !== SELF_RELATION_CODE) ? 'others' : ''
   if (!config.value.editable || !canManage.value || config.value.isPublishReady) activeStep.value = 3
-  const requestedStep = Number(route.query.step) - 3
+  if (config.value.editable && canManage.value && !evaluationMode.value && config.value.targets.length) activeStep.value = 1
+  const requestedStep = props.embedded ? props.initialStep - 2 : Number(route.query.step) - 3
   if (config.value.editable && Number.isInteger(requestedStep) && requestedStep >= 0 && requestedStep <= 3) {
     // 跨页请求只能指定目标步骤，仍须通过现有校验，不能绕过保存与发布检查。
     activeStep.value = 0
     await goStep(requestedStep)
   }
-  if (activeStep.value === 2) await loadCandidates()
 })
+defineExpose({ goPreparationStep })
 onBeforeUnmount(() => publicationStore.reset())
 </script>
 
 <template>
-  <section v-loading="publicationStore.loading" class="publication-page">
-    <header class="publication-header workspace-page-header workspace-detail-header">
+  <section v-loading="publicationStore.loading" class="publication-page" :class="{ embedded: props.embedded }">
+    <header v-if="!props.embedded" class="publication-header workspace-page-header workspace-detail-header">
       <div class="workspace-detail-heading">
         <el-button
           v-if="config?.editable && permissionStore.hasPermission('feedback:questionnaire:edit')"
@@ -286,19 +306,19 @@ onBeforeUnmount(() => publicationStore.reset())
       </el-card>
 
       <el-card v-show="activeStep === 1" shadow="never">
-        <el-form :model="{ evaluationMode }" class="evaluation-mode" label-position="top">
-          <el-form-item label="本轮如何评价？">
+        <el-form ref="evaluationModeForm" :model="{ evaluationMode }" class="evaluation-mode" label-position="top">
+          <el-form-item label="本轮如何评价？" prop="evaluationMode" :rules="[{ required: true, message: '请选择评价方式', trigger: 'change' }]">
             <el-radio-group :model-value="evaluationMode" :disabled="!config.editable || !canManage || busy" @change="changeMode">
               <el-radio-button value="others">自评 + 他人评价</el-radio-button>
               <el-radio-button value="self">仅自评</el-radio-button>
             </el-radio-group>
           </el-form-item>
           <p v-if="evaluationMode === 'self'">例如：张三填写问卷评价自己的表现。张三既是被评价人，也是评价人，评价关系为“自评”。</p>
-          <p v-else>例如：李四作为上级评价张三。张三是被评价人，李四是评价人，“上级”是评价关系。</p>
+          <p v-else-if="evaluationMode === 'others'">例如：李四作为上级评价张三。张三是被评价人，李四是评价人，“上级”是评价关系。</p>
         </el-form>
         <el-alert v-if="evaluationMode === 'self'" title="每名被评价人只填写自己的问卷，无需分配其他评价人。下一步直接检查发布条件。" type="info" :closable="false" show-icon />
         <RelationConfigPanel
-          v-else
+          v-else-if="evaluationMode === 'others'"
           :relations="config.relations"
           :editable="config.editable && canManage && !busy"
           @update="publicationStore.updateRelation"
@@ -313,20 +333,17 @@ onBeforeUnmount(() => publicationStore.reset())
         <EvaluatorSelectionPanel
           v-else
           ref="evaluatorPanel"
+          :active="activeStep === 2"
           :summaries="workflow.targetSummaries"
           :assignment-issues="workflow.assignmentIssues"
           :targets="config.targets"
           :relations="config.relations"
           :selections="config.evaluatorSelections"
           :participants="participantDirectory"
-          :candidate-rows="publicationStore.candidateRows"
-          :candidate-total="publicationStore.candidateTotal"
-          :candidate-page-num="publicationStore.candidatePageNum"
-          :candidate-page-size="publicationStore.candidatePageSize"
-          :loading="publicationStore.candidatesLoading"
+          :load-departments="loadTargetDepartments"
+          :load-people="loadTargetPeople"
+          @remember-person="publicationStore.rememberParticipant"
           :editable="config.editable && canManage && !busy"
-          @search="loadCandidates({ pageNum: 1, keyword: $event })"
-          @page-change="loadCandidates({ pageNum: $event })"
           @set-evaluators="publicationStore.setEvaluatorIds"
         />
       </el-card>
@@ -377,6 +394,10 @@ onBeforeUnmount(() => publicationStore.reset())
 </template>
 
 <style scoped>
+.embedded.publication-page { width: 100%; min-width: 0; height: 100%; min-height: 0; max-width: none; margin: 0; padding: 0; box-sizing: border-box; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 16px; }
+.embedded .step-content { overflow: auto; min-height: 0; }
+.embedded .action-bar { position: static; margin: 0; }
+
 .publication-page { display: flex; flex-direction: column; gap: 24px; max-width: 1440px; margin: auto; padding-top: 12px; min-height: calc(100dvh - 110px); }
 .publication-header { flex-wrap: nowrap; gap: 12px; min-height: 54px; padding: 10px 14px; }
 .publication-header .workspace-detail-heading { flex: 1; }

@@ -24,7 +24,6 @@ export function getQuestionnaireWorkflow(draft) {
   const unbound = questions.filter(question => question.isScored && !boundCodes.has(question.questionCode))
   if (unbound.length) indicatorIssues.push(`还有${unbound.length}道计分题未绑定指标`)
   for (const indicator of indicators) {
-    if (Number(indicator.weight) <= 0) continue
     const boundQuestions = questions.filter(question => indicator.questionCodes.includes(question.questionCode))
     if (compareDecimals(calculateRawMaxScore({ pages: [{ questions: boundQuestions }] }), 0) <= 0) {
       indicatorIssues.push(`“${indicator.indicatorName || '未命名指标'}”需要绑定有效计分题`)

@@ -115,6 +115,7 @@ export function validateQuestionnaireDraft(draft) {
   const boundQuestionCodes = new Set()
   indicators.forEach(indicator => {
     if (!indicator.indicatorName?.trim()) errors.push('请填写所有指标名称')
+    if (indicator.weight == null || indicator.weight === '') errors.push('请填写所有指标权重')
     try {
       if (compareDecimals(indicator.weight, 0) < 0 || compareDecimals(indicator.weight, 100) > 0) {
         errors.push(`“${indicator.indicatorName || '未命名指标'}”：权重必须在0至100之间`)

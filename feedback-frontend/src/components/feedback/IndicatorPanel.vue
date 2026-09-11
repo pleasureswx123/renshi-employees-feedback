@@ -7,12 +7,25 @@ import { computed } from 'vue'
 import { DECIMAL_FACTOR, decimalToNumber, normalizeDecimal, sumDecimals, toScaledInteger } from '@/utils/fixedDecimal'
 import { getQuestionTypeDefinition } from './questions/questionTypeRegistry'
 
+const forms = new Map()
+async function validate() {
+  const results = await Promise.all([...forms.values()].map(form => form.validate().catch(() => false)))
+  return results.every(Boolean)
+}
+defineExpose({ validate })
 const props = defineProps({
+  showAdd: { type: Boolean, default: true },
+  activeCode: { type: String, default: '' },
   indicators: { type: Array, required: true },
   questions: { type: Array, required: true },
   pages: { type: Array, default: () => [] }
 })
-const emit = defineEmits(['add', 'change', 'delete', 'move', 'set-bindings', 'set-question-indicator', 'locate-question'])
+const emit = defineEmits(['select', 'add', 'change', 'delete', 'move', 'set-bindings', 'set-question-indicator', 'locate-question'])
+function changeBindings(indicator, codes) {
+  const previewCode = codes.find(code => !indicator.questionCodes.includes(code)) || codes[0]
+  emit('set-bindings', indicator.indicatorCode, codes)
+  if (previewCode) emit('locate-question', previewCode)
+}
 const questionNumbers = computed(() => new Map(
   (props.pages.length ? props.pages.flatMap(page => page.questions) : props.questions)
     .map((question, index) => [question.questionCode, index + 1])
@@ -25,7 +38,7 @@ const unboundQuestions = computed(() => {
     question, number: ++number, pageNumber: pageIndex + 1, pageTitle: page.pageTitle
   }))).filter(({ question }) => question.isScored && question.questionType !== 'TEXT' && !boundCodes.has(question.questionCode))
 })
-const totalWeight = computed(() => sumDecimals(props.indicators.map(indicator => indicator.weight)))
+const totalWeight = computed(() => sumDecimals(props.indicators.map(indicator => indicator.weight ?? 0)))
 const weightState = computed(() => {
   const total = toScaledInteger(totalWeight.value)
   const target = 100 * DECIMAL_FACTOR
@@ -60,7 +73,7 @@ const weightState = computed(() => {
           </div>
         </el-popover>
       </div>
-      <el-button type="primary" plain size="small" @click="emit('add')">增加指标</el-button>
+      <el-button v-if="showAdd" type="primary" plain size="small" @click="emit('add')">增加指标</el-button>
     </div>
     <p class="indicator-hint">指标是评价的方面，如能力、协作；权重决定它占总分多少。</p>
     <el-alert
@@ -77,7 +90,7 @@ const weightState = computed(() => {
       </template>
     </el-alert>
     <el-empty v-if="!indicators.length" description="尚未配置评价指标" :image-size="72" />
-    <article v-for="(indicator, index) in indicators" :key="indicator.indicatorCode" class="indicator-card">
+    <article v-for="(indicator, index) in indicators" :key="indicator.indicatorCode" class="indicator-card" :class="{ selected: activeCode === indicator.indicatorCode }" @focusin="emit('select', indicator.indicatorCode)" @click="emit('select', indicator.indicatorCode)">
       <div class="indicator-card-heading">
         <strong>指标 {{ index + 1 }}</strong>
         <div class="indicator-actions" role="group" :aria-label="`指标 ${index + 1} 操作`">
@@ -92,23 +105,23 @@ const weightState = computed(() => {
           </el-tooltip>
         </div>
       </div>
-      <el-form :model="indicator" label-position="top" size="small">
+      <el-form :ref="form => form ? forms.set(indicator.indicatorCode, form) : forms.delete(indicator.indicatorCode)" :model="indicator" label-position="top" size="small">
         <div class="indicator-form-row">
-          <el-form-item label="指标名称" required>
+          <el-form-item label="指标名称" prop="indicatorName" :rules="[{ required: true, whitespace: true, message: '请填写指标名称', trigger: 'blur' }]">
             <el-input
               :model-value="indicator.indicatorName"
               maxlength="100"
               @input="emit('change', indicator.indicatorCode, { indicatorName: $event })"
             />
           </el-form-item>
-          <el-form-item label="权重（%）" required>
+          <el-form-item label="权重（%）" prop="weight" :rules="[{ required: true, message: '请填写权重', trigger: 'change' }]">
             <!-- 显示不补零，变更时仍通过统一定点工具规范为四位精度。 -->
             <el-input-number
-              :model-value="decimalToNumber(indicator.weight)"
+              :model-value="indicator.weight == null ? undefined : decimalToNumber(indicator.weight)"
               :min="0"
               :max="100"
               controls-position="right"
-              @change="emit('change', indicator.indicatorCode, { weight: normalizeDecimal($event ?? 0) })"
+              @change="emit('change', indicator.indicatorCode, { weight: $event == null ? null : normalizeDecimal($event) })"
             />
           </el-form-item>
         </div>
@@ -122,7 +135,7 @@ const weightState = computed(() => {
             @input="emit('change', indicator.indicatorCode, { description: $event })"
           />
         </el-form-item>
-        <el-form-item label="绑定计分题">
+        <el-form-item label="绑定计分题" prop="questionCodes" :rules="[{ type: 'array', required: true, min: 1, message: '请至少绑定一道计分题', trigger: 'change' }]">
           <el-select
             :model-value="indicator.questionCodes"
             multiple
@@ -131,7 +144,7 @@ const weightState = computed(() => {
             collapse-tags-tooltip
             :max-collapse-tags="10"
             placeholder="选择该指标包含的计分题"
-            @change="emit('set-bindings', indicator.indicatorCode, $event)"
+            @change="changeBindings(indicator, $event)"
           >
             <el-option
               v-for="question in questions"
@@ -214,7 +227,7 @@ const weightState = computed(() => {
 .unbound-item:deep(.el-form-item) { margin: 0; }
 .binding-complete { margin: 0; color: var(--el-color-success-dark-2); font-size: 12px; }
 .indicator-card { min-width: 0; padding: 10px 12px 12px; border: 1px solid var(--fb-border, #e5e7eb); border-radius: 8px; background: var(--fb-surface, #fff); }
-.indicator-card:focus-within { border-color: var(--el-color-primary-light-5); }
+.indicator-card.selected, .indicator-card:focus-within { border-color: var(--el-color-primary-light-5); }
 .indicator-card-heading { margin-bottom: 10px; padding-bottom: 7px; border-bottom: 1px solid var(--fb-border, #f0f2f5); }
 .indicator-card-heading strong { color: var(--fb-text-regular, #475569); font-size: 12px; font-weight: 600; }
 .indicator-actions { display: flex; flex: none; align-items: center; gap: 2px; }

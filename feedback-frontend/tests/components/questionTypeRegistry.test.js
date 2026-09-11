@@ -64,12 +64,12 @@ describe('五题型注册表', () => {
     expect(definition.validate(existing)).toEqual([])
   })
 
-  it('单选题默认每项1分，缺省分值为1，已有0分拒绝保存但不自动改写', () => {
+  it('单选题默认每项2分，缺省分值为2，已有0分拒绝保存但不自动改写', () => {
     const definition = getQuestionTypeDefinition('SINGLE_CHOICE')
     const question = { ...definition.createDefault(), title: '协作表现' }
-    expect(question.options.map(option => option.score)).toEqual(['1.0000', '1.0000'])
+    expect(question.options.map(option => option.score)).toEqual(['2.0000', '2.0000'])
     delete question.options[0].score
-    expect(definition.normalize(question).options[0].score).toBe('1.0000')
+    expect(definition.normalize(question).options[0].score).toBe('2.0000')
     question.options[0].score = '0.0000'
     expect(definition.validate(question)).toContain('选项分值必须大于等于1')
     expect(definition.normalize(question).options[0].score).toBe('0.0000')
@@ -88,7 +88,7 @@ describe('五题型注册表', () => {
 
   it('精确计算五题型原始满分，并保持问答题不计分', () => {
     const draft = draftWithAllTypes()
-    expect(calculateRawMaxScore(draft)).toBe('116.0000')
+    expect(calculateRawMaxScore(draft)).toBe('117.0000')
     const textQuestion = draft.pages[0].questions.at(-1)
     expect(textQuestion.isScored).toBe(false)
     expect(textQuestion.minScore).toBeNull()

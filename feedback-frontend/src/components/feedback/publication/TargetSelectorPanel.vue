@@ -4,6 +4,10 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 const props = defineProps({
   selectedTargets: { type: Array, default: () => [] },
   canBrowse: Boolean, editable: Boolean,
+  showHeading: { type: Boolean, default: true },
+  selectedLabel: { type: String, default: '已选被评价人' },
+  excludedIds: { type: Array, default: () => [] },
+  allowDepartment: Boolean,
   loadDepartments: { type: Function, required: true },
   loadPeople: { type: Function, required: true }
 })
@@ -14,6 +18,7 @@ const searchTerm = ref('')
 const selectedKeyword = ref('')
 const revision = ref(0)
 const loading = ref(false)
+const departmentLoading = ref(false)
 const error = ref('')
 const departments = ref([])
 const expandedDepartmentKeys = computed(() => searchTerm.value ? [] : departments.value
@@ -27,8 +32,9 @@ const filteredTargets = computed(() => props.selectedTargets.filter(person =>
   `${person.nickName} ${person.userName || ''} ${person.deptName || ''}`.toLowerCase().includes(selectedKeyword.value.trim().toLowerCase())))
 const treeProps = {
   label: 'label', isLeaf: data => data.kind !== 'department',
-  disabled: data => !props.editable || data.kind !== 'person' || selectedIds.value.has(data.person.userId)
+  disabled: data => !props.editable || departmentLoading.value || data.kind !== 'person' || !canSelect(data.person)
 }
+const canSelect = person => person.available !== false && !props.excludedIds.includes(person.userId) && !selectedIds.value.has(person.userId)
 const departmentNode = dept => ({ ...dept, key: `dept-${dept.deptId}`, kind: 'department' })
 async function peoplePage(deptId, pageNum, term = '') {
   const params = { pageNum, pageSize: 50 }
@@ -95,16 +101,56 @@ function search(event) {
   revision.value += 1
 }
 function checkPeople() {
-  checkedPeople.value = (tree.value?.getCheckedNodes() || []).filter(node => node.kind === 'person' && !selectedIds.value.has(node.person.userId)).map(node => node.person)
+  checkedPeople.value = (tree.value?.getCheckedNodes() || []).filter(node => node.kind === 'person' && canSelect(node.person)).map(node => node.person)
 }
 function addChecked() {
-  if (!props.editable) return
+  if (!props.editable || departmentLoading.value) return
   for (const person of checkedPeople.value) if (!selectedIds.value.has(person.userId)) emit('add', person)
   tree.value?.setCheckedKeys([])
   checkedPeople.value = []
 }
+async function addDepartment(dept) {
+  if (!props.editable || !props.canBrowse || departmentLoading.value) return
+  const current = revision.value
+  departmentLoading.value = true
+  error.value = ''
+  try {
+    // 按部门逐页读取完整人员集合；包含下级部门，全部成功后才更新选择。
+    const ids = new Set([dept.deptId])
+    if (dept.deptId !== 0) {
+      let changed = true
+      while (changed) {
+        changed = false
+        for (const child of departments.value) {
+          if (child.deptId !== 0 && ids.has(child.parentId) && !ids.has(child.deptId)) {
+            ids.add(child.deptId)
+            changed = true
+          }
+        }
+      }
+    }
+    const people = new Map()
+    for (const deptId of ids) {
+      let pageNum = 1
+      let total = 0
+      do {
+        const response = await props.loadPeople({ pageNum, pageSize: 50, ...(deptId === 0 ? { unassigned: true } : { deptId }) })
+        if (current !== revision.value || !props.editable) return
+        const rows = response.rows || []
+        total = Number(response.total || 0)
+        if (!rows.length && (pageNum - 1) * 50 < total) throw new Error('部门人员未加载完整，请重试')
+        for (const person of rows) if (canSelect(person)) people.set(person.userId, person)
+        pageNum += 1
+      } while ((pageNum - 1) * 50 < total)
+    }
+    if (current !== revision.value || !props.editable) return
+    for (const person of people.values()) emit('add', person)
+  } catch (failure) {
+    if (current === revision.value) error.value = failure?.message || '部门人员加载失败，请重试'
+  } finally { departmentLoading.value = false }
+}
 function removeChecked() {
-  if (!props.editable) return
+  if (!props.editable || departmentLoading.value) return
   for (const person of checkedSelected.value) if (selectedIds.value.has(person.userId)) emit('remove', person.userId)
   checkedSelected.value = []
 }
@@ -114,8 +160,8 @@ onBeforeUnmount(() => { revision.value += 1 })
 </script>
 
 <template>
-  <section class="selector-panel">
-    <div class="section-heading"><div><h2>3. 评价谁</h2><p>展开部门勾选员工，添加到右侧作为本轮被评价人。</p></div><el-tag type="info" size="small">已选 {{ selectedTargets.length }} 人</el-tag></div>
+  <section :class="showHeading ? 'selector-panel' : 'evaluator-transfer'">
+    <div v-if="showHeading" class="section-heading"><div><h2>3. 评价谁</h2><p>展开部门勾选员工，添加到右侧作为本轮被评价人。</p></div><el-tag type="info" size="small">已选 {{ selectedTargets.length }} 人</el-tag></div>
     <div class="target-transfer">
       <div class="list-column source-column">
         <div class="column-heading"><strong>组织与人员</strong><span>已勾选 {{ checkedPeople.length }} 人</span></div>
@@ -127,24 +173,24 @@ onBeforeUnmount(() => { revision.value += 1 })
         <div v-loading="loading" class="tree-scroll">
           <el-tree :key="revision" ref="tree" node-key="key" :props="treeProps" :load="loadTree" :default-expanded-keys="expandedDepartmentKeys" lazy show-checkbox check-strictly empty-text="暂无可选人员" @check="checkPeople">
             <template #default="{ data, node }">
-              <span v-if="data.kind === 'department'" class="department-node" :title="data.label">{{ data.label }}</span>
+              <span v-if="data.kind === 'department'" class="department-node" :title="data.label">{{ data.label }}<el-button v-if="allowDepartment && editable" link type="primary" size="small" :disabled="departmentLoading" :aria-label="`添加${data.label}全部人员`" @click.stop="addDepartment(data)">添加整部门</el-button></span>
               <el-button v-else-if="data.kind === 'more'" link type="primary" size="small" class="more-node" :loading="loadingMore.has(data.key)" @click.stop="loadMore(data, node)">加载更多</el-button>
               <span v-else class="person-node" :title="`${data.label} · ${data.person.userName || ''} · ${data.person.deptName || '未分配部门'}`"><span>{{ data.label }}</span><small>{{ data.person.deptName || '未分配部门' }}</small><small v-if="selectedIds.has(data.person.userId)">已选</small></span>
             </template>
           </el-tree>
         </div>
-        <p class="selection-note">勾选员工后点击添加；搜索留空可返回组织架构。</p>
+        <p class="selection-note">勾选员工后点击添加；搜索留空可返回组织架构。<template v-if="allowDepartment">添加整部门包含下级部门，自动排除本人及已选人员。</template></p>
       </div>
       <div v-if="editable" class="transfer-actions">
-        <el-button type="primary" size="small" :disabled="!checkedPeople.length" aria-label="添加选中人员" @click="addChecked">添加 →</el-button>
-        <el-button size="small" :disabled="!checkedSelected.length" aria-label="移除选中人员" @click="removeChecked">← 移除</el-button>
+        <el-button type="primary" size="small" :loading="departmentLoading" :disabled="!checkedPeople.length || departmentLoading" aria-label="添加选中人员" @click="addChecked">添加 →</el-button>
+        <el-button size="small" :disabled="!checkedSelected.length || departmentLoading" aria-label="移除选中人员" @click="removeChecked">← 移除</el-button>
       </div>
       <div class="list-column selected-column">
-        <div class="column-heading"><strong>已选被评价人</strong><span>{{ selectedTargets.length }} 人</span></div>
+        <div class="column-heading"><strong>{{ selectedLabel }}</strong><span>{{ selectedTargets.length }} 人</span></div>
         <el-input v-model="selectedKeyword" size="small" clearable placeholder="搜索已选人员" aria-label="搜索已选人员" />
         <el-table :data="filteredTargets" row-key="userId" size="small" height="380" empty-text="暂无人员，请从左侧勾选并添加" @selection-change="checkedSelected = $event">
           <el-table-column v-if="editable" type="selection" width="36" />
-          <el-table-column prop="nickName" label="姓名" min-width="90" show-overflow-tooltip />
+          <el-table-column prop="nickName" label="姓名" min-width="90" show-overflow-tooltip><template #default="{ row }">{{ row.nickName || row.userName }}{{ row.available === false ? '（失效）' : '' }}</template></el-table-column>
           <el-table-column prop="deptName" label="部门" min-width="100" show-overflow-tooltip><template #default="{ row }">{{ row.deptName || '未分配部门' }}</template></el-table-column>
           <el-table-column v-if="editable" label="操作" width="56"><template #default="{ row }"><el-button type="danger" link size="small" :aria-label="`移除${row.nickName}`" @click="emit('remove', row.userId)">移除</el-button></template></el-table-column>
         </el-table>
@@ -154,7 +200,7 @@ onBeforeUnmount(() => { revision.value += 1 })
 </template>
 
 <style scoped>
-.selector-panel { display: grid; gap: 16px; }
+.selector-panel, .evaluator-transfer { display: grid; gap: 16px; }
 .section-heading, .column-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .section-heading h2, .section-heading p { margin: 0; }
 .section-heading h2 { font-size: 18px; }
@@ -172,7 +218,7 @@ onBeforeUnmount(() => { revision.value += 1 })
 .tree-scroll :deep(.el-tree-node__content) { height: 34px; }
 .tree-scroll :deep(.el-tree-node__content:has(.department-node) > .el-checkbox), .tree-scroll :deep(.el-tree-node__content:has(.more-node) > .el-checkbox) { display: none; }
 .department-node, .person-node { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.department-node { font-weight: 500; }
+.department-node { font-weight: 500; display: flex; align-items: center; gap: 12px; }
 .person-node { display: flex; gap: 8px; flex: 1; }
 .person-node small { overflow: hidden; text-overflow: ellipsis; color: var(--fb-text-muted, #64748b); }
 .transfer-actions { display: flex; flex-direction: column; justify-content: center; gap: 12px; }

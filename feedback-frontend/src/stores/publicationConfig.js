@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { acceptHMRUpdate, defineStore } from 'pinia'
 
 import {
   getPublicationConfig,
@@ -52,6 +52,9 @@ export const usePublicationConfigStore = defineStore('publicationConfig', {
     }
   },
   actions: {
+    rememberParticipant(person) {
+      if (this.config?.editable) upsertParticipant(this.config.configuredParticipants, person)
+    },
     async load(projectId) {
       if (this.loading) return
       this.loading = true
@@ -221,3 +224,8 @@ export const usePublicationConfigStore = defineStore('publicationConfig', {
     }
   }
 })
+
+// 开发期间更新动作时保留当前未保存配置，同时替换已有 Store 实例的方法。
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(usePublicationConfigStore, import.meta.hot))
+}

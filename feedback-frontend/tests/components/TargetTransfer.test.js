@@ -13,6 +13,51 @@ function open(extra = {}) {
   return { loadDepartments, loadPeople }
 }
 describe('组织树选人穿梭框', () => {
+  it('整部门读取所有分页与下级部门，排除本人、失效和重复人员', async () => {
+    const colleague = { ...person, userId: 21, nickName: '李四' }
+    const child = { ...person, userId: 22, nickName: '王五' }
+    const loadPeople = vi.fn().mockImplementation(async ({ deptId, pageNum }) => {
+      if (deptId === 3) return { rows: [child, colleague], total: 2 }
+      return pageNum === 1 ? { rows: [person, colleague, { ...person, userId: 99, available: false }], total: 51 } : { rows: [colleague], total: 51 }
+    })
+    open({ allowDepartment: true, excludedIds: [person.userId], loadPeople,
+      loadDepartments: async () => [{ deptId: 2, parentId: 0, label: '研发部', directCount: 0 }, { deptId: 3, parentId: 2, label: '研发组', directCount: 0 }] })
+    await flushPromises()
+    await wrapper.get('[aria-label="添加研发部全部人员"]').trigger('click')
+    await flushPromises()
+    expect(loadPeople).toHaveBeenCalledWith({ deptId: 2, pageNum: 2, pageSize: 50 })
+    expect(loadPeople).toHaveBeenCalledWith({ deptId: 3, pageNum: 1, pageSize: 50 })
+    expect(wrapper.emitted('add')).toEqual([[colleague], [child]])
+  })
+
+  it('整部门后续页失败时不添加部分人员，允许重试', async () => {
+    const loadPeople = vi.fn().mockResolvedValueOnce({ rows: [person], total: 51 }).mockRejectedValueOnce(new Error('读取失败'))
+    open({ allowDepartment: true, loadPeople })
+    await flushPromises()
+    await wrapper.get('[aria-label="添加研发部全部人员"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.emitted('add')).toBeUndefined()
+    expect(wrapper.get('[role="alert"]').text()).toContain('读取失败')
+    loadPeople.mockResolvedValue({ rows: [person], total: 1 })
+    await wrapper.get('[aria-label="添加研发部全部人员"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.emitted('add')).toEqual([[person]])
+  })
+
+  it('整部门加载期间重复点击不重复请求，卸载后忽略迟到结果', async () => {
+    let finish
+    const loadPeople = vi.fn(() => new Promise(resolve => { finish = resolve }))
+    open({ allowDepartment: true, loadPeople })
+    await flushPromises()
+    await wrapper.get('[aria-label="添加研发部全部人员"]').trigger('click')
+    await wrapper.get('[aria-label="添加研发部全部人员"]').trigger('click')
+    expect(loadPeople).toHaveBeenCalledOnce()
+    wrapper.unmount()
+    finish({ rows: [person], total: 1 })
+    await flushPromises()
+    expect(wrapper.emitted('add')).toBeUndefined()
+  })
+
   it('默认展开公司层级展示部门，部门人员仍按需加载', async () => {
     const loadDepartments = vi.fn().mockResolvedValue([
       { deptId: 1, parentId: 0, label: '总公司', directCount: 0 },

@@ -219,8 +219,6 @@ def get_publish_validation_issues(draft: Any) -> list[dict[str, str]]:
 
     question_by_code = {question.question_code: question for _, _, question in question_entries}
     for indicator_index, indicator in enumerate(draft.indicators):
-        if indicator.weight <= 0:
-            continue
         scored_max = sum(
             (
                 calculate_question_max_score(question_by_code[code])
@@ -234,7 +232,7 @@ def get_publish_validation_issues(draft: Any) -> list[dict[str, str]]:
                 {
                     'code': 'INDICATOR_SCORED_QUESTION_REQUIRED',
                     'path': f'indicators.{indicator_index}.questionCodes',
-                    'message': f'权重大于0的指标“{indicator.indicator_name}”至少需要一道满分大于0的计分题',
+                    'message': f'指标“{indicator.indicator_name}”至少需要一道满分大于0的计分题',
                 }
             )
     return issues

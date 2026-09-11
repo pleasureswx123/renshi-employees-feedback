@@ -62,19 +62,19 @@ const routes = [
       {
         path: 'projects/:projectId/editor',
         name: 'hr-questionnaire-editor',
-        component: () => import('@/views/hr/QuestionnaireEditorView.vue'),
+        component: () => import('@/views/hr/ProjectConfigurationView.vue'),
         meta: {
-          title: '问卷编辑器',
+          title: '项目配置',
           activeMenu: '/hr/projects',
           defaultSidebarCollapsed: true,
           workspace: 'hr',
-          permissions: ['feedback:questionnaire:edit']
+          permissions: ['feedback:questionnaire:edit', 'feedback:participant:manage', 'feedback:project:publish']
         }
       },
       {
         path: 'projects/:projectId/publication',
         name: 'hr-publication-config',
-        component: () => import('@/views/hr/PublicationConfigView.vue'),
+        redirect: to => ({ path: `/hr/projects/${to.params.projectId}/editor`, query: { ...to.query, step: to.query.step || '3' } }),
         meta: {
           title: '人员关系与发布',
           activeMenu: '/hr/projects',

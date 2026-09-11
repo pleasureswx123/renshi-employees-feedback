@@ -49,7 +49,7 @@ function normalizeOption(option, index) {
     optionId: option?.optionId ?? null,
     optionCode: option?.optionCode || createStableCode('O'),
     optionLabel: option?.optionLabel ?? `选项${index + 1}`,
-    score: decimal(option?.score, 1),
+    score: decimal(option?.score, 2),
     requiresReason: Boolean(option?.requiresReason),
     sortOrder: index + 1
   }
@@ -68,8 +68,8 @@ function normalizeSingleChoice(question = {}) {
   const sourceOptions = question.options?.length
     ? question.options
     : [
-        { optionLabel: '选项1', score: 1 },
-        { optionLabel: '选项2', score: 1 }
+        { optionLabel: '选项1', score: 2 },
+        { optionLabel: '选项2', score: 2 }
       ]
   return {
     ...commonQuestion(question, { questionType: 'SINGLE_CHOICE', title: '新的单选题' }),
